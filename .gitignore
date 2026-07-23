@@ -20,9 +20,12 @@ out/
 # WhatsApp session credentials
 auth_info_baileys/
 
-# Per-tenant instances (secrets + WhatsApp sessions) — never commit
-apps/backend/tenants/
-tenants/
+# Per-tenant instances (secrets + WhatsApp sessions) — never commit.
+# NOTE: anchored with a leading slash so it only matches these runtime instance
+# dirs — a bare `tenants/` also matched `apps/backend/src/tenants/` (real source),
+# which silently kept the multi-tenant code out of the repo and broke the build.
+/apps/backend/tenants/
+/tenants/
 
 # Per-tenant / backup AI configs (runtime data, not source) — keep only the shared ai-config.json
 apps/backend/config/ai-config.*.json
