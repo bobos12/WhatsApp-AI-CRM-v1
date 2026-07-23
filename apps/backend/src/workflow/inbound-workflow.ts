@@ -5,7 +5,7 @@ import { MsgStatus, MessageType } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { normalizePhone, parseWhatsAppJid, isGroupJid } from '../lib/phone';
 import { logger } from '../lib/logger';
-import { sock } from '../whatsapp/client';
+import { getSock } from '../whatsapp/client';
 import { emitRealtime } from '../realtime/socket';
 import { getOrCreateConversationByPhone } from '../conversations/conversation-resolver';
 import { checkAutomationRules } from '../automations/engine';
@@ -171,6 +171,7 @@ async function downloadMediaToUrl(message: any) {
             error: () => undefined,
           } as any,
           reuploadRequest: async (msg: any) => {
+            const sock = getSock();
             if (sock?.updateMediaMessage) {
               return await sock.updateMediaMessage(msg);
             }

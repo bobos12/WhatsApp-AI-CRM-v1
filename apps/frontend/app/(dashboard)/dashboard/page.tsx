@@ -10,11 +10,10 @@ import { cn } from '../../../lib/utils';
 import { api } from '../../../lib/api';
 import { useSocket } from '../../../hooks/useSocket';
 import KpiCards from '../../../components/dashboard/donezo/KpiCards';
-import SessionStatusWidget from '../../../components/dashboard/SessionStatusWidget';
+import ConnectionStrip from '../../../components/dashboard/ConnectionStrip';
 import Reminders from '../../../components/dashboard/donezo/Reminders';
 import AgentCollaboration from '../../../components/dashboard/donezo/AgentCollaboration';
-import ProgressGauge from '../../../components/dashboard/donezo/ProgressGauge';
-import UptimeTracker from '../../../components/dashboard/donezo/UptimeTracker';
+import PipelineWidget, { type PipelineStats } from '../../../components/dashboard/PipelineWidget';
 import RecentConversations from '../../../components/dashboard/RecentConversations';
 
 const GLASS = 'rounded-[20px] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-[0_2px_20px_rgba(0,0,0,0.05)] dark:bg-[#182229] dark:border-transparent dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]';
@@ -44,14 +43,6 @@ interface AgentStat {
   openConversations: number;
   resolvedConversations: number;
   avgFirstResponseMin: number | null;
-}
-
-interface PipelineStats {
-  stages: { stage: string; count: number; value: number }[];
-  totalDeals: number;
-  totalValue: number;
-  closedDeals: number;
-  conversionRate: number;
 }
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD'];
@@ -116,6 +107,9 @@ export default function DashboardPage() {
   const [messagesData, setMessagesData] = useState<any[] | null>(null);
   const [agentStats, setAgentStats] = useState<AgentStat[] | null>(null);
   const [pipelineStats, setPipelineStats] = useState<PipelineStats | null>(null);
+  // Separate from `pipelineStats` being non-null: an empty pipeline is a real
+  // answer the widget renders, not a reason to keep showing a skeleton forever.
+  const [pipelineLoaded, setPipelineLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const role = (session?.user as any)?.role ?? 'AGENT';
@@ -123,7 +117,7 @@ export default function DashboardPage() {
 
   // Each section loads independently and reveals as soon as ITS data lands —
   // the page never blocks on the slowest endpoint. Note: /api/whatsapp/status
-  // is NOT fetched here; SessionStatusWidget owns that call.
+  // is NOT fetched here; ConnectionStrip owns that call.
   const fetchData = useCallback(() => {
     setError(null);
     void api.get('/api/analytics/overview')
@@ -141,7 +135,8 @@ export default function DashboardPage() {
       .catch(() => setAgentStats([]));
     void api.get('/api/analytics/pipeline')
       .then((data) => setPipelineStats(data?.totalDeals !== undefined ? data : null))
-      .catch(() => setPipelineStats(null));
+      .catch(() => setPipelineStats(null))
+      .finally(() => setPipelineLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -171,17 +166,6 @@ export default function DashboardPage() {
   useSocket('conversation:updated', onConversationUpdated);
 
   const statsLoaded = agentStats !== null;
-  const totalResolved = (agentStats ?? []).reduce((s, a) => s + a.resolvedConversations, 0);
-  const totalOpen = (agentStats ?? []).reduce((s, a) => s + a.openConversations, 0);
-  let gaugePercent = 0;
-  if (totalResolved + totalOpen > 0) gaugePercent = (totalResolved / (totalResolved + totalOpen)) * 100;
-  else if (pipelineStats && pipelineStats.totalDeals > 0) gaugePercent = pipelineStats.conversionRate;
-
-  const gaugeLegend = [
-    { label: t('collab.completed'), swatch: 'bg-[#16A34A] dark:bg-[#25D366]' },
-    { label: t('collab.inProgress'), swatch: 'bg-[#8ad3ab] dark:bg-[#1fa85a]' },
-    { label: t('collab.pending'), swatch: 'dz-hatch border border-gray-300 dark:border-white/20' },
-  ];
 
   return (
     <div className="relative space-y-4">
@@ -244,6 +228,11 @@ export default function DashboardPage() {
           </button>
         </div>
       )}
+
+      {/* ── Which line are we sending from ───────────────────────────────── */}
+      {/* Above the KPIs and outside the hero, because the hero is sm+ only and a
+          phone is exactly where "am I still connected, and as whom?" gets asked. */}
+      <ConnectionStrip />
 
       {/* ── Mobile Quick Actions (tablet only: sm → lg) ──────────────────── */}
       <div className="hidden sm:grid sm:grid-cols-4 gap-2 lg:hidden">
@@ -339,40 +328,32 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Dashboard grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
 
-        {/* Row 1 — Chart (primary) + Session widget */}
-        <div className="lg:col-span-8">
+        {/* Row 1 — Message volume (primary) + what needs a reply */}
+        <div className="md:col-span-12 lg:col-span-8">
           {messagesData !== null
             ? <div className="section-reveal"><MessagesChart data={messagesData} /></div>
             : <ChartSkeleton />}
         </div>
-        <div className="lg:col-span-4">
-          <SessionStatusWidget />
-        </div>
-
-        {/* Row 2 — Reminders + Agent leaderboard + Recent conversations */}
-        <div className="lg:col-span-3">
+        <div className="md:col-span-12 lg:col-span-4">
           <Reminders openCount={overview?.openConversations ?? 0} />
         </div>
-        <div className="lg:col-span-5">
+
+        {/* Row 2 — Three equal columns: money, people, conversations. Each is a
+            different question an operator asks, so none of them nests. */}
+        <div className="md:col-span-6 lg:col-span-4">
+          {pipelineLoaded
+            ? <div className="section-reveal h-full"><PipelineWidget stats={pipelineStats} /></div>
+            : <div className="skeleton h-72 rounded-[20px]" aria-hidden="true" />}
+        </div>
+        <div className="md:col-span-6 lg:col-span-4">
           {statsLoaded
             ? <div className="section-reveal h-full"><AgentCollaboration agents={agentStats ?? []} isAdmin={isAdmin} /></div>
-            : <div className="skeleton h-64 rounded-[20px]" aria-hidden="true" />}
+            : <div className="skeleton h-72 rounded-[20px]" aria-hidden="true" />}
         </div>
-        <div className="lg:col-span-4">
+        <div className="md:col-span-12 lg:col-span-4">
           <RecentConversations />
-        </div>
-
-        {/* Row 3 — Resolution gauge + Uptime tracker */}
-        {/* Resolution gauge is hidden on phones (shown from md / tablets up) */}
-        <div className="hidden md:block lg:col-span-8">
-          {statsLoaded
-            ? <div className="section-reveal h-full"><ProgressGauge percent={gaugePercent} caption={t('progress.caption')} legend={gaugeLegend} /></div>
-            : <div className="skeleton h-52 rounded-[20px]" aria-hidden="true" />}
-        </div>
-        <div className="lg:col-span-4">
-          <UptimeTracker />
         </div>
 
       </div>

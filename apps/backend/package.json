@@ -16,7 +16,7 @@
     "@aws-sdk/client-s3": "^3.1075.0",
     "@crm/messaging-schema": "*",
     "@prisma/client": "^5.0.0",
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.0",
     "cors": "^2.8.5",

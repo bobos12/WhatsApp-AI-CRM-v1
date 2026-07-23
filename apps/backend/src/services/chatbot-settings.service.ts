@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../lib/prisma';
+import { runAsPlatform } from '../lib/tenant-context';
 import { logger } from '../lib/logger';
 
 export interface ChatbotSettings {
@@ -214,7 +215,12 @@ class ChatbotSettingsService {
    */
   async init(): Promise<void> {
     try {
-      const row = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
+      // Shared AI credentials live in a single platform-level Setting row
+      // (tenantId = null): the operator supplies the API keys for every tenant.
+      // Per-customer bot behaviour/persona is per-tenant and lives in AiConfig.
+      const row = await runAsPlatform(async () => {
+        return await prisma.setting.findFirst({ where: { key: SETTING_KEY, tenantId: null } });
+      });
       if (row) {
         this.cache = { ...DEFAULTS, ...(row.value as Partial<ChatbotSettings>) };
         return;
@@ -266,10 +272,19 @@ class ChatbotSettingsService {
   }
 
   private async saveToDb(settings: ChatbotSettings): Promise<void> {
-    await prisma.setting.upsert({
-      where: { key: SETTING_KEY },
-      create: { key: SETTING_KEY, value: settings as any },
-      update: { value: settings as any },
+    // Upsert the single shared (tenantId = null) row in platform scope. Done as
+    // find-then-write because the (tenantId, key) unique locator can't be keyed
+    // by a null tenantId through findUnique/upsert.
+    await runAsPlatform(async () => {
+      const existing = await prisma.setting.findFirst({
+        where: { key: SETTING_KEY, tenantId: null },
+        select: { id: true },
+      });
+      if (existing) {
+        await prisma.setting.update({ where: { id: existing.id }, data: { value: settings as any } });
+      } else {
+        await prisma.setting.create({ data: { key: SETTING_KEY, tenantId: null, value: settings as any } });
+      }
     });
   }
 

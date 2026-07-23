@@ -1,10 +1,10 @@
 import {
   connectToWhatsApp,
   disconnectWhatsApp,
-  sock,
-  waStatus,
-  currentQR,
-  lastConnectionError,
+  getSock,
+  getWaStatus,
+  getCurrentQR,
+  getLastError,
   getWhatsAppProfilePictureUrl,
 } from '../whatsapp/client';
 import { sendMessage as baileysSend } from '../whatsapp/sender';
@@ -23,6 +23,7 @@ export class BaileysProvider implements MessagingProvider {
   }
 
   getStatus(): ProviderStatus {
+    const sock = getSock();
     const userId = sock?.user?.id as string | undefined;
     const numberPart = userId?.split('@')[0]?.split(':')[0];
     const connectedPhone = numberPart
@@ -30,10 +31,10 @@ export class BaileysProvider implements MessagingProvider {
       : null;
 
     return {
-      status: waStatus,
-      qr: currentQR,
+      status: getWaStatus(),
+      qr: getCurrentQR(),
       connectedPhone,
-      error: lastConnectionError,
+      error: getLastError(),
     };
   }
 
@@ -64,7 +65,8 @@ export class BaileysProvider implements MessagingProvider {
     fromMe: boolean,
     emoji: string,
   ): Promise<void> {
-    if (!sock || waStatus !== 'connected') throw new Error('WhatsApp is not connected');
+    const sock = getSock();
+    if (!sock || getWaStatus() !== 'connected') throw new Error('WhatsApp is not connected');
     const jid = normalizeRecipient(phone);
     if (!jid) throw new Error('Invalid recipient');
     await sock.sendMessage(jid, {

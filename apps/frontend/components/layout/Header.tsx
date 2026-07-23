@@ -49,7 +49,9 @@ export default function Header() {
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const searchDropdownRef = useRef<HTMLDivElement>(null);
+  // Attached to the search <form>, not a div — it is only read for `.contains()`
+  // in the click-outside handler, but the element type still has to match.
+  const searchDropdownRef = useRef<HTMLFormElement>(null);
 
   const onHardRefresh = () => {
     if (hardRefreshing) return;

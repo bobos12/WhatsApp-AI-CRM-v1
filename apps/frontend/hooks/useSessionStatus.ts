@@ -17,6 +17,12 @@ export interface WarmupInfo {
 export interface SessionInfo {
   createdAt: string | null;
   dayNumber: number;
+  /**
+   * Whether the operator switched warm-up on. The server already folds this into
+   * `warmup.active`, but consumers should check it too — a disabled warm-up must
+   * never surface a ramp or a daily limit, because nothing enforces them.
+   */
+  warmupEnabled: boolean;
   warmup: WarmupInfo;
 }
 
@@ -80,6 +86,11 @@ export function useSessionStatus() {
         };
       });
     }
+  });
+
+  // Real-time WhatsApp status updates (instant banner dismiss on connect)
+  useSocket('wa:status', () => {
+    fetchStatus();
   });
 
   return {

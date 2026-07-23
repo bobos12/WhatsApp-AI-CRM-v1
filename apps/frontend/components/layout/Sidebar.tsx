@@ -26,11 +26,13 @@ import {
   Target,
   Smartphone,
   Sparkles,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLiveCounts } from '../../hooks/useLiveCounts';
 import { useLeadAlerts } from '../../hooks/useLeadAlerts';
 import { useDirection } from '../../hooks/useDirection';
+import { useOperatorAccess } from '../../hooks/useOperatorAccess';
 import { isManager } from '../../lib/roles';
 import SidebarConnect from '../whatsapp/SidebarConnect';
 
@@ -43,6 +45,7 @@ export default function Sidebar() {
 
   const role    = (session?.user as any)?.role ?? 'AGENT';
   const isAdmin = isManager(role);
+  const { isOperator } = useOperatorAccess();
 
   const { openConversations } = useLiveCounts();
 
@@ -187,6 +190,46 @@ export default function Sidebar() {
             </div>
             <ul className="space-y-1">
               {adminNav.map((item) => <NavItem key={item.key} item={item} />)}
+            </ul>
+          </div>
+        )}
+
+        {/* Operator-only: manage every client business (multi-tenant console) */}
+        {isOperator && (
+          <div>
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <Building2 className="h-3.5 w-3.5 text-[#16A34A] dark:text-[#25D366]" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#16A34A] dark:text-[#25D366]">
+                Operator
+              </p>
+            </div>
+            <ul className="space-y-1">
+              <li>
+                <Link
+                  href="/platform"
+                  onClick={() => setOpen(false)}
+                  aria-current={pathname?.startsWith('/platform') ? 'page' : undefined}
+                  className={cn(
+                    'group relative flex items-center gap-3 rounded-xl py-2.5 pe-3 ps-4 text-sm transition-all duration-150',
+                    pathname?.startsWith('/platform')
+                      ? 'font-bold text-gray-900 dark:text-white'
+                      : 'font-medium text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
+                  )}
+                >
+                  {pathname?.startsWith('/platform') && (
+                    <span aria-hidden="true" className="absolute inset-y-1 start-0 w-1.5 rounded-full bg-[#16A34A] dark:bg-[#25D366]" />
+                  )}
+                  <Building2
+                    className={cn(
+                      'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
+                      pathname?.startsWith('/platform')
+                        ? 'text-[#16A34A] dark:text-[#25D366]'
+                        : 'text-gray-400 dark:text-[#8696A0] group-hover:text-gray-600 dark:group-hover:text-white',
+                    )}
+                  />
+                  <span className="flex-1 truncate">Clients</span>
+                </Link>
+              </li>
             </ul>
           </div>
         )}

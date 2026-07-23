@@ -141,5 +141,13 @@
     "perMinute": "حتى {{count}} / دقيقة",
     "protectNote": "تحمي هذه الحدود رقمك من حظر واتساب.",
     "openInbox": "فتح الوارد"
-  }
+  },
+  "connection": {
+    "aria": "اتصال واتساب",
+    "connected": "متصل",
+    "copy": "نسخ الرقم",
+    "manage": "إدارة"
+  },
+  "pipelineEmpty": "لا توجد صفقات بعد",
+  "pipelineEmptyCta": "فتح لوحة الصفقات"
 }

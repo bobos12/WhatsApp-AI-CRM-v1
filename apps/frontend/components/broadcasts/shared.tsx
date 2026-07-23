@@ -327,16 +327,24 @@ export function BroadcastActions({
     );
   }
 
+  // Deleting a campaign that is mid-flight also stops it. Say so — "Delete
+  // Broadcast" alone reads as if the send would carry on without its record.
+  const live = broadcast.status === 'SENDING' || broadcast.status === 'PAUSED';
+
   if (confirming) {
     return (
       <div className={cn('flex flex-wrap items-center gap-2', justify)}>
-        <span className="text-xs text-red-500 dark:text-red-300">{t('deleteConfirm.title')}</span>
+        <span className="text-xs text-red-500 dark:text-red-300">
+          {live
+            ? t('deleteConfirm.liveTitle', { defaultValue: 'Stop sending and delete?' })
+            : t('deleteConfirm.title')}
+        </span>
         <button
           type="button"
           onClick={onConfirmDelete}
           className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-600"
         >
-          {t('common:yes')}
+          {live ? t('deleteConfirm.liveConfirm', { defaultValue: 'Stop & delete' }) : t('common:yes')}
         </button>
         <button
           type="button"
@@ -350,8 +358,7 @@ export function BroadcastActions({
   }
 
   const editable = EDITABLE_STATUSES.includes(broadcast.status);
-  const deletable = broadcast.status !== 'SENDING';
-  const cancellable = (broadcast.status === 'SENDING' || broadcast.status === 'PAUSED') && Boolean(onAskCancel);
+  const cancellable = live && Boolean(onAskCancel);
 
   // The one thing this broadcast is asking for right now, spelled out in words.
   let primary: ReactNode = null;
@@ -431,15 +438,17 @@ export function BroadcastActions({
           danger
         />
       )}
-      {deletable && (
-        <IconButton
-          icon={Trash2}
-          label={t('common:actions.delete')}
-          onClick={onAskDelete}
-          disabled={busy}
-          danger
-        />
-      )}
+      {/* Always offered. On a live campaign it stops the send as well — Cancel
+          keeps the record and its per-recipient outcomes, Delete does not. */}
+      <IconButton
+        icon={Trash2}
+        label={live
+          ? t('actions.stopAndDelete', { defaultValue: 'Stop sending and delete' })
+          : t('common:actions.delete')}
+        onClick={onAskDelete}
+        disabled={busy}
+        danger
+      />
     </div>
   );
 }

@@ -375,13 +375,18 @@ export default function BroadcastsPage() {
 
   const handleDeleteBroadcast = async (id: string) => {
     const snapshot = broadcasts;
+    // Deleting a campaign that is mid-flight stops the send too — report that,
+    // so the user knows the remaining recipients were spared and isn't left
+    // wondering whether messages are still going out behind a vanished row.
+    const status = broadcasts.find((b) => b.id === id)?.status;
+    const wasLive = status === 'SENDING' || status === 'PAUSED';
     setBroadcasts((prev) => prev.filter((b) => b.id !== id));
     setConfirmDeleteId(null);
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
     setDeletingId(id);
     try {
       await api.delete(`/api/broadcasts/${id}`);
-      success('Broadcast deleted.');
+      success(wasLive ? 'Broadcast stopped and deleted.' : 'Broadcast deleted.');
       router.refresh();
     } catch (err) {
       setBroadcasts(snapshot);

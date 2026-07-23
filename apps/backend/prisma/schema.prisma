@@ -7,29 +7,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// A single isolated business ("tenant") in the shared multi-tenant deployment.
+/// Everything a client owns — users, contacts, conversations, its WhatsApp
+/// session, settings — is stamped with this tenant's id and fenced off by the
+/// Prisma tenant-guard (lib/tenant-context.ts + lib/prisma.ts). One business =
+/// one Tenant; a Tenant may contain one or more Teams as intra-business groups.
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  /// URL/logging-friendly handle, unique across the whole platform.
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
+
+  @@index([status])
+}
+
+enum TenantStatus {
+  ACTIVE
+  /// Logins rejected and WhatsApp socket dropped; data is preserved untouched.
+  SUSPENDED
+}
+
 model User {
-  id               String            @id @default(cuid())
-  name             String
-  email            String            @unique
-  password         String
-  role             Role              @default(AGENT)
-  teamId           String?
-  team             Team?             @relation("TeamMembers", fields: [teamId], references: [id])
-  ownedTeam        Team?             @relation("TeamOwner")
-  emailVerifiedAt  DateTime?
-  resetToken       String?
-  resetTokenExpiry DateTime?
-  refreshTokenId   String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @default(now()) @updatedAt
-  conversations    Conversation[]    @relation("AssignedConversations")
-  ownedDeals       Deal[]            @relation("OwnedDeals")
-  assignedTasks    Task[]            @relation("AssignedTasks")
-  internalNotes    InternalNote[]    @relation("InternalNotes")
-  auditLogs        AuditLog[]
-  reactions        MessageReaction[] @relation("UserReactions")
-  notifications    Notification[]    @relation("UserNotifications")
+  id                String             @id @default(cuid())
+  /// Owning tenant. Null only for the platform-scoped identities (PLATFORM_OWNER
+  /// and the dev superuser), which deliberately live above every tenant.
+  tenantId          String?
+  name              String
+  email             String             @unique
+  password          String
+  role              Role               @default(AGENT)
+  teamId            String?
+  team              Team?              @relation("TeamMembers", fields: [teamId], references: [id])
+  ownedTeam         Team?              @relation("TeamOwner")
+  emailVerifiedAt   DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  refreshTokenId    String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
+  conversations     Conversation[]     @relation("AssignedConversations")
+  ownedDeals        Deal[]             @relation("OwnedDeals")
+  assignedTasks     Task[]             @relation("AssignedTasks")
+  internalNotes     InternalNote[]     @relation("InternalNotes")
+  auditLogs         AuditLog[]
+  reactions         MessageReaction[]  @relation("UserReactions")
+  notifications     Notification[]     @relation("UserNotifications")
   pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
+
+  @@index([tenantId])
 }
 
 /// A Web Push subscription for a user's device/browser. One user can have many
@@ -49,6 +77,9 @@ model PushSubscription {
 }
 
 enum Role {
+  /// Platform operator (you). Lives above every tenant, bypasses the tenant-guard,
+  /// and is the only identity that can create/suspend/impersonate tenants.
+  PLATFORM_OWNER
   SUPER_ADMIN
   ADMIN
   TEAM_LEAD
@@ -59,6 +90,7 @@ enum Role {
 
 model Team {
   id            String         @id @default(cuid())
+  tenantId      String?
   name          String
   ownerId       String         @unique
   owner         User           @relation("TeamOwner", fields: [ownerId], references: [id])
@@ -67,21 +99,26 @@ model Team {
   autoAssign    Boolean        @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
+
+  @@index([tenantId])
 }
 
 model WhatsAppSession {
-  id             String   @id @default(cuid())
-  sessionId      String   @unique
-  data           Json
-  warmupEnabled  Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  id            String   @id @default(cuid())
+  /// One WhatsApp connection per tenant. Unique so a tenant can never hold two.
+  tenantId      String?  @unique
+  sessionId     String   @unique
+  data          Json
+  warmupEnabled Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 }
 
 model Contact {
   id             String             @id @default(cuid())
+  tenantId       String?
   teamId         String?
-  phone          String             @unique
+  phone          String
   name           String?
   email          String?
   company        String?
@@ -103,6 +140,10 @@ model Contact {
   qualification  LeadQualification?
   notifications  Notification[]
 
+  /// Phone is unique *within* a tenant now — two different businesses may each
+  /// have the same customer number. (Was globally @unique.)
+  @@unique([tenantId, phone])
+  @@index([tenantId])
   @@index([teamId])
   @@index([phone])
 }
@@ -132,6 +173,7 @@ enum CustomFieldType {
 /// stored value.
 model CustomFieldDefinition {
   id           String          @id @default(cuid())
+  tenantId     String?
   teamId       String?
   key          String
   label        String
@@ -152,12 +194,14 @@ model CustomFieldDefinition {
   updatedAt    DateTime        @default(now()) @updatedAt
 
   @@unique([teamId, key])
+  @@index([tenantId])
   @@index([teamId, order])
 }
 
 // Relational tags — replaces the CSV `tag` field on Contact
 model Tag {
   id        String       @id @default(cuid())
+  tenantId  String?
   teamId    String?
   name      String
   color     String       @default("#6366f1")
@@ -165,6 +209,7 @@ model Tag {
   contacts  ContactTag[]
 
   @@unique([teamId, name])
+  @@index([tenantId])
   @@index([teamId])
 }
 
@@ -180,6 +225,7 @@ model ContactTag {
 
 model Conversation {
   id                 String         @id @default(cuid())
+  tenantId           String?
   teamId             String?
   contactId          String
   contact            Contact        @relation(fields: [contactId], references: [id])
@@ -231,6 +277,7 @@ model Conversation {
   /// When set, the bot is paused until this timestamp (human agent took over).
   botPausedUntil DateTime?
 
+  @@index([tenantId])
   @@index([teamId, status, lastMessageAt(sort: Desc)])
   @@index([contactId, status])
   @@index([assignedTo])
@@ -256,6 +303,7 @@ enum Priority {
 
 model Message {
   id             String            @id @default(cuid())
+  tenantId       String?
   externalId     String
   sessionId      String
   direction      MessageDirection
@@ -323,6 +371,7 @@ model Message {
 
   @@unique([externalId, sessionId])
   @@unique([clientId, conversationId])
+  @@index([tenantId])
   @@index([conversationId, timestamp(sort: Desc)])
   @@index([conversationId, sequenceNumber(sort: Desc)])
   @@index([phone])
@@ -330,6 +379,7 @@ model Message {
 
 model MessageReaction {
   id           String   @id @default(cuid())
+  tenantId     String?
   messageId    String
   message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   userId       String?
@@ -339,6 +389,7 @@ model MessageReaction {
   createdAt    DateTime @default(now())
 
   @@unique([messageId, userId])
+  @@index([tenantId])
   @@index([messageId])
   @@index([messageId, contactPhone])
 }
@@ -377,6 +428,7 @@ enum MsgStatus {
 
 model InternalNote {
   id             String       @id @default(cuid())
+  tenantId       String?
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   authorId       String
@@ -384,10 +436,13 @@ model InternalNote {
   body           String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @default(now()) @updatedAt
+
+  @@index([tenantId])
 }
 
 model AutomationRule {
   id        String      @id @default(cuid())
+  tenantId  String?
   teamId    String?
   name      String
   trigger   TriggerType
@@ -396,12 +451,15 @@ model AutomationRule {
   isActive  Boolean     @default(true)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @default(now()) @updatedAt
+
+  @@index([tenantId])
 }
 
 // ── Multi-step automation flows ───────────────────────────────────────────────
 
 model AutomationFlow {
   id          String                    @id @default(cuid())
+  tenantId    String?
   teamId      String?
   name        String
   trigger     TriggerType
@@ -413,6 +471,7 @@ model AutomationFlow {
   createdAt   DateTime                  @default(now())
   updatedAt   DateTime                  @default(now()) @updatedAt
 
+  @@index([tenantId])
   @@index([teamId, isActive])
 }
 
@@ -435,6 +494,7 @@ enum FlowStepType {
 
 model AutomationFlowExecution {
   id            String         @id @default(cuid())
+  tenantId      String?
   flowId        String
   flow          AutomationFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
   phone         String
@@ -444,6 +504,7 @@ model AutomationFlowExecution {
   stoppedAt     DateTime?
   stoppedReason String?
 
+  @@index([tenantId])
   @@index([flowId, phone, status])
   @@index([phone, status])
 }
@@ -467,54 +528,56 @@ enum TriggerType {
 }
 
 model Broadcast {
-  id                 String               @id @default(cuid())
-  teamId             String?
-  name               String
-  description        String?
-  message            String
-  interactiveContent Json?
+  id                   String               @id @default(cuid())
+  tenantId             String?
+  teamId               String?
+  name                 String
+  description          String?
+  message              String
+  interactiveContent   Json?
   /// Storage-relative media reference (e.g. "/uploads/ab12.jpg"), never an
   /// absolute URL — see lib/media.ts. Absolute URLs stored by older builds are
   /// normalized on read so a host/port change can't orphan the attachment.
-  mediaUrl           String?
-  mediaType          String?
-  mediaFilename      String?
-  mediaMimeType      String?
-  status             BroadcastStatus      @default(DRAFT)
-  type               BroadcastType        @default(IMMEDIATE)
+  mediaUrl             String?
+  mediaType            String?
+  mediaFilename        String?
+  mediaMimeType        String?
+  status               BroadcastStatus      @default(DRAFT)
+  type                 BroadcastType        @default(IMMEDIATE)
   /// The absolute instant the broadcast fires (UTC). Never a wall-clock string.
-  scheduledAt        DateTime?
-  recurringCron      String?
+  scheduledAt          DateTime?
+  recurringCron        String?
   /// IANA zone the user picked the wall-clock time in (e.g. "Africa/Cairo").
   /// Used only to render `scheduledAt` back as the exact time they chose.
-  timezone           String               @default("UTC")
-  sentAt             DateTime?
+  timezone             String               @default("UTC")
+  sentAt               DateTime?
   /// Set when the scheduler claims the row, so a crashed run can be detected.
-  queuedAt           DateTime?
-  lastError          String?
-  totalSent          Int                  @default(0)
-  totalFailed        Int                  @default(0)
+  queuedAt             DateTime?
+  lastError            String?
+  totalSent            Int                  @default(0)
+  totalFailed          Int                  @default(0)
   /// Smart Sending: deliver the audience in batches with a wait between each,
   /// instead of one blast. Off by default; a small audience that fits in one
   /// batch behaves exactly like an ordinary send.
-  smartSending       Boolean              @default(false)
+  smartSending         Boolean              @default(false)
   /// Contacts per batch. Null unless smart sending is on.
-  batchSize          Int?
+  batchSize            Int?
   /// Minutes to wait between batches. Null unless smart sending is on.
   batchIntervalMinutes Int?
   /// When the next batch is due (UTC). This is the ONE piece of state that must
   /// survive a restart for a paused-between-batches campaign to resume — the
   /// scheduler polls it exactly like `scheduledAt`. Null while a batch is
   /// actively sending or the campaign is finished.
-  nextBatchAt        DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @default(now()) @updatedAt
-  recipients         BroadcastRecipient[]
+  nextBatchAt          DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @default(now()) @updatedAt
+  recipients           BroadcastRecipient[]
 
   /// Drives the scheduler's due-broadcast poll.
   @@index([status, scheduledAt])
   /// Drives the scheduler's due-batch poll (smart sending continuations).
   @@index([status, nextBatchAt])
+  @@index([tenantId])
 }
 
 enum BroadcastStatus {
@@ -549,37 +612,48 @@ enum TemplateStatus {
 
 model BroadcastRecipient {
   id          String    @id @default(cuid())
+  tenantId    String?
   broadcastId String
   broadcast   Broadcast @relation(fields: [broadcastId], references: [id])
   phone       String
   status      String    @default("pending")
 
   @@index([broadcastId, status])
+  @@index([tenantId])
 }
 
 model Analytics {
   id               String   @id @default(cuid())
-  date             DateTime @unique @default(now()) @db.Date
+  tenantId         String?
+  /// One analytics row per tenant per day (was globally @unique on date).
+  date             DateTime @default(now()) @db.Date
   totalMessages    Int      @default(0)
   incomingMessages Int      @default(0)
   outgoingMessages Int      @default(0)
   newContacts      Int      @default(0)
   resolvedConvs    Int      @default(0)
   automationsFired Int      @default(0)
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
+  tenantId  String?
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   action    String
   resource  String
   details   Json?
   createdAt DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model SavedReply {
   id        String   @id @default(cuid())
+  tenantId  String?
   teamId    String?
   shortcut  String
   message   String
@@ -587,10 +661,12 @@ model SavedReply {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([teamId, shortcut])
+  @@index([tenantId])
 }
 
 model Deal {
   id        String    @id @default(cuid())
+  tenantId  String?
   teamId    String?
   contactId String
   contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -604,6 +680,7 @@ model Deal {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
 
+  @@index([tenantId])
   @@index([teamId, stage])
 }
 
@@ -616,6 +693,7 @@ enum DealStage {
 
 model MessageTemplate {
   id             String         @id @default(cuid())
+  tenantId       String?
   teamId         String?
   name           String
   content        String
@@ -641,11 +719,13 @@ model MessageTemplate {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @default(now()) @updatedAt
 
+  @@index([tenantId])
   @@index([teamId])
 }
 
 model Task {
   id             String        @id @default(cuid())
+  tenantId       String?
   teamId         String?
   contactId      String?
   contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -661,6 +741,7 @@ model Task {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @default(now()) @updatedAt
 
+  @@index([tenantId])
   @@index([teamId, status])
 }
 
@@ -699,6 +780,7 @@ enum LeadStatus {
 /// upserted as new inbound messages arrive (debounced per contact).
 model LeadQualification {
   id                     String            @id @default(cuid())
+  tenantId               String?
   contactId              String            @unique
   contact                Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
   teamId                 String?
@@ -727,6 +809,7 @@ model LeadQualification {
   updatedAt              DateTime          @default(now()) @updatedAt
   events                 LeadStatusEvent[]
 
+  @@index([tenantId])
   @@index([teamId, status])
   @@index([teamId, priority])
   @@index([teamId, needsAttention])
@@ -737,6 +820,7 @@ model LeadQualification {
 /// in customer status over time as conversations evolve).
 model LeadStatusEvent {
   id              String            @id @default(cuid())
+  tenantId        String?
   qualificationId String
   qualification   LeadQualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
   contactId       String
@@ -748,6 +832,7 @@ model LeadStatusEvent {
   reason          String?
   createdAt       DateTime          @default(now())
 
+  @@index([tenantId])
   @@index([contactId, createdAt(sort: Desc)])
   @@index([qualificationId, createdAt(sort: Desc)])
 }
@@ -762,6 +847,7 @@ enum NotificationType {
 /// conversation is assigned, otherwise the whole team.
 model Notification {
   id             String           @id @default(cuid())
+  tenantId       String?
   recipientId    String
   recipient      User             @relation("UserNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
   teamId         String?
@@ -777,14 +863,21 @@ model Notification {
   readAt         DateTime?
   createdAt      DateTime         @default(now())
 
+  @@index([tenantId])
   @@index([recipientId, isRead, createdAt(sort: Desc)])
   @@index([recipientId, createdAt(sort: Desc)])
 }
 
 /// Generic key-value settings store. Used for chatbot config and future
-/// system-wide settings. Keyed by a stable string slug (e.g. "chatbot").
+/// per-tenant settings. Keyed by (tenantId, key): each tenant has its own
+/// "chatbot" row. A null tenantId row holds platform-wide/shared config.
 model Setting {
-  key       String   @id
+  id        String   @id @default(cuid())
+  tenantId  String?
+  key       String
   value     Json
   updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }

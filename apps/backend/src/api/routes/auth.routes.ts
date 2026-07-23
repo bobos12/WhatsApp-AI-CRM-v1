@@ -4,8 +4,16 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../../lib/prisma';
 import { env } from '../../lib/env';
+import { runAsPlatform } from '../../lib/tenant-context';
 
 const router = Router();
+
+// Authentication is inherently cross-tenant: login looks a user up by email
+// across every tenant, and /refresh, /me, and password reset resolve a user by
+// a unique token/id before any tenant scope exists. Run the whole auth router in
+// platform scope so these User lookups pass the tenant-guard. Every handler here
+// only ever touches the User model keyed by unique fields (email/id/resetToken).
+router.use((_req, _res, next) => runAsPlatform(() => next()));
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -41,17 +49,17 @@ function getClientKey(req: any) {
   return req.ip || req.headers['x-forwarded-for'] || 'unknown';
 }
 
-function signAccessToken(user: { id: string; email: string; name: string; role?: string; teamId?: string | null }) {
+function signAccessToken(user: { id: string; email: string; name: string; role?: string; teamId?: string | null; tenantId?: string | null }) {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role, teamId: user.teamId },
+    { id: user.id, email: user.email, name: user.name, role: user.role, teamId: user.teamId, tenantId: user.tenantId ?? null },
     env.jwtSecret,
     { expiresIn: ACCESS_TOKEN_TTL }
   );
 }
 
-function signRefreshToken(user: { id: string; email: string; role?: string; teamId?: string | null }) {
+function signRefreshToken(user: { id: string; email: string; role?: string; teamId?: string | null; tenantId?: string | null }) {
   const refreshToken = jwt.sign(
-    { id: user.id, email: user.email, role: user.role, teamId: user.teamId, tokenId: crypto.randomUUID() },
+    { id: user.id, email: user.email, role: user.role, teamId: user.teamId, tenantId: user.tenantId ?? null, tokenId: crypto.randomUUID() },
     env.jwtSecret,
     { expiresIn: `${REFRESH_TOKEN_TTL_SECONDS}s` }
   );

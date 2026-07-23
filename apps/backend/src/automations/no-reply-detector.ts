@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { triggerFlows } from './flow-executor';
+import { forEachActiveTenant } from '../tenants/for-each-tenant';
 import { logger } from '../lib/logger';
 
 // How long (ms) with no agent reply before triggering NO_RESPONSE_TIME flows
@@ -9,7 +10,9 @@ const CHECK_INTERVAL_MS = Number(process.env.NO_REPLY_CHECK_INTERVAL_MS ?? 5 * 6
 let timer: ReturnType<typeof setInterval> | null = null;
 
 async function checkNoReplyConversations() {
-  try {
+  // Sweep every tenant in its own scope: the guard fences each query to the
+  // tenant, and triggerFlows sends via that tenant's own WhatsApp socket.
+  await forEachActiveTenant(async () => {
     const cutoff = new Date(Date.now() - NO_REPLY_THRESHOLD_MS);
 
     // Find OPEN conversations where last message is INBOUND and older than threshold
@@ -42,9 +45,7 @@ async function checkNoReplyConversations() {
       logger.info('no_reply_detector.triggering', { conversationId: conv.id, phone });
       void triggerFlows(phone, '', 'NO_RESPONSE_TIME' as any, conv.teamId ?? undefined).catch(() => {});
     }
-  } catch (err) {
-    logger.warn('no_reply_detector.error', { error: err instanceof Error ? err.message : String(err) });
-  }
+  });
 }
 
 export function startNoReplyDetector() {

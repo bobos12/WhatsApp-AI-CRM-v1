@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getTenantId } from '../lib/tenant-context';
 import { providerManager } from '../providers/manager';
 import { logger } from '../lib/logger';
 import { retryAsync } from '../lib/retry';
@@ -69,11 +70,15 @@ export async function checkAutomationRules(phone: string, messageBody: string) {
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      await prisma.analytics.upsert({
-        where: { date: today },
-        update: { automationsFired: { increment: 1 } },
-        create: { date: today, automationsFired: 1 },
-      });
+      // Analytics is per-tenant per-day; only record when a tenant scope is set.
+      const analyticsTenantId = getTenantId();
+      if (analyticsTenantId) {
+        await prisma.analytics.upsert({
+          where: { tenantId_date: { tenantId: analyticsTenantId, date: today } },
+          update: { automationsFired: { increment: 1 } },
+          create: { date: today, automationsFired: 1 },
+        });
+      }
 
       logger.info('Automation rule fired', {
         phone,

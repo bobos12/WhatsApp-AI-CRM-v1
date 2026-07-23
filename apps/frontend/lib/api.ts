@@ -32,7 +32,45 @@ export function invalidateSessionCache() {
   cachedSessionAt = 0;
 }
 
+/** Key under which the platform operator's "view as client" token is stored. */
+export const IMPERSONATION_TOKEN_KEY = 'impersonationToken';
+const IMPERSONATION_LABEL_KEY = 'impersonationLabel';
+
+/** True while the operator is impersonating a tenant (viewing the app as them). */
+export function isImpersonating(): boolean {
+  return typeof window !== 'undefined' && !!window.localStorage.getItem(IMPERSONATION_TOKEN_KEY);
+}
+
+/** The impersonated client's display name, if any. */
+export function getImpersonationLabel(): string | null {
+  return typeof window !== 'undefined' ? window.localStorage.getItem(IMPERSONATION_LABEL_KEY) : null;
+}
+
+/** Begin impersonation: subsequent API calls use this tenant-scoped token. */
+export function startImpersonation(token: string, label?: string) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(IMPERSONATION_TOKEN_KEY, token);
+    if (label) window.localStorage.setItem(IMPERSONATION_LABEL_KEY, label);
+  }
+  invalidateSessionCache();
+}
+
+/** End impersonation and return to the operator's own session. */
+export function stopImpersonation() {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(IMPERSONATION_TOKEN_KEY);
+    window.localStorage.removeItem(IMPERSONATION_LABEL_KEY);
+  }
+  invalidateSessionCache();
+}
+
 async function getAccessToken() {
+  // When impersonating, the tenant-scoped token wins over the operator's own
+  // session so every request is fenced to the impersonated tenant.
+  if (typeof window !== 'undefined') {
+    const imp = window.localStorage.getItem(IMPERSONATION_TOKEN_KEY);
+    if (imp) return imp;
+  }
   const session = await getCachedSession();
   return session?.accessToken || (typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null);
 }
@@ -86,7 +124,9 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
 
   let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
-  if (retry && (response.status === 401 || response.status === 403)) {
+  // While impersonating we must never refresh into the operator's own token —
+  // that would switch the request back to platform scope. Let it fail instead.
+  if (retry && !isImpersonating() && (response.status === 401 || response.status === 403)) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       if (typeof window !== 'undefined') {

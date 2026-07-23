@@ -196,7 +196,8 @@ export class ContactsService {
       throw new HttpError(400, 'Invalid phone number');
     }
 
-    const existing = await prisma.contact.findUnique({ where: { phone } });
+    // Phone is unique per (tenant, phone); the guard scopes this to the tenant.
+    const existing = await prisma.contact.findFirst({ where: { phone } });
     const customFields = await resolveCustomFields(data, existing, { partial: Boolean(existing) });
 
     if (existing) {
@@ -257,13 +258,20 @@ export class ContactsService {
       });
 
       if (conversations.length > 0) {
-        await tx.message.deleteMany({
-          where: { conversationId: { in: conversations.map((conversation) => conversation.id) } },
-        });
+        const conversationIds = conversations.map((conversation) => conversation.id);
 
-        await tx.conversation.deleteMany({
-          where: { id: { in: conversations.map((conversation) => conversation.id) } },
-        });
+        // Children first, and only these three relations need clearing by hand.
+        // Everything else hanging off a Contact cleans itself up: ContactTag,
+        // Deal, LeadQualification and Notification cascade, Task nulls out, and
+        // MessageReaction cascades from Message. But Message→Conversation,
+        // InternalNote→Conversation and Conversation→Contact are declared with no
+        // `onDelete`, so Postgres defaults to RESTRICT and the delete fails.
+        // InternalNote was the one missing here — deleting a contact whose
+        // conversation had a single internal note blew up on
+        // `InternalNote_conversationId_fkey`.
+        await tx.internalNote.deleteMany({ where: { conversationId: { in: conversationIds } } });
+        await tx.message.deleteMany({ where: { conversationId: { in: conversationIds } } });
+        await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } });
       }
 
       return await tx.contact.delete({

@@ -1,9 +1,13 @@
-import { Prisma, PrismaClient } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import type { Contact } from '@prisma/client';
+import { prisma, type GuardedPrisma } from '../lib/prisma';
 import { normalizePhone, phoneFingerprint } from '../lib/phone';
 import { getWhatsAppProfilePictureUrl } from '../whatsapp/client';
 
-type DbClient = PrismaClient | Prisma.TransactionClient;
+// The tenant-guarded client. Every query it runs is scoped to the tenant in the
+// ambient context (lib/tenant-context.ts). This resolver is always called with
+// the shared `prisma` instance (directly or as the default), never a bare
+// transaction client, so a single client type keeps the payload types clean.
+type DbClient = GuardedPrisma;
 
 async function resolveDefaultTeamId(db: DbClient) {
   const explicitTeamId = process.env.WHATSAPP_TEAM_ID?.trim();
@@ -58,18 +62,26 @@ export async function getOrCreateConversationByPhone(
 
   const resolvedTeamId = teamId ?? await resolveDefaultTeamId(db);
 
-  const contact =
-    (await findMatchingContact(db, phone, resolvedTeamId)) ??
-    (await db.contact.upsert({
-      where: { phone: normalizedPhone },
-      create: {
-        phone: normalizedPhone,
-        teamId: resolvedTeamId ?? undefined,
-      },
-      update: {
-        teamId: resolvedTeamId ?? undefined,
-      },
-    }));
+  // Phone is unique per (tenantId, phone) now, so we can't upsert by phone alone.
+  // Find-or-create instead: the tenant-guard scopes the lookup and stamps the
+  // tenantId on create. A concurrent create loses the unique race and is
+  // recovered by re-reading.
+  let contact: Contact | null = await findMatchingContact(db, phone, resolvedTeamId);
+  if (!contact) {
+    try {
+      contact = await db.contact.create({
+        data: {
+          phone: normalizedPhone,
+          teamId: resolvedTeamId ?? undefined,
+        },
+      });
+    } catch {
+      contact = await db.contact.findFirst({ where: { phone: normalizedPhone } });
+    }
+  }
+  if (!contact) {
+    throw new Error('Failed to resolve contact');
+  }
 
   const customFields = (contact.customFields as Record<string, unknown> | null | undefined) || {};
   if (!customFields.avatarUrl) {
@@ -99,6 +111,11 @@ export async function getOrCreateConversationByPhone(
     const [primary, ...duplicates] = conversations;
     if (duplicates.length > 0) {
       const duplicateIds = duplicates.map((conversation) => conversation.id);
+      // InternalNote→Conversation has no `onDelete`, so it RESTRICTs. Without
+      // this, collapsing duplicates threw a foreign-key error the moment one of
+      // them carried a note — and this runs on the inbound path, so it would
+      // have rejected the incoming message too.
+      await db.internalNote.deleteMany({ where: { conversationId: { in: duplicateIds } } });
       await db.message.deleteMany({ where: { conversationId: { in: duplicateIds } } });
       await db.conversation.deleteMany({ where: { id: { in: duplicateIds } } });
     }

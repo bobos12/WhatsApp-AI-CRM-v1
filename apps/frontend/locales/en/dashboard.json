@@ -141,5 +141,13 @@
     "perMinute": "Up to {{count}} / min",
     "protectNote": "These limits protect your number from WhatsApp bans.",
     "openInbox": "Open Inbox"
-  }
+  },
+  "connection": {
+    "aria": "WhatsApp connection",
+    "connected": "Connected",
+    "copy": "Copy number",
+    "manage": "Manage"
+  },
+  "pipelineEmpty": "No deals yet",
+  "pipelineEmptyCta": "Open the deals board"
 }

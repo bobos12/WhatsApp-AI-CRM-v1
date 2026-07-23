@@ -5,6 +5,7 @@ import type {
   SignalDataTypeMap,
 } from '@whiskeysockets/baileys';
 import { prisma } from '../lib/prisma';
+import { runWithTenant } from '../lib/tenant-context';
 import { logger } from '../lib/logger';
 
 type KeyBucket = { [id: string]: any };
@@ -34,13 +35,47 @@ export async function clearDbAuthState(sessionId: string): Promise<void> {
   }
 }
 
-export async function useDbAuthState(sessionId: string): Promise<{
+export async function useDbAuthState(
+  sessionId: string,
+  /**
+   * The tenant that owns this session. REQUIRED and passed explicitly rather
+   * than read from ambient context: Baileys drives most writes from its own
+   * socket event loop, where there is no scope to read.
+   */
+  ownerTenantId: string,
+): Promise<{
   state: AuthenticationState;
   saveCreds: () => Promise<void>;
 }> {
+  /**
+   * Re-enter the owning tenant's scope for every read and write.
+   *
+   * Baileys calls `saveCreds` and `keys.set` from its OWN socket event loop —
+   * `creds.update`, key rotations, app-state sync — which runs long after the
+   * `runWithTenant()` that called `connect()` has exited. `WhatsAppSession` is a
+   * tenant-scoped model, so the guard in lib/prisma.ts fails closed there and
+   * every one of those writes threw, was swallowed by the catch below, and left
+   * only a log line. The session then looked connected (the socket is live in
+   * memory) while its credentials and signal keys silently stopped persisting.
+   *
+   * An earlier version of this fix fell back to `runAsPlatform()` when no tenant
+   * was in scope. That was worse than the bug: platform scope bypasses the guard
+   * AND skips the tenantId stamp, so it turned a loud failure into a silently
+   * ORPHANED session row (tenantId NULL) that `reconnectAll()` and `getSock()`
+   * can never see again. Hence the required parameter — there is no longer a
+   * code path that can write a tenant-less session.
+   *
+   * Note the `await` INSIDE the callback: a Prisma promise is lazy, so returning
+   * it unawaited would run the query after the scope has already exited.
+   */
+  const inTenantScope = <T>(fn: () => Promise<T>): Promise<T> =>
+    runWithTenant(ownerTenantId, fn);
+
   async function readRow(): Promise<StoredAuthData> {
     try {
-      const row = await prisma.whatsAppSession.findUnique({ where: { sessionId } });
+      const row = await inTenantScope(async () =>
+        await prisma.whatsAppSession.findUnique({ where: { sessionId } }),
+      );
       if (!row?.data || typeof row.data !== 'object') return {};
       return row.data as StoredAuthData;
     } catch (err) {
@@ -51,10 +86,15 @@ export async function useDbAuthState(sessionId: string): Promise<{
 
   async function writeRow(data: StoredAuthData): Promise<void> {
     try {
-      await prisma.whatsAppSession.upsert({
-        where: { sessionId },
-        create: { sessionId, data: data as any },
-        update: { data: data as any },
+      await inTenantScope(async () => {
+        // `tenantId` is written explicitly as well as being stamped by the guard,
+        // so the row is correctly owned even if this ever runs under a different
+        // scope. An unowned session is unusable — it must never be created.
+        await prisma.whatsAppSession.upsert({
+          where: { sessionId },
+          create: { sessionId, tenantId: ownerTenantId, data: data as any },
+          update: { data: data as any },
+        });
       });
     } catch (err) {
       logger.error('db_auth_state.write_failed', { sessionId, error: String(err) });

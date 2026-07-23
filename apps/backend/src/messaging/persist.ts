@@ -4,6 +4,62 @@ import { prisma } from '../lib/prisma';
 import { emitRealtime } from '../realtime/socket';
 import { emitEvent } from '../realtime/event-bus';
 
+// ── Raw payload sanitisation ──────────────────────────────────────────────────
+
+/**
+ * Convert a provider's raw payload into something that can actually be stored in
+ * a JSON column.
+ *
+ * Baileys hands us protobuf-backed objects. Prisma serialises a Json column with
+ * `JSON.stringify`, which calls the payload's `toJSON()`, which delegates to
+ * `this.constructor.toObject` — a method that does not exist on every generated
+ * class in Baileys 7.x. The result was `TypeError: this.constructor.toObject is
+ * not a function` thrown at the final INSERT, AFTER the message had been
+ * normalised, validated, deduped and had its contact and conversation resolved.
+ * Every inbound message was lost at the last step, and because `raw` is only
+ * kept for debugging, the whole message was discarded for the sake of a field
+ * nothing reads.
+ *
+ * Walking it into plain values sidesteps `toJSON()` entirely. Binary becomes
+ * base64 and protobuf Longs become strings, both of which JSON can represent;
+ * functions are dropped; depth is bounded so a cyclic or absurdly nested payload
+ * can never hang the insert.
+ */
+function toStorableJson(value: unknown, depth = 0): unknown {
+  if (value === null || value === undefined) return null;
+  if (depth > 16) return '[truncated]';
+
+  const type = typeof value;
+  if (type === 'string' || type === 'boolean') return value;
+  if (type === 'number') return Number.isFinite(value as number) ? value : null;
+  if (type === 'bigint') return (value as bigint).toString();
+  if (type === 'function' || type === 'symbol') return undefined;
+
+  if (value instanceof Date) return value.toISOString();
+  if (Buffer.isBuffer(value)) return value.toString('base64');
+  if (value instanceof Uint8Array) return Buffer.from(value).toString('base64');
+  if (Array.isArray(value)) return value.map((v) => toStorableJson(v, depth + 1));
+
+  const obj = value as Record<string, unknown>;
+
+  // protobufjs Long ({ low, high, unsigned }) — stringify rather than lose precision.
+  if (typeof (obj as any).toString === 'function' && 'low' in obj && 'high' in obj) {
+    try { return String(obj); } catch { return null; }
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(obj)) {
+    let child: unknown;
+    try {
+      child = toStorableJson(obj[key], depth + 1);
+    } catch {
+      continue; // a getter that throws must not take the message with it
+    }
+    if (child !== undefined) out[key] = child;
+  }
+  return out;
+}
+
 // ── Legacy column derivation ──────────────────────────────────────────────────
 
 function legacyBody(content: MessageContent): string {
@@ -165,7 +221,7 @@ export async function persistNormalizedMessage(
       kind:          content.kind,
       content:       content as any,
       metadata:      msg.metadata as any,
-      raw:           msg.raw as any,
+      raw:           toStorableJson(msg.raw) as any,
       renderable:    renderable as any,
     } as any,
     select: { id: true, conversationId: true },

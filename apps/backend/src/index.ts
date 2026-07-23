@@ -8,7 +8,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { loadEnv } from './lib/env';
 import { logger } from './lib/logger';
-import { providerManager } from './providers/manager';
+import { runAsPlatform } from './lib/tenant-context';
+import { sessionManager } from './whatsapp/session-manager';
 import { bindRealtimeServer } from './realtime/socket';
 import { startSnoozeWakeupScheduler } from './conversations/snooze-wakeup';
 import { startBroadcastScheduler } from './broadcasts/broadcast.scheduler';
@@ -17,7 +18,8 @@ import { startNoReplyDetector } from './automations/no-reply-detector';
 import { aiBotService } from './services/ai-bot.service';
 import { GroqBotProvider } from './services/groq-bot.provider';
 import { provisionDevSuperuser } from './auth/provision-superuser';
-import { provisionOwner } from './auth/provision-owner';
+import { provisionPlatformOwner } from './auth/provision-platform-owner';
+import { bootstrapDefaultTenant } from './tenants/provision-tenant.service';
 import { chatbotSettingsService } from './services/chatbot-settings.service';
 import { storageMode, LOCAL_UPLOADS_DIR } from './lib/storage';
 import authRoutes from './api/routes/auth.routes';
@@ -42,6 +44,7 @@ import leadsRoutes from './api/routes/leads.routes';
 import notificationsRoutes from './api/routes/notifications.routes';
 import pushRoutes from './api/routes/push.routes';
 import searchRoutes from './api/routes/search.routes';
+import platformRoutes from './api/routes/platform.routes';
 
 // Fail fast on missing/weak required configuration before binding the server.
 const config = loadEnv();
@@ -131,11 +134,18 @@ app.get('/health', (_req, res) => {
 
 // Global API rate limit. A per-IP ceiling that protects every endpoint from
 // abuse/brute-force; individual routes (e.g. login) add stricter limits on top.
+// The ceiling is generous because this is a real-time app: an active dashboard
+// legitimately makes many calls (live counts, notifications, and — while the
+// WhatsApp QR screen is open — frequent status/QR polling). The lightweight,
+// read-only WhatsApp status/QR polls are exempt so keeping that screen open can
+// never starve the rest of the API.
+const POLL_EXEMPT = /\/api\/whatsapp\/(status|qr)\b/;
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => POLL_EXEMPT.test(req.originalUrl),
   message: { error: 'Too many requests. Please slow down and try again later.' },
 });
 app.use('/api', apiLimiter);
@@ -173,6 +183,7 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/platform', platformRoutes);
 
 // ── DEV ONLY: force re-analysis of the most recent 1-to-1 chats. Runs inside
 // the live server so lead notifications/popups are pushed over the socket.
@@ -246,24 +257,35 @@ const PORT = config.port;
 server.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
 
-  // Load chatbot settings from DB before serving any AI traffic.
-  await chatbotSettingsService.init();
+  // Boot-time work runs above any single tenant (guard bypassed): it provisions
+  // platform identities, reads shared settings, and starts schedulers that must
+  // scan every tenant. Per-tenant narrowing happens inside each scheduler tick
+  // and inbound handler. AsyncLocalStorage propagates this platform scope into
+  // the timers/handlers created here.
+  await runAsPlatform(async () => {
+    // Load chatbot settings from DB before serving any AI traffic.
+    await chatbotSettingsService.init();
 
-  // Ensure the developer super-account and (on a fresh tenant) the business
-  // owner exist before serving traffic.
-  provisionDevSuperuser();
-  provisionOwner();
-  startSnoozeWakeupScheduler();
-  // Dispatches SCHEDULED broadcasts whose time has come, and recovers any run
-  // interrupted by a restart. Must start before traffic so a schedule that fell
-  // due while the process was down fires on the first tick.
-  startBroadcastScheduler();
-  ensureFlowWorker();
-  startNoReplyDetector();
-  aiBotService.register(new GroqBotProvider());
-  if (process.env.WHATSAPP_AUTO_CONNECT !== 'false') {
-    providerManager.connect().catch((err: Error) => {
-      console.error('WhatsApp auto-connect failed:', err.message);
-    });
-  }
+    // Ensure the platform identities exist, then fold any pre-multitenant data
+    // into the default tenant and seed its owner — all before serving traffic.
+    // Await the dev super-account first so the backfill can fold it into the
+    // default tenant (it runs the business AND operates the platform).
+    await provisionDevSuperuser();
+    provisionPlatformOwner();
+    await bootstrapDefaultTenant();
+    startSnoozeWakeupScheduler();
+    // Dispatches SCHEDULED broadcasts whose time has come, and recovers any run
+    // interrupted by a restart. Must start before traffic so a schedule that fell
+    // due while the process was down fires on the first tick.
+    startBroadcastScheduler();
+    ensureFlowWorker();
+    startNoReplyDetector();
+    aiBotService.register(new GroqBotProvider());
+    if (process.env.WHATSAPP_AUTO_CONNECT !== 'false') {
+      // Reconnect every ACTIVE tenant that already has a stored WhatsApp session.
+      sessionManager.reconnectAll().catch((err: Error) => {
+        console.error('WhatsApp reconnect-all failed:', err.message);
+      });
+    }
+  });
 });

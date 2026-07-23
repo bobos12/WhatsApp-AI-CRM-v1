@@ -250,7 +250,9 @@
     "title": "حذف الحملة",
     "message": "هل أنت متأكد من رغبتك في حذف هذه الحملة؟",
     "confirm": "نعم، احذف",
-    "cancel": "إلغاء"
+    "cancel": "إلغاء",
+    "liveTitle": "إيقاف الإرسال والحذف؟",
+    "liveConfirm": "إيقاف وحذف"
   },
   "cancelConfirm": {
     "title": "إيقاف هذه الحملة؟",
@@ -265,7 +267,8 @@
     "duplicate": "نسخ",
     "unschedule": "إلغاء الجدولة",
     "view": "عرض",
-    "cancel": "إيقاف الحملة"
+    "cancel": "إيقاف الحملة",
+    "stopAndDelete": "إيقاف الإرسال وحذف الحملة"
   },
   "delivery": {
     "queued": "{{count}} في الانتظار",

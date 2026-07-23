@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getTenantId } from '../lib/tenant-context';
 import { normalizePhone } from '../lib/phone';
 import { HttpError } from '../auth/authorize';
 import {
@@ -207,12 +208,16 @@ export async function deleteDefinition(
   if (opts.purgeValues) {
     // `-` drops the key from the jsonb document. Spelled `jsonb_exists(...)`
     // rather than the `?` operator, which a driver can mistake for a placeholder.
+    // Raw SQL bypasses the tenant-guard, so the tenant filter is added explicitly
+    // — without it this would purge the key from every tenant's contacts.
+    const tenantId = getTenantId();
     await prisma.$executeRawUnsafe(
       `UPDATE "Contact" SET "customFields" = "customFields" - $1
        WHERE "customFields" IS NOT NULL
          AND jsonb_exists("customFields", $1)
-         ${teamId ? 'AND "teamId" = $2' : ''}`,
-      ...(teamId ? [existing.key, teamId] : [existing.key]),
+         AND "tenantId" = $2
+         ${teamId ? 'AND "teamId" = $3' : ''}`,
+      ...(teamId ? [existing.key, tenantId, teamId] : [existing.key, tenantId]),
     );
   }
 

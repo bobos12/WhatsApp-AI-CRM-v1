@@ -8,7 +8,8 @@ import { authMiddleware, checkPermission } from '../../auth/auth.middleware';
 import { processIncomingMessage } from '../../workflow/inbound-workflow';
 import { logger } from '../../lib/logger';
 import { prisma } from '../../lib/prisma';
-import { getSessionId } from '../../whatsapp/client';
+import { getSessionId, getAuthSessionId, getSock } from '../../whatsapp/client';
+import { getTenantId } from '../../lib/tenant-context';
 import { clearDbAuthState } from '../../whatsapp/db-auth-state';
 import { getWarmupPhase, startOfToday } from '../../whatsapp/warmup';
 import { getFromCache, setInCache, invalidateCache } from '../../lib/status-cache';
@@ -24,7 +25,18 @@ router.use((req, res, next) => {
 
 router.post('/connect', checkPermission('update', 'whatsapp'), async (req, res) => {
   try {
-    await clearDbAuthState(process.env.WHATSAPP_SESSION_ID || 'default');
+    // WhatsApp is per-client. The platform operator's own session has no tenant,
+    // so there is nothing to connect — return a clear message instead of a 500.
+    if (!getTenantId()) {
+      return res.status(409).json({
+        error: 'WhatsApp is managed per client. Open a client from the operator console to connect their WhatsApp.',
+        code: 'NO_TENANT',
+      });
+    }
+    // The auth ROW key, not the live JID — clearing the JID-named key would
+    // leave the real credentials behind and the re-scan would resurrect them.
+    const authId = getAuthSessionId();
+    if (authId) await clearDbAuthState(authId);
     await providerManager.connect();
     res.json({ success: true });
   } catch (error) {
@@ -34,8 +46,12 @@ router.post('/connect', checkPermission('update', 'whatsapp'), async (req, res) 
 
 router.post('/reset-auth', checkPermission('update', 'whatsapp'), async (req, res) => {
   try {
+    if (!getTenantId()) {
+      return res.status(409).json({ error: 'WhatsApp is managed per client.', code: 'NO_TENANT' });
+    }
     await providerManager.disconnect();
-    await clearDbAuthState(process.env.WHATSAPP_SESSION_ID || 'default');
+    const authId = getAuthSessionId();
+    if (authId) await clearDbAuthState(authId);
     const authDir = path.resolve(process.cwd(), 'auth_info_baileys');
     if (fs.existsSync(authDir)) {
       fs.rmSync(authDir, { recursive: true, force: true });
@@ -48,11 +64,18 @@ router.post('/reset-auth', checkPermission('update', 'whatsapp'), async (req, re
 
 router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
   try {
+    // A tenant-less identity (a pure platform operator) has no WhatsApp of its
+    // own. Tell the client so it hides the connect UI instead of prompting to
+    // link a number that has nowhere to live.
+    if (!getTenantId()) {
+      return res.json({ status: 'disconnected', connectedPhone: null, error: null, queueDepth: 0, session: null, tenantless: true });
+    }
+
     // Get connection status immediately (from memory, no DB queries)
     const { status, connectedPhone, error } = providerManager.getStatus();
 
     // Check in-memory cache first (30-second TTL)
-    const sessionId = getSessionId();
+    const sessionId = getAuthSessionId();
     const cacheKey = `whatsapp_session_${sessionId}`;
     const cachedSession = getFromCache(cacheKey);
 
@@ -81,7 +104,7 @@ router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
           (async () => {
             try {
               const today = startOfToday();
-              const analytics = await prisma.analytics.findUnique({
+              const analytics = await prisma.analytics.findFirst({
                 where: { date: today },
                 select: { outgoingMessages: true },
               });
@@ -105,19 +128,33 @@ router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
 
         if (sessionRow) {
           const warmup = getWarmupPhase(sessionRow.createdAt);
-          const dailyRemaining = warmup.dailyLimit ? Math.max(0, warmup.dailyLimit - dailySent) : null;
+
+          // Report the EFFECTIVE warm-up state, not the raw age-derived one.
+          //
+          // `getWarmupPhase()` only knows how old the session is, so it reports
+          // `active: true` for any young number regardless of whether the
+          // operator actually switched warm-up on. Every consumer then had to
+          // remember to AND it with `warmupEnabled`, and the dashboard did not —
+          // so a session with warm-up OFF still displayed a ramp and a daily
+          // limit that nothing was enforcing. Collapsing the two here means a
+          // disabled warm-up is uniformly invisible and no caller can get it
+          // wrong. (Sending was never gated: `checkWarmupGate` in sender.ts
+          // returns early when `warmupEnabled` is false.)
+          const enabled = sessionRow.warmupEnabled;
+          const dailyLimit = enabled ? warmup.dailyLimit : null;
+          const dailyRemaining = dailyLimit ? Math.max(0, dailyLimit - dailySent) : null;
 
           session = {
             createdAt: sessionRow.createdAt.toISOString(),
             dayNumber: warmup.dayNumber,
-            warmupEnabled: sessionRow.warmupEnabled,
+            warmupEnabled: enabled,
             warmup: {
-              active: warmup.active,
+              active: enabled && warmup.active,
               phaseName: warmup.phaseName,
-              dailyLimit: warmup.dailyLimit,
+              dailyLimit,
               dailySent,
               dailyRemaining,
-              fullyUnlockedAt: warmup.fullyUnlockedAt?.toISOString() || null,
+              fullyUnlockedAt: enabled ? (warmup.fullyUnlockedAt?.toISOString() || null) : null,
               perMinuteCap: warmup.perMinuteCap,
             },
           };
@@ -158,7 +195,10 @@ router.patch('/session-settings', checkPermission('update', 'whatsapp'), async (
     if (typeof warmupEnabled !== 'boolean') {
       return res.status(400).json({ error: 'warmupEnabled must be a boolean' });
     }
-    const sessionId = getSessionId();
+    // Must be the auth row key: keyed by the live JID this would create a
+    // SECOND, credential-less session row instead of updating the real one.
+    const sessionId = getAuthSessionId();
+    if (!sessionId) return res.status(409).json({ error: 'No tenant in scope', code: 'NO_TENANT' });
     await prisma.whatsAppSession.upsert({
       where: { sessionId },
       create: { sessionId, data: {}, warmupEnabled },
@@ -190,6 +230,32 @@ router.post('/disconnect', checkPermission('update', 'whatsapp'), async (req, re
 
   await providerManager.disconnect();
   res.json({ success: true });
+});
+
+/**
+ * TEMPORARY DIAGNOSTIC — asks WhatsApp itself whether this account is under a
+ * reachout restriction. Error 463 is ambiguous (`MessageAccountRestriction` and
+ * `SenderReachoutTimelocked` are the same code), so it cannot distinguish "this
+ * account is restricted" from "Baileys failed to attach a privacy token". This
+ * endpoint settles it from the authoritative source. Remove once answered.
+ */
+router.get('/restriction-status', checkPermission('read', 'whatsapp'), async (_req, res) => {
+  try {
+    const sock: any = getSock();
+    if (!sock) return res.status(409).json({ error: 'No live socket' });
+
+    const timelock = await sock.fetchAccountReachoutTimelock?.().catch((e: any) => ({ queryFailed: e?.message }));
+    const chatCap = await sock.fetchNewChatMessageCap?.().catch((e: any) => ({ queryFailed: e?.message }));
+
+    res.json({
+      me: sock?.user?.id ?? null,
+      reachoutTimelock: timelock ?? 'unsupported by this Baileys build',
+      newChatMessageCap: chatCap ?? 'unsupported by this Baileys build',
+      connectionStateTimelock: sock?.authState?.creds?.reachoutTimeLock ?? null,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  }
 });
 
 router.post('/send', checkPermission('create', 'messages'), async (req, res) => {

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getTenantContext, runWithTenant } from '../lib/tenant-context';
 import { normalizePhone } from '../lib/phone';
 import { emitRealtime } from '../realtime/socket';
 import { providerManager } from '../providers/manager';
@@ -9,6 +10,57 @@ import { providerManager } from '../providers/manager';
 // left broken images once a URL expired).
 const AVATAR_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 
+/** A profile-picture lookup is a live round-trip to WhatsApp; never wait long. */
+const AVATAR_FETCH_TIMEOUT_MS = 4000;
+
+/** Resolve to null if `promise` has not settled within `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise.catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+/**
+ * Refresh a contact's cached avatar. Best-effort, runs detached from the request.
+ *
+ * The attempt timestamp is written even when no picture comes back. That is the
+ * whole point: a contact with no profile photo (or a private one) yields null,
+ * and if we recorded nothing, `isFresh` stayed false forever and EVERY open paid
+ * for another live WhatsApp lookup. Stamping the attempt makes a missing picture
+ * as cheap to remember as a present one.
+ */
+async function refreshContactAvatar(
+  contactId: string,
+  phone: string,
+  customFields: Record<string, unknown>,
+): Promise<void> {
+  const tenantId = getTenantContext()?.tenantId ?? null;
+  try {
+    const avatarUrl = await withTimeout(
+      providerManager.getProfilePictureUrl(phone),
+      AVATAR_FETCH_TIMEOUT_MS,
+    );
+    const write = async () => {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          customFields: {
+            ...customFields,
+            ...(avatarUrl ? { avatarUrl } : {}),
+            avatarUrlAt: Date.now(),
+          },
+        },
+      });
+    };
+    // Re-enter the originating tenant's scope: this continues after the request
+    // has returned, and `Contact` is tenant-guarded.
+    await (tenantId ? runWithTenant(tenantId, write) : write());
+  } catch {
+    // Cosmetic data — a failed refresh must never surface to the caller.
+  }
+}
+
 export async function enrichContactAvatar(contact: any) {
   if (!contact?.id) return contact;
   const customFields = (contact.customFields as Record<string, unknown> | null | undefined) || {};
@@ -16,14 +68,19 @@ export async function enrichContactAvatar(contact: any) {
   const isFresh = Boolean(customFields.avatarUrl) && Date.now() - fetchedAt < AVATAR_TTL_MS;
   if (isFresh) return contact;
 
-  const avatarUrl = await providerManager.getProfilePictureUrl(contact.phone);
-  // Provider offline or contact has no picture: keep whatever we already have.
-  if (!avatarUrl) return contact;
-
-  return prisma.contact.update({
-    where: { id: contact.id },
-    data: { customFields: { ...customFields, avatarUrl, avatarUrlAt: Date.now() } },
-  });
+  // Refresh in the BACKGROUND and return immediately.
+  //
+  // This used to be awaited on the critical path of opening a conversation — an
+  // un-timed network call to WhatsApp — so a chat could not render until the
+  // provider answered. For a contact with no profile picture nothing was ever
+  // cached, so the full cost was paid on every single open. That is the "some
+  // contacts take forever to load" symptom.
+  //
+  // An avatar is decoration: showing a slightly stale one (or none) while the
+  // fresh one lands on the next open is a far better trade than stalling the
+  // chat behind it.
+  void refreshContactAvatar(contact.id, contact.phone, customFields);
+  return contact;
 }
 
 export async function logActivity(

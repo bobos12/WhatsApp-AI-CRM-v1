@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../lib/logger';
+import { getTenantId } from '../lib/tenant-context';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Structured, fully-editable AI configuration for the customer-facing WhatsApp
@@ -209,7 +210,17 @@ export interface AiConfig {
   _migratedV2?: boolean;
 }
 
-const CONFIG_PATH = path.resolve(process.cwd(), 'config', 'ai-config.json');
+// Legacy shared config from the single-tenant era. Its contents are migrated
+// into the Default tenant's per-tenant file once at boot (see seedFromLegacy).
+const LEGACY_CONFIG_PATH = path.resolve(process.cwd(), 'config', 'ai-config.json');
+const CONFIG_DIR = path.resolve(process.cwd(), 'config');
+
+/** Per-tenant config file path. Each tenant has its own bot persona/behavior. */
+function configPathFor(tenantId: string): string {
+  // Sanitize to keep the id filesystem-safe.
+  const safe = tenantId.replace(/[^a-zA-Z0-9_-]/g, '');
+  return path.join(CONFIG_DIR, `ai-config.${safe}.json`);
+}
 
 export const DEFAULT_AI_CONFIG: AiConfig = {
   enabled: false,
@@ -440,46 +451,85 @@ function migrateFromLegacy(cfg: AiConfig): AiConfig {
 }
 
 class AiConfigService {
-  private cache: AiConfig | null = null;
+  // One config per tenant. The bot persona/behavior differs per business.
+  private cache = new Map<string, AiConfig>();
 
-  get(): AiConfig {
-    if (this.cache) return this.cache;
-    try {
-      if (fs.existsSync(CONFIG_PATH)) {
-        const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-        this.cache = mergeAiConfig(DEFAULT_AI_CONFIG, JSON.parse(raw));
-      } else {
-        this.cache = { ...DEFAULT_AI_CONFIG };
-      }
-    } catch (err) {
-      logger.warn('ai_config.read_error', { error: String(err) });
-      this.cache = { ...DEFAULT_AI_CONFIG };
-    }
-    // Run the one-time legacy reconciliation, then persist the result.
-    if (!this.cache!._migratedV2) {
-      this.cache = migrateFromLegacy(this.cache!);
-      this.persist(this.cache!);
-      logger.info('ai_config.migrated_v2');
-    }
-    return this.cache!;
+  /** The scope key for the current tenant (falls back to a shared bucket). */
+  private key(): string {
+    return getTenantId() ?? '__default__';
   }
 
-  private persist(cfg: AiConfig): void {
+  get(): AiConfig {
+    const key = this.key();
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+
+    let cfg: AiConfig;
+    const p = configPathFor(key);
     try {
-      const dir = path.dirname(CONFIG_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8');
+      if (fs.existsSync(p)) {
+        cfg = mergeAiConfig(DEFAULT_AI_CONFIG, JSON.parse(fs.readFileSync(p, 'utf-8')));
+      } else {
+        // Brand-new tenant: start from defaults, no legacy import (legacy is only
+        // folded into the Default tenant, once, via seedFromLegacy at boot).
+        cfg = { ...DEFAULT_AI_CONFIG, _migratedV2: true };
+      }
     } catch (err) {
-      logger.error('ai_config.write_error', { error: String(err) });
+      logger.warn('ai_config.read_error', { key, error: String(err) });
+      cfg = { ...DEFAULT_AI_CONFIG, _migratedV2: true };
+    }
+    this.cache.set(key, cfg);
+    return cfg;
+  }
+
+  private persist(key: string, cfg: AiConfig): void {
+    try {
+      if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+      fs.writeFileSync(configPathFor(key), JSON.stringify(cfg, null, 2), 'utf-8');
+    } catch (err) {
+      logger.error('ai_config.write_error', { key, error: String(err) });
     }
   }
 
   update(partial: Partial<AiConfig>): AiConfig {
+    const key = this.key();
     const next = mergeAiConfig(this.get(), partial);
-    this.cache = next;
-    this.persist(next);
-    logger.info('ai_config.updated');
+    this.cache.set(key, next);
+    this.persist(key, next);
+    logger.info('ai_config.updated', { key });
     return next;
+  }
+
+  /**
+   * One-time boot step: fold the legacy single-tenant config
+   * (config/ai-config.json) into the Default tenant's per-tenant file, running
+   * the v2 reconciliation. No-op if the tenant already has a file or there is no
+   * legacy file. Called from bootstrapDefaultTenant.
+   */
+  /** Remove a tenant's config (cache + file). Called when a tenant is deleted. */
+  remove(tenantId: string): void {
+    this.cache.delete(tenantId);
+    try {
+      const p = configPathFor(tenantId);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch (err) {
+      logger.warn('ai_config.remove_failed', { tenantId, error: String(err) });
+    }
+  }
+
+  seedFromLegacy(tenantId: string): void {
+    const p = configPathFor(tenantId);
+    try {
+      if (fs.existsSync(p)) return; // already has its own config
+      if (!fs.existsSync(LEGACY_CONFIG_PATH)) return; // nothing to migrate
+      let cfg = mergeAiConfig(DEFAULT_AI_CONFIG, JSON.parse(fs.readFileSync(LEGACY_CONFIG_PATH, 'utf-8')));
+      if (!cfg._migratedV2) cfg = migrateFromLegacy(cfg);
+      this.persist(tenantId, cfg);
+      this.cache.set(tenantId, cfg);
+      logger.info('ai_config.seeded_from_legacy', { tenantId });
+    } catch (err) {
+      logger.warn('ai_config.seed_from_legacy_failed', { tenantId, error: String(err) });
+    }
   }
 }
 

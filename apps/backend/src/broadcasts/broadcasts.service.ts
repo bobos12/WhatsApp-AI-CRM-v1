@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getTenantContext } from '../lib/tenant-context';
 import { HttpError } from '../auth/authorize';
 import { toStorageRef, resolveMediaUrl } from '../lib/media';
 import { instantToWallClock, isValidTimeZone, resolveScheduledInstant } from '../lib/timezone';
@@ -50,6 +51,27 @@ const MIN_BATCH_INTERVAL = 1;
 const MAX_BATCH_INTERVAL = 1_440; // 24h
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_BATCH_INTERVAL = 30;
+
+/**
+ * Build the recipient rows for a nested `create`, tenant stamp included.
+ *
+ * The tenant guard in lib/prisma.ts only stamps the TOP-LEVEL `data` of a
+ * create — a nested `recipients: { create: [...] }` slips past it, and the child
+ * rows land with `tenantId: null`. Every later guarded query then injects
+ * `where: { tenantId }` and silently matches none of them, which meant:
+ *
+ *   • the worker's per-recipient `sent`/`failed` markers were never persisted
+ *     (so a resumed run would message everyone a second time), and
+ *   • `deleteBroadcast`'s `deleteMany` removed nothing, so deleting ANY campaign
+ *     died on the recipient foreign key.
+ *
+ * Stamping the children here is what keeps them reachable. Null under platform
+ * scope, which matches the parent broadcast and is what the guard expects.
+ */
+function recipientRows(phones: string[]): Array<{ phone: string; tenantId: string | null }> {
+  const tenantId = getTenantContext()?.tenantId ?? null;
+  return phones.map((phone) => ({ phone, tenantId }));
+}
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
   const n = Math.floor(Number(value));
@@ -259,7 +281,7 @@ export class BroadcastsService {
         timezone: schedule?.timezone ?? input.timezone?.trim() ?? 'UTC',
         description: input.tag ? `Tag: ${input.tag}` : null,
         recipients: {
-          create: recipients.map((phone) => ({ phone })),
+          create: recipientRows(recipients),
         },
       },
       // Without this the response would claim `recipientCount: 0` for a
@@ -311,7 +333,7 @@ export class BroadcastsService {
         queuedAt: null,
         recipients: {
           deleteMany: {},
-          create: recipients.map((phone) => ({ phone })),
+          create: recipientRows(recipients),
         },
       },
       include: { _count: { select: { recipients: true } } },
@@ -368,7 +390,7 @@ export class BroadcastsService {
         type: 'IMMEDIATE',
         scheduledAt: null,
         timezone: source.timezone,
-        recipients: { create: source.recipients.map((recipient) => ({ phone: recipient.phone })) },
+        recipients: { create: recipientRows(source.recipients.map((recipient) => recipient.phone)) },
       },
       include: { _count: { select: { recipients: true } } },
     });
@@ -443,8 +465,17 @@ export class BroadcastsService {
     });
 
     if (!broadcast) throw new HttpError(404, 'Broadcast not found');
-    if (broadcast.status === 'SENDING') {
-      throw new HttpError(409, 'Pause the broadcast before deleting it.');
+
+    // Deleting a live campaign is also how you stop one. Flip the status *before*
+    // removing the rows so the worker's between-send check sees a cancelled
+    // campaign on its very next poll — that check runs between every recipient,
+    // so the send halts within one message rather than waiting on this delete.
+    // The delete itself then removes the (now inert) record.
+    if (broadcast.status === 'SENDING' || broadcast.status === 'PAUSED') {
+      await prisma.broadcast.updateMany({
+        where: { id: broadcast.id },
+        data: { status: 'CANCELLED', nextBatchAt: null, queuedAt: null },
+      });
     }
 
     return await prisma.$transaction([

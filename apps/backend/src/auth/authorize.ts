@@ -10,7 +10,7 @@
 
 import { env } from '../lib/env';
 
-export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'TEAM_LEAD' | 'AGENT' | 'ANALYST' | 'VIEWER';
+export type Role = 'PLATFORM_OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'TEAM_LEAD' | 'AGENT' | 'ANALYST' | 'VIEWER';
 
 /** The hidden developer super-account's email, or null when not configured. */
 export function devSuperuserEmail(): string | null {
@@ -49,7 +49,7 @@ export interface AuthActor {
  * Existing enum values are preserved in the DB so no destructive migration is
  * needed; access is decided purely by which tier a role falls into.
  */
-export const MANAGER_ROLES = new Set<string>(['SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD']);
+export const MANAGER_ROLES = new Set<string>(['PLATFORM_OWNER', 'SUPER_ADMIN', 'ADMIN', 'TEAM_LEAD']);
 
 /** True when the role grants full ("System Manager") access. */
 export function isManager(role?: Role | string): boolean {

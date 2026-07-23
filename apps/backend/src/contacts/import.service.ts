@@ -470,7 +470,7 @@ export async function importRows(
     }
 
     try {
-      const existing = await prisma.contact.findUnique({ where: { phone: prepared.phone } });
+      const existing = await prisma.contact.findFirst({ where: { phone: prepared.phone } });
       const firstRow = seenInBatch.get(prepared.phone);
       const isDuplicate = Boolean(existing) || firstRow !== undefined;
       if (firstRow === undefined) seenInBatch.set(prepared.phone, prepared.row);

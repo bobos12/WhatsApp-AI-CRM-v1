@@ -23,7 +23,9 @@ const MIN_KEY = 'wa_connect_banner_min';
 export default function WhatsAppConnectBanner() {
   const { t } = useTranslation('common');
   const pathname = usePathname();
-  const { status, isLoading } = useSessionStatus() as { status?: string; isLoading: boolean };
+  // `tenantless` is true for a platform operator with no business of their own —
+  // WhatsApp is per client, so the connect prompt doesn't apply to them.
+  const { status, isLoading, tenantless } = useSessionStatus() as { status?: string; isLoading: boolean; tenantless?: boolean };
 
   const [minimized, setMinimized] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -53,6 +55,7 @@ export default function WhatsAppConnectBanner() {
 
   // Don't render until we know the status, when connected, or on the settings page.
   if (!hydrated || isLoading) return null;
+  if (tenantless) return null; // a pure operator has no WhatsApp of their own
   if (status !== 'disconnected' && status !== 'connecting') return null;
   if (pathname?.startsWith('/settings')) return null;
 

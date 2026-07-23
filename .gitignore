@@ -24,6 +24,10 @@ auth_info_baileys/
 apps/backend/tenants/
 tenants/
 
+# Per-tenant / backup AI configs (runtime data, not source) — keep only the shared ai-config.json
+apps/backend/config/ai-config.*.json
+apps/backend/config/*.backup.json
+
 # Logs
 logs/
 *.log

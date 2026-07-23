@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
 import { isManager, type Role } from './authorize';
+import { runAsPlatform, runWithContext } from '../lib/tenant-context';
 
 interface AuthRequest extends Request {
   user?: {
@@ -11,7 +12,18 @@ interface AuthRequest extends Request {
     name: string;
     role: Role;
     teamId: string | null;
+    tenantId: string | null;
   };
+}
+
+/**
+ * Platform identities have no owning tenant (tenantId === null): the PLATFORM_OWNER
+ * and the developer super-account. They run with the tenant-guard bypassed so they
+ * can see across every tenant. Every ordinary tenant user carries a tenantId and is
+ * fenced to it.
+ */
+function isPlatformIdentity(user: { role: string; tenantId: string | null }): boolean {
+  return user.role === 'PLATFORM_OWNER' || user.tenantId == null;
 }
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -24,17 +36,41 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     }
 
     const decoded = jwt.verify(token, env.jwtSecret) as { id: string };
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, name: true, role: true, teamId: true },
+    // The user lookup precedes knowing the tenant, so it runs in platform scope;
+    // the request itself is then scoped to the user's tenant below. NOTE: the
+    // `await` must be INSIDE runAsPlatform — a Prisma query is lazy, so returning
+    // it unawaited would execute it after the scope has already exited.
+    const user = await runAsPlatform(async () => {
+      return await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, email: true, name: true, role: true, teamId: true, tenantId: true },
+      });
     });
 
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // A suspended tenant's users cannot use the app; their data is preserved.
+    if (user.tenantId) {
+      const tenant = await runAsPlatform(async () => {
+        return await prisma.tenant.findUnique({ where: { id: user.tenantId! }, select: { status: true } });
+      });
+      if (tenant?.status === 'SUSPENDED') {
+        return res.status(403).json({ error: 'This account is suspended. Please contact support.' });
+      }
+    }
+
     req.user = user;
-    next();
+
+    // Establish the tenant scope for the entire downstream request. Because
+    // Express invokes the next handler synchronously inside this call, the
+    // AsyncLocalStorage context flows through every awaited DB call in the route.
+    const platform = isPlatformIdentity(user);
+    runWithContext(
+      { tenantId: user.tenantId ?? null, userId: user.id, role: user.role, platform },
+      () => next(),
+    );
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }

@@ -21,6 +21,8 @@ export interface WhatsAppConnectState {
   connectedPhone: string | null;
   qrCode: string | null;
   error: string | null;
+  /** True when the current identity has no WhatsApp of its own (a platform operator). */
+  tenantless: boolean;
   /** Re-run the handshake (used by the error "try again" action). */
   retry: () => void;
 }
@@ -30,6 +32,7 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tenantless, setTenantless] = useState(false);
 
   // Guards a single connect POST per disconnected episode — the socket, the poll
   // and re-renders all funnel through here without hammering the endpoint.
@@ -62,6 +65,14 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
   const fetchStatus = useCallback(async () => {
     try {
       const data = await api.get('/api/whatsapp/status');
+      // A platform operator with no business of their own: nothing to connect.
+      if (data.tenantless) {
+        setTenantless(true);
+        setStatus('disconnected');
+        setQrCode(null);
+        return;
+      }
+      setTenantless(false);
       const next: WaStatus = data.status;
       setStatus(next);
       setConnectedPhone(data.connectedPhone ?? null);
@@ -106,5 +117,5 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
     return () => clearInterval(id);
   }, [enabled, status, fetchStatus]);
 
-  return { status, connectedPhone, qrCode, error, retry };
+  return { status, connectedPhone, qrCode, error, tenantless, retry };
 }

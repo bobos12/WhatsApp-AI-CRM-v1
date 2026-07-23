@@ -1,5 +1,6 @@
 import Queue from 'bull';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaUnscoped } from '../lib/prisma';
+import { runWithTenant, runAsPlatform } from '../lib/tenant-context';
 import { providerManager } from '../providers/manager';
 import { emitRealtime } from '../realtime/socket';
 import { logger } from '../lib/logger';
@@ -36,12 +37,36 @@ export function ensureBroadcastWorker() {
   broadcastQueue.process(async (job) => {
     const { broadcastId } = job.data as { broadcastId: string };
 
+    // A Bull job runs detached from any request/boot scope. Resolve the owning
+    // tenant unguarded, then run the whole job in that tenant's scope so every
+    // query is fenced and the send uses the tenant's own WhatsApp socket.
+    const owner = await prismaUnscoped.broadcast.findUnique({
+      where: { id: broadcastId },
+      select: { tenantId: true },
+    });
+    // The campaign was deleted before its job was picked up. That is a legitimate
+    // outcome now that Delete doubles as Stop, so retire the job quietly instead
+    // of throwing — a throw would burn three retries on a row that is never
+    // coming back and leave noise in the failed set.
+    if (!owner) {
+      logger.info('broadcast.job_for_deleted_broadcast', { broadcastId });
+      return { broadcastId, deleted: true };
+    }
+    const runScoped = <T>(fn: () => Promise<T>): Promise<T> =>
+      owner.tenantId ? runWithTenant(owner.tenantId, fn) : runAsPlatform(fn);
+
+    return runScoped(async () => {
     const broadcast = await prisma.broadcast.findUnique({
       where: { id: broadcastId },
       include: { recipients: true },
     });
 
-    if (!broadcast) throw new Error('Broadcast not found');
+    // Same race as above, one step later: deleted between resolving the owner and
+    // reading the campaign.
+    if (!broadcast) {
+      logger.info('broadcast.job_for_deleted_broadcast', { broadcastId });
+      return { broadcastId, deleted: true };
+    }
 
     // The only status a job may run against is SENDING — the claim (manual send,
     // scheduler dispatch, or due-batch poll) sets it before the job is added. Any
@@ -112,21 +137,30 @@ export function ensureBroadcastWorker() {
     for (let i = 0; i < batch.length; i++) {
       const recipient = batch[i];
 
-      // Re-check the campaign's status between sends. Anything other than SENDING
-      // — the user pressed Pause or Cancel, or another process reverted it —
-      // stops this batch. We persist the running totals but never write the
-      // status here, so the user's choice stands.
+      // Re-check the campaign between sends. Anything other than SENDING — the
+      // user pressed Pause or Cancel, or another process reverted it — stops this
+      // batch. A row that is *gone* stops it just as firmly: Delete doubles as
+      // Stop, so a missing campaign means the user pulled the plug mid-send and
+      // we must not keep messaging people on behalf of something that no longer
+      // exists. (Treating null as "carry on" was the bug that made deleting a
+      // live broadcast impossible to do safely.)
+      //
+      // We persist the running totals but never write the status here, so the
+      // user's choice stands.
       const current = await prisma.broadcast.findUnique({
         where: { id: broadcastId },
         select: { status: true },
       });
-      if (current && current.status !== 'SENDING') {
-        logger.info('broadcast.batch_stopped', { broadcastId, status: current.status, sentSoFar: sent });
-        await prisma.broadcast.update({
+      if (!current || current.status !== 'SENDING') {
+        const stoppedAs = current?.status ?? 'DELETED';
+        logger.info('broadcast.batch_stopped', { broadcastId, status: stoppedAs, sentSoFar: sent });
+        // updateMany, not update: the row may already be deleted, and a
+        // missing-row throw here would fail the job and retry into the same void.
+        await prisma.broadcast.updateMany({
           where: { id: broadcastId },
           data: { totalSent: sent, totalFailed: failed },
         });
-        return { broadcastId, sent, failed, stopped: current.status };
+        return { broadcastId, sent, failed, stopped: stoppedAs };
       }
 
       const vars = buildPersonalizationVars(contactByPhone.get(recipient.phone), recipient.phone);
@@ -244,5 +278,6 @@ export function ensureBroadcastWorker() {
 
     emitRealtime('broadcast:complete', { broadcastId, sent, failed, total, status: finalStatus }, broadcast.teamId ?? undefined);
     return { broadcastId, sent, failed };
+    });
   });
 }

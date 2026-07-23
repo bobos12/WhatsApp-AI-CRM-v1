@@ -10,6 +10,7 @@ import LeadAlertPopup from '../../components/notifications/LeadAlertPopup';
 import CrmAssistantBubble from '../../components/layout/CrmAssistantBubble';
 import WhatsAppConnectBanner from '../../components/whatsapp/WhatsAppConnectBanner';
 import AppUpdateBanner from '../../components/layout/AppUpdateBanner';
+import ImpersonationBanner from '../../components/layout/ImpersonationBanner';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <Header />
+            <ImpersonationBanner />
             <AppUpdateBanner />
             <WhatsAppConnectBanner />
             <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pt-5 sm:px-6 sm:py-5 lg:px-7 pb-[var(--bottom-nav-space)] animate-fade-in">

@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
-import { sock, waStatus, getSessionId } from './client';
+import { getTenantId } from '../lib/tenant-context';
+import { getSock, getWaStatus, getSessionId, getAuthSessionId } from './client';
 import { normalizePhone, normalizeRecipient, parseWhatsAppJid } from '../lib/phone';
 import { getOrCreateConversationByPhone } from '../conversations/conversation-resolver';
 import { retryAsync } from '../lib/retry';
@@ -59,7 +60,8 @@ function pickPayloadFromMedia(input?: {
  * Throws WarmupLimitError if limit is exceeded.
  */
 async function checkWarmupGate(): Promise<void> {
-  const sessionId = getSessionId();
+  const sessionId = getAuthSessionId();
+  if (!sessionId) return;
   const whatsappSession = await prisma.whatsAppSession.findUnique({
     where: { sessionId },
     select: { createdAt: true, warmupEnabled: true },
@@ -75,7 +77,7 @@ async function checkWarmupGate(): Promise<void> {
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
   let dailySent = 0;
   try {
-    const analytics = await prisma.analytics.findUnique({
+    const analytics = await prisma.analytics.findFirst({
       where: { date: today },
       select: { outgoingMessages: true },
     });
@@ -94,12 +96,17 @@ async function checkWarmupGate(): Promise<void> {
 /** Atomically increment today's outgoing count and bust the 30-s status cache. */
 async function incrementDailyOutgoingCount(): Promise<void> {
   const today = startOfToday();
-  await prisma.analytics.upsert({
-    where: { date: today },
-    create: { date: today, outgoingMessages: 1, incomingMessages: 0 },
-    update: { outgoingMessages: { increment: 1 } },
-  }).catch(() => {});
-  invalidateCache(`whatsapp_session_${getSessionId()}`);
+  // Analytics is per-tenant per-day. Outbound sends always run inside a tenant
+  // scope; if somehow none is set, skip (analytics is best-effort, non-critical).
+  const tenantId = getTenantId();
+  if (tenantId) {
+    await prisma.analytics.upsert({
+      where: { tenantId_date: { tenantId, date: today } },
+      create: { date: today, outgoingMessages: 1, incomingMessages: 0 },
+      update: { outgoingMessages: { increment: 1 } },
+    }).catch(() => {});
+  }
+  invalidateCache(`whatsapp_session_${getAuthSessionId() ?? getSessionId()}`);
 }
 
 // Prefer the bundled ffmpeg-static binary when present; otherwise fall back to a
@@ -165,7 +172,9 @@ export async function sendMessage(
   knownConversationId?: string,
   options?: { byBot?: boolean },
 ) {
-  if (!sock || waStatus !== 'connected') throw new Error('WhatsApp is not connected');
+  // Resolve the current tenant's socket from the ambient context.
+  const sock = getSock();
+  if (!sock || getWaStatus() !== 'connected') throw new Error('WhatsApp is not connected');
 
   // Check warm-up daily limit before proceeding
   await checkWarmupGate();
@@ -381,7 +390,9 @@ export async function sendInteractiveViaBaileys(
   conversationId: string,
   clientId?: string,
 ): Promise<{ id: string }> {
-  if (!sock || waStatus !== 'connected') throw new Error('WhatsApp is not connected');
+  // Resolve the current tenant's socket from the ambient context.
+  const sock = getSock();
+  if (!sock || getWaStatus() !== 'connected') throw new Error('WhatsApp is not connected');
 
   // Check warm-up daily limit before proceeding
   await checkWarmupGate();

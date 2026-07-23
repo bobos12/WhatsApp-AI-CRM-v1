@@ -250,7 +250,9 @@
     "title": "Delete Broadcast",
     "message": "Are you sure you want to delete this broadcast?",
     "confirm": "Yes, delete",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "liveTitle": "Stop sending and delete?",
+    "liveConfirm": "Stop & delete"
   },
   "cancelConfirm": {
     "title": "Stop this campaign?",
@@ -265,7 +267,8 @@
     "duplicate": "Duplicate",
     "unschedule": "Unschedule",
     "view": "View",
-    "cancel": "Stop campaign"
+    "cancel": "Stop campaign",
+    "stopAndDelete": "Stop sending and delete"
   },
   "delivery": {
     "queued": "{{count}} queued",

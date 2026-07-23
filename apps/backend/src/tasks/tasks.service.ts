@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { getTenantId } from '../lib/tenant-context';
 import crypto from 'crypto';
 
 type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE';
@@ -18,6 +19,7 @@ async function ensureTasksTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Task" (
       id TEXT PRIMARY KEY,
+      "tenantId" TEXT NULL,
       "teamId" TEXT NULL,
       "contactId" TEXT NULL,
       "conversationId" TEXT NULL,
@@ -34,6 +36,16 @@ async function ensureTasksTable() {
   // Add new columns to existing deployments
   await prisma.$executeRawUnsafe(`ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'MEDIUM'`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "conversationId" TEXT NULL`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "tenantId" TEXT NULL`);
+}
+
+/**
+ * The current tenant id for a task query. This service uses raw SQL, so the
+ * Prisma tenant-guard does NOT apply — every query below must filter on this
+ * explicitly, or a manager could reach another tenant's tasks by id.
+ */
+function currentTenantId(): string | null {
+  return getTenantId();
 }
 
 const SELECT_TASK = `
@@ -55,26 +67,24 @@ export class TasksService {
     await ensureTasksTable();
     const { teamId, assigneeId, isAdmin } = opts;
 
-    let query: string;
-    let params: any[];
+    // Always fence to the current tenant first; team/assignee narrow within it.
+    const conds: string[] = [`t."tenantId" = $1`];
+    const params: any[] = [currentTenantId()];
 
-    if (isAdmin && teamId) {
-      query = `${SELECT_TASK} WHERE t."teamId" = $1 ORDER BY t.status ASC, t."dueDate" ASC NULLS LAST, t."createdAt" DESC`;
-      params = [teamId];
-    } else if (isAdmin) {
-      query = `${SELECT_TASK} ORDER BY t.status ASC, t."dueDate" ASC NULLS LAST, t."createdAt" DESC`;
-      params = [];
+    if (isAdmin) {
+      if (teamId) {
+        conds.push(`t."teamId" = $${params.length + 1}`);
+        params.push(teamId);
+      }
     } else if (assigneeId) {
-      query = `${SELECT_TASK} WHERE t."assigneeId" = $1 ORDER BY t.status ASC, t."dueDate" ASC NULLS LAST, t."createdAt" DESC`;
-      params = [assigneeId];
+      conds.push(`t."assigneeId" = $${params.length + 1}`);
+      params.push(assigneeId);
     } else {
       return [];
     }
 
-    const rows = await (params.length
-      ? prisma.$queryRawUnsafe<any[]>(query, ...params)
-      : prisma.$queryRawUnsafe<any[]>(query));
-
+    const query = `${SELECT_TASK} WHERE ${conds.join(' AND ')} ORDER BY t.status ASC, t."dueDate" ASC NULLS LAST, t."createdAt" DESC`;
+    const rows = await prisma.$queryRawUnsafe<any[]>(query, ...params);
     return rows.map(mapTaskRow);
   }
 
@@ -91,9 +101,10 @@ export class TasksService {
     await ensureTasksTable();
     const id = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "Task" (id, "teamId", "contactId", "conversationId", title, description, "dueDate", status, priority, "assigneeId", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'OPEN', $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      `INSERT INTO "Task" (id, "tenantId", "teamId", "contactId", "conversationId", title, description, "dueDate", status, priority, "assigneeId", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       id,
+      currentTenantId(),
       data.teamId ?? null,
       data.contactId ?? null,
       data.conversationId ?? null,
@@ -122,24 +133,27 @@ export class TasksService {
     },
   ) {
     await ensureTasksTable();
+    const tenantId = currentTenantId();
+    // Always fence to the tenant; optionally also to the caller's team.
     const existing = data.teamId
-      ? await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Task" WHERE id = $1 AND "teamId" = $2`, id, data.teamId)
-      : await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Task" WHERE id = $1`, id);
+      ? await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Task" WHERE id = $1 AND "tenantId" = $2 AND "teamId" = $3`, id, tenantId, data.teamId)
+      : await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "Task" WHERE id = $1 AND "tenantId" = $2`, id, tenantId);
     if (!existing.length) throw new Error('Task not found');
 
     await prisma.$executeRawUnsafe(
       `UPDATE "Task"
-       SET title          = COALESCE($2, title),
-           description    = COALESCE($3, description),
-           "dueDate"      = COALESCE($4, "dueDate"),
-           "contactId"    = COALESCE($5, "contactId"),
-           "assigneeId"   = COALESCE($6, "assigneeId"),
-           status         = COALESCE($7, status),
-           priority       = COALESCE($8, priority),
-           "conversationId" = COALESCE($9, "conversationId"),
+       SET title          = COALESCE($3, title),
+           description    = COALESCE($4, description),
+           "dueDate"      = COALESCE($5, "dueDate"),
+           "contactId"    = COALESCE($6, "contactId"),
+           "assigneeId"   = COALESCE($7, "assigneeId"),
+           status         = COALESCE($8, status),
+           priority       = COALESCE($9, priority),
+           "conversationId" = COALESCE($10, "conversationId"),
            "updatedAt"    = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+       WHERE id = $1 AND "tenantId" = $2`,
       id,
+      tenantId,
       data.title ?? null,
       data.description ?? null,
       data.dueDate ?? null,
@@ -149,15 +163,16 @@ export class TasksService {
       data.priority ?? null,
       data.conversationId ?? null,
     );
-    const [task] = await prisma.$queryRawUnsafe<any[]>(`${SELECT_TASK} WHERE t.id = $1`, id);
+    const [task] = await prisma.$queryRawUnsafe<any[]>(`${SELECT_TASK} WHERE t.id = $1 AND t."tenantId" = $2`, id, tenantId);
     return mapTaskRow(task);
   }
 
   static async deleteTask(id: string, teamId?: string) {
     await ensureTasksTable();
+    const tenantId = currentTenantId();
     const count = teamId
-      ? await prisma.$executeRawUnsafe(`DELETE FROM "Task" WHERE id = $1 AND "teamId" = $2`, id, teamId)
-      : await prisma.$executeRawUnsafe(`DELETE FROM "Task" WHERE id = $1`, id);
+      ? await prisma.$executeRawUnsafe(`DELETE FROM "Task" WHERE id = $1 AND "tenantId" = $2 AND "teamId" = $3`, id, tenantId, teamId)
+      : await prisma.$executeRawUnsafe(`DELETE FROM "Task" WHERE id = $1 AND "tenantId" = $2`, id, tenantId);
     if (!count) throw new Error('Task not found');
     return { success: true };
   }
@@ -165,8 +180,9 @@ export class TasksService {
   static async getTasksByConversation(conversationId: string) {
     await ensureTasksTable();
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `${SELECT_TASK} WHERE t."conversationId" = $1 ORDER BY t."createdAt" DESC`,
+      `${SELECT_TASK} WHERE t."conversationId" = $1 AND t."tenantId" = $2 ORDER BY t."createdAt" DESC`,
       conversationId,
+      currentTenantId(),
     );
     return rows.map(mapTaskRow);
   }

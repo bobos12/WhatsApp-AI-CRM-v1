@@ -1,5 +1,6 @@
 import Queue from 'bull';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaUnscoped } from '../lib/prisma';
+import { runWithTenant, runAsPlatform } from '../lib/tenant-context';
 import { providerManager } from '../providers/manager';
 import { logger } from '../lib/logger';
 
@@ -30,6 +31,17 @@ export function ensureFlowWorker() {
   flowQueue.process(async (job) => {
     const { executionId, flowId, stepIndex, phone } = job.data as FlowStepJob;
 
+    // Bull jobs run detached from any scope: resolve the owning tenant unguarded,
+    // then run the step in that tenant's scope (fences queries + picks its socket).
+    const owner = await prismaUnscoped.automationFlowExecution.findUnique({
+      where: { id: executionId },
+      select: { tenantId: true },
+    });
+    if (!owner) return;
+    const runScoped = <T>(fn: () => Promise<T>): Promise<T> =>
+      owner.tenantId ? runWithTenant(owner.tenantId, fn) : runAsPlatform(fn);
+
+    return runScoped(async () => {
     const execution = await prisma.automationFlowExecution.findUnique({ where: { id: executionId } });
     if (!execution || execution.status !== 'RUNNING') return;
 
@@ -88,6 +100,7 @@ export function ensureFlowWorker() {
         data: { status: 'COMPLETED', currentStep: nextIndex },
       });
     }
+    });
   });
 }
 
