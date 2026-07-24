@@ -15,6 +15,15 @@ import { runWithTenant } from '../lib/tenant-context';
 
 export type WaStatus = 'connected' | 'disconnected' | 'connecting';
 
+/**
+ * How many back-to-back QR pairing cycles (each ~a minute of rotating codes) to
+ * offer before going idle. Enough time for someone actively linking to scan, but
+ * bounded so an unwatched QR never loops forever — a perpetual pairing loop from
+ * one IP gets the whole server rate-limited by WhatsApp, after which new scans
+ * silently never complete. The user restarts pairing with POST /connect.
+ */
+const MAX_QR_CYCLES = 5;
+
 export interface ConnectionError {
   statusCode?: number;
   reason?: string;
@@ -36,6 +45,8 @@ interface TenantSession {
   reconnectTimer: NodeJS.Timeout | null;
   lastError: ConnectionError | null;
   connectedAt: Date | null;
+  /** Consecutive QR pairing cycles with no successful scan. Reset on a fresh connect or on open. */
+  qrCycles: number;
 }
 
 /**
@@ -66,6 +77,7 @@ class SessionManager {
         reconnectTimer: null,
         lastError: null,
         connectedAt: null,
+        qrCycles: 0,
       };
       this.sessions.set(tenantId, s);
     }
@@ -122,10 +134,14 @@ class SessionManager {
     runWithTenant(s.tenantId, () => emitRealtime('wa:qr', { qr: null }));
   }
 
-  async connect(tenantId: string): Promise<any> {
+  async connect(tenantId: string, fromRetry = false): Promise<any> {
     const s = this.ensure(tenantId);
     if (s.sock && s.status === 'connected') return s.sock;
     if (s.connectInFlight) return s.connectInFlight;
+    // A fresh connect (boot for a paired number, or the user pressing "connect")
+    // restarts the pairing budget; an internal QR-timeout retry does not — that
+    // is what keeps an unwatched QR from looping forever.
+    if (!fromRetry) s.qrCycles = 0;
 
     // The whole connection lifecycle runs in this tenant's scope so the auth-state
     // reads/writes (WhatsAppSession) and all event handlers are tenant-fenced.
@@ -225,9 +241,29 @@ class SessionManager {
         return;
       }
 
+      // A QR that expired unscanned ("QR refs attempts ended") means nobody was
+      // there to link. Offer a few fresh codes for an active user, then STOP —
+      // an endless pairing loop run from one IP gets the server rate-limited by
+      // WhatsApp, after which scans silently never complete. Real disconnects of
+      // a paired session (any other reason) always reconnect.
+      const isQrTimeout = /QR refs attempts ended/i.test(errorMessage);
+      if (isQrTimeout) {
+        s.qrCycles += 1;
+        if (s.qrCycles >= MAX_QR_CYCLES) {
+          logger.info('wa.pairing_idle', {
+            tenantId: s.tenantId,
+            cycles: s.qrCycles,
+            hint: 'no scan across QR cycles — idling; POST /connect to retry',
+          });
+          return;
+        }
+      } else {
+        s.qrCycles = 0;
+      }
+
       // Avoid tight reconnect loops; retry this tenant after a short backoff.
       s.reconnectTimer = setTimeout(() => {
-        void this.connect(s.tenantId);
+        void this.connect(s.tenantId, true);
       }, 3000);
     } else if (connection === 'open') {
       logger.info('WhatsApp connected', { tenantId: s.tenantId });
@@ -235,6 +271,7 @@ class SessionManager {
       s.status = 'connected';
       s.lastError = null;
       s.connectedAt = new Date();
+      s.qrCycles = 0;
       emitRealtime('wa:status', { status: 'connected' });
       s.connectInFlight = null;
     } else if (connection === 'connecting') {
@@ -317,9 +354,16 @@ class SessionManager {
   async reconnectAll(): Promise<void> {
     const stored = await prismaUnscoped.whatsAppSession.findMany({
       where: { tenantId: { not: null } },
-      select: { tenantId: true },
+      select: { tenantId: true, data: true },
     });
-    const tenantIds = stored.map((r) => r.tenantId).filter((id): id is string => Boolean(id));
+    // Only reconnect sessions that actually FINISHED pairing (creds.me present).
+    // An empty/pending row must never auto-connect: at boot it would spin up a
+    // perpetual QR-pairing loop for a number nobody is currently linking — the
+    // exact behaviour that gets the server rate-limited by WhatsApp.
+    const tenantIds = stored
+      .filter((r) => Boolean((r.data as any)?.creds?.me?.id))
+      .map((r) => r.tenantId)
+      .filter((id): id is string => Boolean(id));
     if (tenantIds.length === 0) return;
 
     const active = await prismaUnscoped.tenant.findMany({
