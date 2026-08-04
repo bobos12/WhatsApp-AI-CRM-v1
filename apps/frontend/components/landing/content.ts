@@ -78,6 +78,21 @@ export interface LandingContent {
     bullets: string[]
     url: string
   }
+  /** Product tour — one tab per screen, each backed by a real screenshot. */
+  tour: {
+    eyebrow: string
+    title: string
+    titleGold: string
+    subtitle: string
+    items: { key: string; label: string; title: string; desc: string; bullets: string[] }[]
+  }
+  mobile: {
+    eyebrow: string
+    title: string
+    titleGold: string
+    subtitle: string
+    bullets: string[]
+  }
   testimonials: {
     eyebrow: string
     title: string
@@ -126,9 +141,11 @@ export const LANDING: Record<LandingLang, LandingContent> = {
   en: {
     nav: {
       links: [
+        { id: 'product', label: 'Product' },
         { id: 'features', label: 'Features' },
         { id: 'ai', label: 'AI' },
         { id: 'industries', label: 'Solutions' },
+        { id: 'pricing', label: 'Pricing' },
         { id: 'faq', label: 'FAQ' },
       ],
       signIn: 'Sign in',
@@ -247,6 +264,60 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       ],
       url: 'app.nexuscrm.sa/inbox',
     },
+    tour: {
+      eyebrow: 'Product tour',
+      title: 'Six systems.',
+      titleGold: 'One platform.',
+      subtitle: 'Every screen below is the real product, captured from the running app — not a mockup.',
+      items: [
+        {
+          key: 'inbox',
+          label: 'Shared Inbox',
+          title: 'One line. Your whole team.',
+          desc: 'Sales, support and design work the same WhatsApp number without two people answering the same customer.',
+          bullets: ['Round-robin assignment inside working hours', 'Internal notes, tags and saved views', 'Full customer history beside every thread'],
+        },
+        {
+          key: 'automation',
+          label: 'Automation',
+          title: 'Automate the follow-up.',
+          desc: 'Trigger-based workflows qualify a lead, route it to the right team and chase it later — without anyone remembering to.',
+          bullets: ['Triggers on real events, not schedules', 'Branches on score, language and working hours', 'Delays that cancel themselves when the customer replies'],
+        },
+        {
+          key: 'deals',
+          label: 'Pipeline',
+          title: 'Turn chats into deals.',
+          desc: 'A drag-and-drop board that tracks value by stage, so you can see where the money is stuck and who is sitting on it.',
+          bullets: ['Stages that match how you actually sell', 'Value and conversion roll up automatically', 'AI-scored leads arrive already ranked'],
+        },
+        {
+          key: 'broadcasts',
+          label: 'Campaigns',
+          title: 'Broadcast at scale.',
+          desc: 'Thousands of segmented messages with per-recipient delivery tracking — and warm-up limits that keep your number alive.',
+          bullets: ['Segment by tag, stage or custom field', 'Ban-safe send pacing enforced by the sender', 'Delivered, read and replied, per campaign'],
+        },
+        {
+          key: 'analytics',
+          label: 'Analytics',
+          title: 'Measure everything.',
+          desc: 'Response times, resolution rates, agent workload, campaign results and AI impact — on one board-ready screen.',
+          bullets: ['First-response time per agent', 'Revenue traced back to the first message', 'What share of chats the AI closed alone'],
+        },
+      ],
+    },
+    mobile: {
+      eyebrow: 'Mobile',
+      title: 'Your inbox,',
+      titleGold: 'in your pocket',
+      subtitle: 'Install it like a native app. The same inbox, the same CRM, the same notifications — on the phone your team already carries.',
+      bullets: [
+        'Installable PWA — no app store review',
+        'Web push for hot leads and SLA breaches',
+        'Works offline-first and syncs on reconnect',
+      ],
+    },
     testimonials: {
       eyebrow: 'Customer stories',
       title: 'Loved by leading Saudi teams',
@@ -304,6 +375,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
   ar: {
     nav: {
       links: [
+        { id: 'product', label: 'المنتج' },
         { id: 'features', label: 'المميزات' },
         { id: 'ai', label: 'الذكاء الاصطناعي' },
         { id: 'industries', label: 'الحلول' },
@@ -425,6 +497,60 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         'واجهة Meta الرسمية + Baileys مع تبديل تلقائي',
       ],
       url: 'app.nexuscrm.sa/inbox',
+    },
+    tour: {
+      eyebrow: 'جولة في المنتج',
+      title: 'ستة أنظمة.',
+      titleGold: 'منصة واحدة.',
+      subtitle: 'كل شاشة بالأسفل هي المنتج الحقيقي، مأخوذة من التطبيق نفسه — وليست تصميمًا وهميًا.',
+      items: [
+        {
+          key: 'inbox',
+          label: 'الصندوق المشترك',
+          title: 'رقم واحد. فريقك بالكامل.',
+          desc: 'المبيعات والدعم والتصميم يعملون على نفس رقم الواتساب دون أن يرد شخصان على العميل نفسه.',
+          bullets: ['توزيع دوري ضمن ساعات العمل', 'ملاحظات داخلية ووسوم وعروض محفوظة', 'سجل العميل كاملًا بجانب كل محادثة'],
+        },
+        {
+          key: 'automation',
+          label: 'الأتمتة',
+          title: 'أتمت المتابعة.',
+          desc: 'مسارات تعمل بالمحفزات تؤهّل العميل وتوجّهه للفريق المناسب وتتابعه لاحقًا — دون أن يتذكر أحد ذلك.',
+          bullets: ['محفزات على أحداث حقيقية لا على جداول', 'تفرّع حسب التقييم واللغة وساعات العمل', 'تأخير يُلغى تلقائيًا عند رد العميل'],
+        },
+        {
+          key: 'deals',
+          label: 'خط الصفقات',
+          title: 'حوّل المحادثات إلى صفقات.',
+          desc: 'لوحة بالسحب والإفلات تتابع القيمة حسب المرحلة، لترى أين تتعطل الأموال ومن المسؤول عنها.',
+          bullets: ['مراحل تطابق طريقة بيعك فعليًا', 'القيمة ونسبة التحويل تُحتسب تلقائيًا', 'العملاء المؤهّلون بالذكاء الاصطناعي يصلون مُرتّبين'],
+        },
+        {
+          key: 'broadcasts',
+          label: 'الحملات',
+          title: 'أرسل على نطاق واسع.',
+          desc: 'آلاف الرسائل المُقسّمة مع تتبّع التسليم لكل مستلم — وحدود إحماء تحافظ على رقمك.',
+          bullets: ['تقسيم حسب الوسم أو المرحلة أو الحقول المخصصة', 'إيقاع إرسال آمن يمنع الحظر', 'التسليم والقراءة والرد لكل حملة'],
+        },
+        {
+          key: 'analytics',
+          label: 'التحليلات',
+          title: 'قِس كل شيء.',
+          desc: 'أزمنة الرد ونسب الحل وأحمال الموظفين ونتائج الحملات وأثر الذكاء الاصطناعي — في شاشة واحدة جاهزة للعرض.',
+          bullets: ['زمن أول رد لكل موظف', 'الإيرادات متتبَّعة حتى أول رسالة', 'نسبة المحادثات التي أغلقها الذكاء الاصطناعي وحده'],
+        },
+      ],
+    },
+    mobile: {
+      eyebrow: 'الجوال',
+      title: 'صندوق وارِدك،',
+      titleGold: 'في جيبك',
+      subtitle: 'ثبّته كتطبيق أصلي. نفس الصندوق ونفس نظام العملاء ونفس الإشعارات — على الجوال الذي يحمله فريقك أصلًا.',
+      bullets: [
+        'تطبيق ويب قابل للتثبيت — بلا مراجعة متجر',
+        'إشعارات فورية للعملاء المهمين وتجاوز زمن الرد',
+        'يعمل دون اتصال ويزامن عند العودة',
+      ],
     },
     testimonials: {
       eyebrow: 'قصص العملاء',

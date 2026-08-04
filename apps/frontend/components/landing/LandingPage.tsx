@@ -1,13 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
   Users, BotMessageSquare, Megaphone, Workflow, Contact,
   BarChart3, Sparkles, Reply, Filter, FileText, Activity, Languages,
   User, Bot, Database, UtensilsCrossed, Stethoscope, Building2, Store,
   ShoppingBag, GraduationCap, Car, Check, ArrowRight, ChevronDown,
-  Star, ShieldCheck, Menu, X, Globe, Zap, Send, type LucideProps,
+  Star, ShieldCheck, Menu, X, Globe, Timer, Target,
+  MessagesSquare, Smartphone, BellRing, type LucideProps,
 } from 'lucide-react'
 import { useLanguage } from '@/components/providers/I18nProvider'
 import { LANDING, type LandingLang } from './content'
@@ -34,14 +36,38 @@ const INDUSTRY_ICONS: Record<string, Icon> = {
   retail: Store, ecommerce: ShoppingBag, education: GraduationCap,
   automotive: Car, agencies: Megaphone,
 }
+const TOUR_ICONS: Record<string, Icon> = {
+  inbox: MessagesSquare, automation: Workflow, deals: Target,
+  broadcasts: Megaphone, analytics: BarChart3,
+}
+
+/**
+ * Screenshots of the running product, rendered by `marketing/tools/render.mjs`
+ * on a transparent background so the page's aurora shows through the device
+ * frame's shadow instead of being punched out by a dark rectangle.
+ */
+const SHOT: Record<string, { src: string; w: number; h: number }> = {
+  dashboard:   { src: '/marketing/landing-dashboard.png',   w: 1980, h: 1351 },
+  inbox:       { src: '/marketing/landing-inbox.png',       w: 1980, h: 1351 },
+  automation:  { src: '/marketing/landing-automation.png',  w: 1980, h: 1351 },
+  analytics:   { src: '/marketing/landing-analytics.png',   w: 1980, h: 1351 },
+  deals:       { src: '/marketing/landing-deals.png',       w: 1980, h: 1351 },
+  broadcasts:  { src: '/marketing/landing-broadcasts.png',  w: 1980, h: 1351 },
+  phoneChat:   { src: '/marketing/landing-phone-chat.png',      w: 660,  h: 1265 },
+  phoneInbox:  { src: '/marketing/landing-phone-inbox.png',     w: 660,  h: 1265 },
+  phoneDash:   { src: '/marketing/landing-phone-dashboard.png', w: 660,  h: 1265 },
+  aiThread:    { src: '/marketing/landing-detail-ai-thread.png',    w: 620,  h: 941 },
+  contextRail: { src: '/marketing/landing-detail-context-rail.png', w: 400,  h: 885 },
+}
 
 // ─── Logo / brand mark ─────────────────────────────────────────────────────────
 function BrandMark({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const img = size === 'sm' ? 'h-7 w-auto' : 'h-9 w-auto'
+  const img = size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'
   const text = size === 'sm' ? 'text-base' : 'text-lg'
   return (
     <div className="flex items-center gap-2.5">
-      <img src="/app-logo.png" alt="NexusCRM" className={`${img} rounded-full drop-shadow-lg`} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/app-logo.png" alt="NexusCRM" className={`${img} rounded-full object-cover drop-shadow-lg`} />
       <span className={`font-extrabold ${text} tracking-tight text-white`}>
         Nexus<span className="text-gold-gradient">CRM</span>
       </span>
@@ -49,7 +75,7 @@ function BrandMark({ size = 'md' }: { size?: 'sm' | 'md' }) {
   )
 }
 
-// ─── Language toggle (dark, on-brand) ──────────────────────────────────────────
+// ─── Language toggle ───────────────────────────────────────────────────────────
 function LangToggle({ className = '' }: { className?: string }) {
   const { language, setLanguage } = useLanguage()
   const next: LandingLang = language === 'ar' ? 'en' : 'ar'
@@ -181,6 +207,43 @@ function SectionHeading({
   )
 }
 
+/**
+ * A product screenshot with the ambient glow the rest of the page uses.
+ * `priority` is only set on the hero shot — everything below the fold is lazy.
+ */
+function Shot({
+  shot, alt, className = '', sizes, priority = false, glow = true,
+}: {
+  shot: { src: string; w: number; h: number }
+  alt: string
+  className?: string
+  sizes: string
+  priority?: boolean
+  glow?: boolean
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      {glow && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-[6%] inset-y-[10%] rounded-[3rem] bg-gradient-to-br from-[#25D366]/22 via-[#d4af37]/8 to-transparent blur-[70px]"
+        />
+      )}
+      <Image
+        src={shot.src}
+        alt={alt}
+        width={shot.w}
+        height={shot.h}
+        sizes={sizes}
+        priority={priority}
+        loading={priority ? undefined : 'lazy'}
+        draggable={false}
+        className="relative h-auto w-full select-none"
+      />
+    </div>
+  )
+}
+
 // ─── FAQ accordion item ────────────────────────────────────────────────────────
 function FaqItem({ q, a, headFont }: { q: string; a: string; headFont?: React.CSSProperties }) {
   const [open, setOpen] = useState(false)
@@ -214,6 +277,9 @@ export default function LandingPage() {
   const headFont: React.CSSProperties | undefined = isAr ? { fontFamily: "'Tajawal', sans-serif" } : undefined
   const arrowFlip = isRTL ? 'rotate-180' : ''
 
+  const [tourTab, setTourTab] = useState(0)
+  const tour = t.tour.items[tourTab]
+
   return (
     <div className="lux-root relative min-h-screen overflow-x-hidden bg-[#050b14] text-white">
       {/* Ambient background */}
@@ -227,122 +293,118 @@ export default function LandingPage() {
 
       <main className="relative z-10">
         {/* ─── HERO ─────────────────────────────────────────────── */}
-        <section className="relative px-4 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8 lg:pb-28">
+        <section className="relative px-4 pt-28 sm:px-6 sm:pt-32 lg:px-8">
           <div className="lux-grid pointer-events-none absolute inset-0 -z-10" />
-          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
-            {/* Copy */}
-            <div className="text-center lg:text-start">
-              <Reveal>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3.5 py-1.5 text-xs font-semibold text-[#5cf0a0]">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#25D366]" />
-                  {t.hero.badge}
-                </span>
-              </Reveal>
 
-              <h1 style={headFont} className="mt-6 text-balance text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl xl:text-[4.1rem]">
-                {t.hero.titlePre}
-                <span className="text-gold-gradient">{t.hero.titleGold}</span>
-                {t.hero.titlePost}
-              </h1>
+          <div className="mx-auto max-w-4xl text-center">
+            <Reveal>
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3.5 py-1.5 text-xs font-semibold text-[#5cf0a0]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#25D366]" />
+                {t.hero.badge}
+              </span>
+            </Reveal>
 
-              <Reveal delay={120}>
-                <p className="mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-white/60 sm:text-lg lg:mx-0">
-                  {t.hero.subtitle}
-                </p>
-              </Reveal>
+            <h1
+              style={headFont}
+              className="mt-6 text-balance text-4xl font-black leading-[1.06] tracking-tight sm:text-5xl lg:text-6xl xl:text-[4.25rem]"
+            >
+              {t.hero.titlePre}
+              <span className="text-gold-gradient">{t.hero.titleGold}</span>
+              {t.hero.titlePost}
+            </h1>
 
-              <Reveal delay={200}>
-                <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:items-start lg:justify-start justify-center">
-                  <Link
-                    href="/login"
-                    className="lux-btn-primary group inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-7 py-3.5 text-base font-bold text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 sm:w-auto"
-                  >
-                    {t.hero.ctaPrimary}
-                    <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
-                  </Link>
-                  <InstallButton
-                    variant="hero"
-                    className="lux-pulse-ring w-full sm:w-auto"
-                    label={isAr ? 'حمّل التطبيق' : 'Download the App'}
-                    installedLabel={isAr ? 'التطبيق مثبّت' : 'App Installed'}
-                  />
-                </div>
-                <Reveal delay={260}>
-                  <div className="mt-4 flex justify-center lg:justify-start">
-                    <Link
-                      href="/login"
-                      className="group inline-flex items-center gap-1.5 text-sm font-semibold text-white/55 transition-colors hover:text-[#f3d98b]"
-                    >
-                      {t.hero.ctaSecondary}
-                      <ArrowRight className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
-                    </Link>
-                  </div>
-                </Reveal>
-              </Reveal>
+            <Reveal delay={120}>
+              <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-white/60 sm:text-lg">
+                {t.hero.subtitle}
+              </p>
+            </Reveal>
 
-              <Reveal delay={280}>
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm text-white/45 lg:justify-start">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="h-4 w-4 fill-[#f3d98b] text-[#f3d98b]" />
-                      ))}
-                    </span>
-                    <span className="font-medium text-white/70">{t.hero.ratingLabel}</span>
-                  </span>
-                </div>
-              </Reveal>
-            </div>
-
-            {/* Visual: dashboard mockup + floating cards */}
-            <Reveal delay={160} className="relative">
-              <div className="relative mx-auto w-full max-w-[270px] sm:max-w-[320px] lg:max-w-[400px]">
-                {/* Ambient glow behind the device */}
-                <div className="absolute -inset-10 rounded-full bg-gradient-to-br from-[#25D366]/25 via-[#d4af37]/10 to-transparent blur-3xl" />
-
-                {/* Phone app screenshot — image already includes the device frame */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/hero-app.png"
-                  alt={isAr ? 'تطبيق Nexus CRM على الجوال' : 'Nexus CRM dashboard on a phone'}
-                  loading="eager"
-                  draggable={false}
-                  className="lux-float-slow relative z-10 h-auto w-full select-none drop-shadow-[0_36px_70px_rgba(0,0,0,0.65)]"
+            <Reveal delay={200}>
+              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/login"
+                  className="lux-btn-primary group inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-7 py-3.5 text-base font-bold text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 sm:w-auto"
+                >
+                  {t.hero.ctaPrimary}
+                  <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
+                </Link>
+                <InstallButton
+                  variant="hero"
+                  className="lux-pulse-ring w-full sm:w-auto"
+                  label={isAr ? 'حمّل التطبيق' : 'Download the App'}
+                  installedLabel={isAr ? 'التطبيق مثبّت' : 'App Installed'}
                 />
+              </div>
+            </Reveal>
 
-                {/* Floating stat: AI handled */}
-                <div className="lux-float-delay lux-glass absolute -top-3 -end-3 z-20 hidden rounded-2xl border border-white/12 p-3.5 shadow-xl shadow-black/40 sm:block lg:-end-10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#25D366]/15">
-                      <Bot className="h-5 w-5 text-[#25D366]" />
-                    </div>
-                    <div>
-                      <p className="text-base font-extrabold leading-none text-white">
-                        <CountUp to={70} suffix="%" duration={2.2} />
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-white/50">{t.hero.floating.aiHandled}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating stat: reply time */}
-                <div className="lux-float lux-glass absolute bottom-16 -start-3 z-20 hidden rounded-2xl border border-white/12 p-3.5 shadow-xl shadow-black/40 sm:block lg:-start-10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#d4af37]/15">
-                      <Zap className="h-5 w-5 text-[#f3d98b]" />
-                    </div>
-                    <div>
-                      <p className="text-base font-extrabold leading-none text-white">2s</p>
-                      <p className="mt-0.5 text-[11px] text-white/50">{t.hero.floating.replies}</p>
-                    </div>
-                  </div>
-                </div>
+            <Reveal delay={280}>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm text-white/45">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-[#f3d98b] text-[#f3d98b]" />
+                    ))}
+                  </span>
+                  <span className="font-medium text-white/70">{t.hero.ratingLabel}</span>
+                </span>
+                <span className="hidden h-3 w-px bg-white/15 sm:block" />
+                <span>{t.hero.noCard}</span>
               </div>
             </Reveal>
           </div>
 
+          {/* The product itself — real dashboard, framed, floating over the aurora */}
+          <Reveal delay={160}>
+            <div className="relative mx-auto mt-16 max-w-[1180px]">
+              <Shot
+                shot={SHOT.dashboard}
+                alt={isAr ? 'لوحة تحكم NexusCRM' : 'NexusCRM dashboard'}
+                sizes="(max-width: 1280px) 100vw, 1180px"
+                priority
+              />
+
+              {/*
+                Floating proof — hidden on small screens where they'd crowd the shot.
+                Offsets are percentages, not fixed pixels: the screenshot carries
+                ~4.5% horizontal / ~6.7% vertical transparent padding around the
+                browser frame, so a `-top-4` would float in empty space above it.
+              */}
+              <div className="lux-float-delay lux-glass absolute top-[3%] end-[1%] z-20 hidden rounded-2xl border border-white/12 p-3.5 shadow-xl shadow-black/40 md:block">
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#25D366]/15">
+                    <Bot className="h-5 w-5 text-[#25D366]" />
+                  </div>
+                  <div>
+                    <p className="text-base font-extrabold leading-none text-white">
+                      <CountUp to={68} suffix="%" duration={2.2} />
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-white/50">{t.hero.floating.aiHandled}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lux-float lux-glass absolute bottom-[26%] start-[-2%] z-20 hidden rounded-2xl border border-white/12 p-3.5 shadow-xl shadow-black/40 md:block">
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#d4af37]/15">
+                    <Timer className="h-5 w-5 text-[#f3d98b]" />
+                  </div>
+                  <div>
+                    <p className="text-base font-extrabold leading-none text-white">8s</p>
+                    <p className="mt-0.5 text-[11px] text-white/50">{t.hero.floating.replies}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fade the shot into the page instead of cutting it off hard */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 -bottom-1 h-32 bg-gradient-to-t from-[#050b14] via-[#050b14]/70 to-transparent"
+              />
+            </div>
+          </Reveal>
+
           {/* Trust marquee */}
-          <div className="mx-auto mt-20 max-w-7xl">
+          <div className="mx-auto mt-8 max-w-7xl">
             <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.2em] text-white/35">
               {t.trust.label}
             </p>
@@ -362,7 +424,7 @@ export default function LandingPage() {
         </section>
 
         {/* ─── STATS BAND ───────────────────────────────────────── */}
-        <section className="px-4 py-8 sm:px-6 lg:px-8">
+        <section className="px-4 py-14 sm:px-6 lg:px-8">
           <Reveal>
             <div className="lux-card mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-3xl md:grid-cols-4">
               {t.stats.map((s, i) => (
@@ -375,6 +437,81 @@ export default function LandingPage() {
               ))}
             </div>
           </Reveal>
+        </section>
+
+        {/* ─── PRODUCT TOUR ─────────────────────────────────────── */}
+        <section id="product" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeading eyebrow={t.tour.eyebrow} sub={t.tour.subtitle} headFont={headFont}>
+              {t.tour.title} <span className="text-emerald-gradient">{t.tour.titleGold}</span>
+            </SectionHeading>
+
+            {/* Tab rail */}
+            <Reveal>
+              <div
+                role="tablist"
+                aria-label={t.tour.eyebrow}
+                className="mx-auto mb-10 flex max-w-3xl flex-wrap items-center justify-center gap-2"
+              >
+                {t.tour.items.map((item, i) => {
+                  const Ic = TOUR_ICONS[item.key]
+                  const active = i === tourTab
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setTourTab(i)}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                        active
+                          ? 'border-[#25D366]/40 bg-[#25D366]/12 text-white shadow-[0_8px_24px_-10px_rgba(37,211,102,0.6)]'
+                          : 'border-white/10 bg-white/[0.03] text-white/55 hover:border-white/20 hover:text-white/85'
+                      }`}
+                    >
+                      <Ic className={`h-4 w-4 ${active ? 'text-[#5cf0a0]' : ''}`} />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </Reveal>
+
+            {/* Active screen. `key` remounts on tab change so the fade replays. */}
+            <div key={tour.key} className="grid items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="lux-reveal is-visible order-2 lg:order-1">
+                <h3 style={headFont} className="text-balance text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                  {tour.title}
+                </h3>
+                <p className="mt-4 leading-relaxed text-white/55">{tour.desc}</p>
+                <ul className="mt-7 space-y-3">
+                  {tour.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-3 text-sm text-white/75">
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#25D366]/15">
+                        <Check className="h-3.5 w-3.5 text-[#25D366]" />
+                      </span>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login"
+                  className="group mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-[#5cf0a0] transition-colors hover:text-[#f3d98b]"
+                >
+                  {t.nav.getStarted}
+                  <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
+                </Link>
+              </div>
+
+              <div className="order-1 lg:order-2">
+                <Shot
+                  shot={SHOT[tour.key]}
+                  alt={`${tour.label} — ${tour.title}`}
+                  sizes="(max-width: 1024px) 100vw, 680px"
+                />
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* ─── FEATURES ─────────────────────────────────────────── */}
@@ -443,83 +580,47 @@ export default function LandingPage() {
                   )
                 })}
               </div>
-            </div>
 
-            {/* AI copilot panel */}
-            <Reveal delay={120}>
-              <div className="relative">
-                <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-[#d4af37]/12 via-[#25D366]/10 to-transparent blur-2xl" />
-                <div className="lux-hairline relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#0b1622] shadow-2xl shadow-black/60">
-                  {/* Chat header */}
-                  <div className="flex items-center gap-3 border-b border-white/8 bg-[#0c1726] px-4 py-3">
-                    <div className="relative">
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#25D366]/40 to-emerald-700/30 text-sm font-bold text-white">
-                        {t.hero.chat.contactName.charAt(0)}
-                      </div>
-                      <span className="absolute -bottom-0.5 -end-0.5 h-3 w-3 rounded-full border-2 border-[#0c1726] bg-[#25D366]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">{t.hero.chat.contactName}</p>
-                      <p className="text-[11px] text-[#5cf0a0]">{t.hero.chat.status}</p>
-                    </div>
-                    <span className="ms-auto inline-flex items-center gap-1.5 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/10 px-2.5 py-1 text-[10px] font-bold text-[#f3d98b]">
-                      <Bot className="h-3.5 w-3.5" /> {t.ai.panelTitle}
-                    </span>
+              <Reveal delay={240}>
+                <div className="mt-8 flex flex-wrap items-center gap-6">
+                  <div>
+                    <p className="text-3xl font-black tracking-tight text-white">
+                      <CountUp to={8} suffix="s" duration={2} />
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">{isAr ? 'متوسط أول رد من الذكاء الاصطناعي' : 'average AI first reply'}</p>
                   </div>
-
-                  {/* Chat thread */}
-                  <div className="space-y-3 bg-[radial-gradient(circle_at_top,rgba(37,211,102,0.05),transparent_55%)] px-4 py-5">
-                    {/* Customer message */}
-                    <div className="flex justify-start">
-                      <div className="max-w-[82%] rounded-2xl rounded-ss-md bg-white/8 px-3.5 py-2">
-                        <p className="text-[13px] text-white/85">{t.ai.customerMsg}</p>
-                        <p className="mt-1 text-end text-[10px] text-white/35">10:38</p>
-                      </div>
-                    </div>
-
-                    {/* AI read the sentiment */}
-                    <div className="flex items-center gap-2 ps-1">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366]/12 px-2.5 py-1 text-[11px] font-semibold text-[#5cf0a0]">
-                        <Activity className="h-3 w-3" /> {t.ai.sentiment}
-                      </span>
-                      <span className="text-[10px] text-white/30">{t.ai.sentimentLabel}</span>
-                    </div>
-
-                    {/* Assistant typing */}
-                    <div className="flex justify-start">
-                      <div className="inline-flex items-center gap-1.5 rounded-2xl rounded-ss-md bg-white/8 px-3 py-3">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#5cf0a0] [animation-duration:1s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#5cf0a0] [animation-delay:0.15s] [animation-duration:1s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#5cf0a0] [animation-delay:0.3s] [animation-duration:1s]" />
-                      </div>
-                    </div>
-
-                    {/* AI suggested reply */}
-                    <div className="relative overflow-hidden rounded-2xl rounded-se-md border border-[#d4af37]/25 bg-gradient-to-br from-[#d4af37]/12 to-[#25D366]/5 p-3.5">
-                      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#f3d98b]">
-                        <Sparkles className="h-3.5 w-3.5" /> {t.ai.suggestionLabel}
-                      </div>
-                      <p className="text-[13px] leading-relaxed text-white/85">{t.ai.suggestion}</p>
-                      <button type="button" className="lux-btn-gold mt-3 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold">
-                        <Check className="h-3.5 w-3.5" /> {t.ai.insertCta}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Composer */}
-                  <div className="flex items-center gap-2 border-t border-white/8 bg-[#0c1726] px-3 py-3">
-                    <div className="flex-1 truncate rounded-full bg-white/5 px-4 py-2.5 text-[12px] text-white/35">
-                      {t.ai.composerPlaceholder}
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={t.ai.insertCta}
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#2ee676] to-[#0f9b6c] text-white shadow-lg shadow-emerald-900/40"
-                    >
-                      <Send className={`h-4 w-4 ${isRTL ? '-scale-x-100' : ''}`} />
-                    </button>
+                  <div className="h-10 w-px bg-white/12" />
+                  <div>
+                    <p className="text-3xl font-black tracking-tight text-white">
+                      <CountUp to={68} suffix="%" duration={2} delay={0.2} />
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">{isAr ? 'محادثات لا تصل لموظف' : 'resolved without an agent'}</p>
                   </div>
                 </div>
+              </Reveal>
+            </div>
+
+            {/* Real conversation + the real context rail beside it */}
+            <Reveal delay={120}>
+              <div className="relative mx-auto flex max-w-[560px] items-start justify-center gap-3">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-8 rounded-[2.5rem] bg-gradient-to-br from-[#d4af37]/14 via-[#25D366]/12 to-transparent blur-[60px]"
+                />
+                <Shot
+                  shot={SHOT.aiThread}
+                  glow={false}
+                  alt={isAr ? 'محادثة يديرها المساعد الذكي' : 'A conversation handled by the AI assistant'}
+                  sizes="(max-width: 1024px) 70vw, 360px"
+                  className="w-[64%] overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/60"
+                />
+                <Shot
+                  shot={SHOT.contextRail}
+                  glow={false}
+                  alt={isAr ? 'ملخص العميل والصفقة' : 'Customer summary, deal and timeline'}
+                  sizes="(max-width: 1024px) 34vw, 190px"
+                  className="mt-8 hidden w-[34%] overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/60 sm:block"
+                />
               </div>
             </Reveal>
           </div>
@@ -557,34 +658,9 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── INDUSTRIES ───────────────────────────────────────── */}
-        <section id="industries" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            <SectionHeading eyebrow={t.industries.eyebrow} sub={t.industries.subtitle} headFont={headFont}>
-              {t.industries.title}
-            </SectionHeading>
-
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {t.industries.items.map((it, i) => {
-                const Ic = INDUSTRY_ICONS[it.key]
-                return (
-                  <Reveal key={it.key} delay={(i % 4) * 70}>
-                    <div className="group lux-card flex h-full flex-col items-start gap-4 rounded-2xl p-5 hover:-translate-y-1">
-                      <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#25D366]/12 ring-1 ring-inset ring-[#25D366]/15 transition-colors group-hover:bg-[#25D366]/20">
-                        <Ic className="h-6 w-6 text-[#5cf0a0]" />
-                      </div>
-                      <p style={headFont} className="text-sm font-bold text-white sm:text-base">{it.label}</p>
-                    </div>
-                  </Reveal>
-                )
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── SHOWCASE ─────────────────────────────────────────── */}
+        {/* ─── SHOWCASE — the real inbox ────────────────────────── */}
         <section className="px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.9fr_1.1fr]">
             <div>
               <Reveal>
                 <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f3d98b]">
@@ -615,71 +691,113 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            {/* Browser mockup */}
             <Reveal delay={120}>
-              <div className="relative">
-                <div className="absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-[#25D366]/15 to-[#d4af37]/8 blur-2xl" />
-                <div className="lux-hairline relative overflow-hidden rounded-2xl border border-white/10 bg-[#091321] shadow-2xl shadow-black/60">
-                  <div className="flex items-center gap-2 border-b border-white/8 bg-[#0c1726] px-4 py-3">
-                    <div className="flex gap-1.5">
-                      <span className="h-3 w-3 rounded-full bg-red-500/60" />
-                      <span className="h-3 w-3 rounded-full bg-amber-500/60" />
-                      <span className="h-3 w-3 rounded-full bg-emerald-500/60" />
-                    </div>
-                    <div className="mx-4 flex h-6 flex-1 items-center rounded-md bg-white/5 px-3">
-                      <span className="text-[11px] text-white/35" dir="ltr">{t.showcase.url}</span>
-                    </div>
-                  </div>
-                  <div className="flex h-80 sm:h-96">
-                    {/* Sidebar */}
-                    <div className="hidden w-56 flex-col border-e border-white/8 sm:flex">
-                      <div className="border-b border-white/8 px-3 py-3">
-                        <div className="h-7 w-full rounded-md bg-white/5" />
-                      </div>
-                      {t.testimonials.items.concat(t.testimonials.items.slice(0, 1)).map((c, i) => (
-                        <div key={i} className={`flex items-center gap-2.5 border-b border-white/5 px-3 py-3 ${i === 0 ? 'bg-[#25D366]/8' : ''}`}>
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-white/12 to-white/4 text-[11px] font-bold text-white/70">
-                            {c.author.charAt(0)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="h-2.5 w-20 rounded bg-white/12" />
-                            <div className="mt-1.5 h-2 w-28 rounded bg-white/6" />
-                          </div>
-                          {i === 0 && <span className="grid h-4 w-4 place-items-center rounded-full bg-[#25D366] text-[9px] font-bold text-white">3</span>}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Pane */}
-                    <div className="flex flex-1 flex-col">
-                      <div className="flex items-center gap-2.5 border-b border-white/8 px-4 py-3">
-                        <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-[#25D366]/40 to-emerald-700/30 text-xs font-bold text-white">
-                          {t.hero.chat.contactName.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-white">{t.hero.chat.contactName}</p>
-                          <p className="text-[10px] text-[#25D366]">{t.hero.chat.status}</p>
-                        </div>
-                      </div>
-                      <div className="flex-1 space-y-3 px-4 py-4">
-                        <div className="flex justify-start">
-                          <div className="max-w-[75%] rounded-2xl rounded-ss-md bg-white/8 px-3 py-2 text-xs text-white/85">{t.hero.chat.inbound1}</div>
-                        </div>
-                        <div className="flex justify-end">
-                          <div className="max-w-[78%] rounded-2xl rounded-se-md bg-gradient-to-br from-[#0c8a5a] to-[#0a6e48] px-3 py-2 text-xs text-white">{t.hero.chat.outbound1}</div>
-                        </div>
-                        {/* interactive buttons preview */}
-                        <div className="flex justify-end">
-                          <div className="w-[78%] space-y-1.5">
-                            <button type="button" className="w-full rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 py-2 text-[11px] font-semibold text-[#5cf0a0]">{t.showcase.bullets[0]}</button>
-                            <button type="button" className="w-full rounded-lg border border-white/10 bg-white/5 py-2 text-[11px] font-semibold text-white/70">{t.ai.insertCta}</button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <Shot
+                shot={SHOT.inbox}
+                alt={isAr ? 'صندوق الوارد المشترك في NexusCRM' : 'The NexusCRM shared inbox'}
+                sizes="(max-width: 1024px) 100vw, 720px"
+              />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ─── MOBILE ───────────────────────────────────────────── */}
+        <section className="relative overflow-hidden px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.1fr_0.9fr]">
+            {/* Three phones, overlapped */}
+            <Reveal>
+              <div className="relative mx-auto flex max-w-[620px] items-end justify-center">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-[#25D366]/18 to-[#d4af37]/8 blur-[80px]"
+                />
+                <Shot
+                  shot={SHOT.phoneDash}
+                  glow={false}
+                  alt={isAr ? 'لوحة التحكم على الجوال' : 'Dashboard on mobile'}
+                  sizes="(max-width: 640px) 32vw, 190px"
+                  className="relative z-10 w-[32%] -rotate-6 translate-y-6"
+                />
+                <Shot
+                  shot={SHOT.phoneInbox}
+                  glow={false}
+                  alt={isAr ? 'صندوق الوارد على الجوال' : 'Inbox on mobile'}
+                  sizes="(max-width: 640px) 38vw, 230px"
+                  className="relative z-20 -mx-4 w-[38%]"
+                />
+                <Shot
+                  shot={SHOT.phoneChat}
+                  glow={false}
+                  alt={isAr ? 'محادثة على الجوال' : 'A chat on mobile'}
+                  sizes="(max-width: 640px) 32vw, 190px"
+                  className="relative z-10 w-[32%] rotate-6 translate-y-6"
+                />
               </div>
             </Reveal>
+
+            <div>
+              <Reveal>
+                <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f3d98b]">
+                  <Smartphone className="h-3.5 w-3.5" /> {t.mobile.eyebrow}
+                </p>
+              </Reveal>
+              <Reveal delay={80}>
+                <h2 style={headFont} className="text-balance text-3xl font-extrabold leading-[1.12] tracking-tight text-white sm:text-4xl">
+                  {t.mobile.title} <span className="text-gold-gradient">{t.mobile.titleGold}</span>
+                </h2>
+              </Reveal>
+              <Reveal delay={140}>
+                <p className="mt-4 leading-relaxed text-white/55">{t.mobile.subtitle}</p>
+              </Reveal>
+              <ul className="mt-7 space-y-3">
+                {t.mobile.bullets.map((b, i) => (
+                  <li key={b}>
+                    <Reveal delay={i * 70}>
+                      <span className="flex items-start gap-3 text-sm text-white/75">
+                        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#25D366]/15">
+                          <BellRing className="h-3 w-3 text-[#25D366]" />
+                        </span>
+                        {b}
+                      </span>
+                    </Reveal>
+                  </li>
+                ))}
+              </ul>
+              <Reveal delay={280}>
+                <div className="mt-8">
+                  <InstallButton
+                    variant="hero"
+                    label={isAr ? 'ثبّت التطبيق' : 'Install the App'}
+                    installedLabel={isAr ? 'التطبيق مثبّت' : 'App Installed'}
+                  />
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── INDUSTRIES ───────────────────────────────────────── */}
+        <section id="industries" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeading eyebrow={t.industries.eyebrow} sub={t.industries.subtitle} headFont={headFont}>
+              {t.industries.title}
+            </SectionHeading>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {t.industries.items.map((it, i) => {
+                const Ic = INDUSTRY_ICONS[it.key]
+                return (
+                  <Reveal key={it.key} delay={(i % 4) * 70}>
+                    <div className="group lux-card flex h-full flex-col items-start gap-4 rounded-2xl p-5 hover:-translate-y-1">
+                      <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#25D366]/12 ring-1 ring-inset ring-[#25D366]/15 transition-colors group-hover:bg-[#25D366]/20">
+                        <Ic className="h-6 w-6 text-[#5cf0a0]" />
+                      </div>
+                      <p style={headFont} className="text-sm font-bold text-white sm:text-base">{it.label}</p>
+                    </div>
+                  </Reveal>
+                )
+              })}
+            </div>
           </div>
         </section>
 
@@ -718,6 +836,75 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ─── PRICING ──────────────────────────────────────────── */}
+        <section id="pricing" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeading eyebrow={t.pricing.eyebrow} sub={t.pricing.subtitle} headFont={headFont}>
+              {t.pricing.title}
+            </SectionHeading>
+
+            <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+              {t.pricing.plans.map((p, i) => (
+                <Reveal key={p.key} delay={i * 90}>
+                  <div
+                    className={`relative flex h-full flex-col rounded-2xl p-7 transition-transform duration-300 ${
+                      p.highlight
+                        ? 'lux-card-gold scale-[1.02] md:scale-105'
+                        : 'lux-card hover:-translate-y-1'
+                    }`}
+                  >
+                    {p.highlight && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#f3d98b] to-[#d4af37] px-3 py-1 text-[11px] font-black uppercase tracking-wide text-[#1a1407] shadow-lg">
+                        {t.pricing.mostPopular}
+                      </span>
+                    )}
+
+                    <p style={headFont} className="text-sm font-bold uppercase tracking-wider text-white/60">{p.name}</p>
+
+                    <div className="mt-4 flex items-baseline gap-1.5">
+                      <span className={`text-4xl font-black tracking-tight ${p.highlight ? 'text-gold-gradient' : 'text-white'}`}>
+                        {p.price}
+                      </span>
+                      {/* Only a real number takes a "/month" suffix — "Free" and "Custom" do not. */}
+                      {/\d/.test(p.price) && (
+                        <span className="text-sm text-white/40">{t.pricing.perMonth}</span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-white/45">{p.sub}</p>
+
+                    <ul className="mt-7 flex-1 space-y-3">
+                      {p.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2.5 text-sm text-white/70">
+                          <span
+                            className={`mt-0.5 grid h-4.5 w-4.5 shrink-0 place-items-center rounded-full ${
+                              p.highlight ? 'bg-[#d4af37]/20' : 'bg-[#25D366]/15'
+                            }`}
+                            style={{ height: '1.125rem', width: '1.125rem' }}
+                          >
+                            <Check className={`h-3 w-3 ${p.highlight ? 'text-[#f3d98b]' : 'text-[#25D366]'}`} />
+                          </span>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link
+                      href="/login"
+                      className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-transform duration-200 hover:scale-[1.02] active:scale-95 ${
+                        p.highlight
+                          ? 'lux-btn-gold'
+                          : 'border border-white/12 bg-white/5 text-white/85 hover:bg-white/10'
+                      }`}
+                    >
+                      {p.cta}
+                      <ArrowRight className={`h-4 w-4 ${arrowFlip}`} />
+                    </Link>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* ─── FAQ ──────────────────────────────────────────────── */}
         <section id="faq" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
@@ -736,9 +923,9 @@ export default function LandingPage() {
         </section>
 
         {/* ─── FINAL CTA ────────────────────────────────────────── */}
-        <section className="px-4 py-24 sm:px-6 lg:px-8">
+        <section className="px-4 pb-24 pt-8 sm:px-6 lg:px-8">
           <Reveal>
-            <div className="lux-hairline relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#0c1f1a] via-[#091321] to-[#0c1726] px-6 py-16 text-center sm:px-12">
+            <div className="lux-hairline relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#0c1f1a] via-[#091321] to-[#0c1726] px-6 pt-16 text-center sm:px-12">
               <div className="lux-aurora pointer-events-none absolute inset-0 opacity-80" />
               <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-[34rem] -translate-x-1/2 rounded-full bg-[#25D366]/15 blur-[110px]" />
               <div className="relative">
@@ -762,6 +949,21 @@ export default function LandingPage() {
                   />
                 </div>
                 <p className="mt-6 text-xs text-white/35">{t.finalCta.reassurance}</p>
+
+                {/* The product, peeking in from the bottom — the last thing they see */}
+                <div className="relative mx-auto mt-12 max-w-3xl">
+                  <Shot
+                    shot={SHOT.analytics}
+                    glow={false}
+                    alt={isAr ? 'تحليلات NexusCRM' : 'NexusCRM analytics'}
+                    sizes="(max-width: 768px) 100vw, 768px"
+                    className="translate-y-2"
+                  />
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0a1520] to-transparent"
+                  />
+                </div>
               </div>
             </div>
           </Reveal>

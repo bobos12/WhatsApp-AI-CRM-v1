@@ -1,0 +1,376 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   scene.css — the marketing layer that sits around the product.
+
+   Nothing here touches the application's own look (that is product.css). This
+   file is the stage: backgrounds, device frames, typography, annotations.
+   Device frames are drawn in CSS rather than composited from stock photos, so
+   they stay sharp at any export scale and carry no licensing baggage.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.canvas { position: relative; overflow: hidden; }
+
+/* Default size for lucide icons used in marketing chrome. product.css only
+   sizes `.ic` inside `.app`, so an icon dropped straight onto a scene has no
+   intrinsic size and expands to fill its box. Low specificity on purpose —
+   every `.cta svg` / `.feat .bx svg` rule below still overrides it. */
+.ic { width: 18px; height: 18px; flex: none; }
+
+/* ─── Backgrounds ───────────────────────────────────────────────────────── */
+
+/* Signature dark: near-black with an emerald core, the brand's own green. */
+.bg-dark {
+  background:
+    radial-gradient(1200px 700px at 78% 8%, rgba(37, 211, 102, 0.16), transparent 62%),
+    radial-gradient(900px 620px at 12% 92%, rgba(18, 140, 126, 0.14), transparent 60%),
+    radial-gradient(700px 500px at 50% 50%, rgba(15, 60, 44, 0.5), transparent 70%),
+    linear-gradient(160deg, #05100C 0%, #060E12 45%, #04090C 100%);
+  color: #fff;
+}
+
+/* Signature light: warm paper with a mint wash. */
+.bg-light {
+  background:
+    radial-gradient(1100px 640px at 82% 6%, rgba(37, 211, 102, 0.13), transparent 60%),
+    radial-gradient(820px 560px at 8% 88%, rgba(59, 130, 246, 0.07), transparent 58%),
+    linear-gradient(165deg, #FBFCFB 0%, #F2F6F3 55%, #EDF3EF 100%);
+  color: #0A1710;
+}
+
+/* Executive: deep emerald-to-ink, for slides and covers. */
+.bg-exec {
+  background:
+    radial-gradient(900px 700px at 85% 20%, rgba(37, 211, 102, 0.2), transparent 58%),
+    linear-gradient(135deg, #07271A 0%, #061A14 40%, #04100E 100%);
+  color: #fff;
+}
+
+/* Fine grid + noise overlays. Both are decorative and sit under content. */
+.grid-lines::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 78%);
+}
+.bg-light .grid-lines::before {
+  background-image:
+    linear-gradient(rgba(6, 40, 26, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 40, 26, 0.05) 1px, transparent 1px);
+}
+.noise::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* A soft coloured orb — used sparingly to add depth behind devices. */
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
+.orb.green { background: rgba(37, 211, 102, 0.34); }
+.orb.teal { background: rgba(18, 140, 126, 0.3); }
+.orb.blue { background: rgba(59, 130, 246, 0.22); }
+.orb.violet { background: rgba(139, 92, 246, 0.2); }
+
+/* ─── Typography ────────────────────────────────────────────────────────── */
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 9px;
+  border-radius: 999px; padding: 8px 16px 8px 12px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  border: 1px solid rgba(37, 211, 102, 0.32); background: rgba(37, 211, 102, 0.1);
+  color: #5CE894;
+}
+.bg-light .eyebrow { border-color: rgba(22, 163, 74, 0.28); background: rgba(22, 163, 74, 0.08); color: #15803D; }
+/* inline-flex still stretches when it is a column-flex child. `fit-content`
+   opts out of the stretch without pinning the pill to one edge, so a centred
+   text block keeps its eyebrow centred and a left-aligned one keeps it left. */
+.vstack > .eyebrow, .vstack > .cta, .vstack > .tagpill { width: fit-content; }
+.eyebrow .dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; box-shadow: 0 0 12px currentColor; }
+
+h1.display {
+  font-size: 76px; line-height: 1.02; font-weight: 800; letter-spacing: -0.038em;
+}
+h1.display .accent {
+  background: linear-gradient(100deg, #25D366 0%, #6EE7B7 50%, #25D366 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+h2.title { font-size: 52px; line-height: 1.06; font-weight: 800; letter-spacing: -0.032em; }
+h3.sub { font-size: 32px; line-height: 1.15; font-weight: 700; letter-spacing: -0.022em; }
+
+p.lead { font-size: 21px; line-height: 1.58; font-weight: 400; color: rgba(255, 255, 255, 0.62); }
+.bg-light p.lead { color: rgba(10, 23, 16, 0.62); }
+p.body { font-size: 16px; line-height: 1.65; color: rgba(255, 255, 255, 0.55); }
+.bg-light p.body { color: rgba(10, 23, 16, 0.58); }
+
+.dim { color: rgba(255, 255, 255, 0.45); }
+.bg-light .dim { color: rgba(10, 23, 16, 0.5); }
+
+/* ─── Brand lockup ──────────────────────────────────────────────────────── */
+
+.lockup { display: flex; align-items: center; gap: 14px; }
+.lockup img { width: 46px; height: 46px; border-radius: 15px; box-shadow: 0 10px 26px -8px rgba(13, 77, 46, 0.85); }
+.lockup .wm { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.lockup .tag-line {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42); margin-top: 3px;
+}
+.bg-light .lockup .tag-line { color: rgba(10, 23, 16, 0.45); }
+
+/* ─── Buttons & pills (marketing chrome, not product buttons) ───────────── */
+
+.cta {
+  display: inline-flex; align-items: center; gap: 10px; border-radius: 14px;
+  padding: 16px 28px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #2FE071, #1BB558); color: #04150C;
+  box-shadow: 0 14px 34px -10px rgba(37, 211, 102, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+.cta.ghost {
+  background: rgba(255, 255, 255, 0.06); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: none;
+}
+.bg-light .cta.ghost { background: rgba(6, 40, 26, 0.04); color: #0A1710; border-color: rgba(6, 40, 26, 0.12); }
+.cta svg { width: 18px; height: 18px; }
+
+.tagpill {
+  display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.05);
+  padding: 9px 16px; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.78);
+}
+.bg-light .tagpill { border-color: rgba(6, 40, 26, 0.1); background: rgba(255, 255, 255, 0.6); color: rgba(10, 23, 16, 0.7); }
+.tagpill svg { width: 16px; height: 16px; color: #25D366; }
+
+/* ─── Glass panel (marketing annotation cards) ──────────────────────────── */
+
+.glass {
+  border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(24px); box-shadow: 0 24px 60px -22px rgba(0, 0, 0, 0.65);
+}
+.bg-light .glass {
+  border-color: rgba(6, 40, 26, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+  box-shadow: 0 24px 60px -26px rgba(6, 40, 26, 0.28);
+}
+
+/* Metric callout used across hero + slides */
+.metric .n {
+  font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+  background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.66));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.bg-light .metric .n { background: none; color: #06281A; }
+.metric .k {
+  margin-top: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.bg-light .metric .k { color: rgba(10, 23, 16, 0.55); }
+
+/* Feature bullet */
+.feat { display: flex; gap: 14px; align-items: flex-start; }
+.feat .bx {
+  display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px;
+  background: rgba(37, 211, 102, 0.12); border: 1px solid rgba(37, 211, 102, 0.24); color: #3FE07C;
+}
+.bg-light .feat .bx { background: rgba(22, 163, 74, 0.09); border-color: rgba(22, 163, 74, 0.2); color: #15803D; }
+.feat .bx svg { width: 20px; height: 20px; }
+.feat .t { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.feat .d { margin-top: 4px; font-size: 14px; line-height: 1.55; color: rgba(255, 255, 255, 0.5); }
+.bg-light .feat .d { color: rgba(10, 23, 16, 0.55); }
+
+/* ═══ Device frames ═════════════════════════════════════════════════════════
+   Each frame owns a `.viewport` that clips the product screen. Screens are
+   authored at 1440×900 (desktop) or 390×844 (mobile) and scaled with a CSS
+   transform, so text stays vector-crisp at any export size. */
+
+.viewport { position: relative; overflow: hidden; background: #fff; }
+.viewport > .scaler { transform-origin: top left; }
+
+/* ── MacBook Pro 16" ──────────────────────────────────────────────────── */
+
+.macbook { position: relative; }
+.macbook .lid {
+  position: relative; border-radius: 22px; padding: 11px;
+  background: linear-gradient(158deg, #4A4F55 0%, #2A2E33 24%, #1B1E22 60%, #34383D 100%);
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.14) inset,
+    0 60px 120px -40px rgba(0, 0, 0, 0.8),
+    0 30px 60px -30px rgba(0, 0, 0, 0.6);
+}
+.macbook .bezel {
+  position: relative; border-radius: 13px; background: #08090B; padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.macbook .notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 150px; height: 22px; background: #08090B; border-radius: 0 0 11px 11px; z-index: 3;
+}
+.macbook .notch::after {
+  content: ''; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+  width: 6px; height: 6px; border-radius: 999px;
+  background: #16181C; box-shadow: inset 0 0 2px rgba(120, 180, 255, 0.4);
+}
+/* Screen glare — a single soft diagonal, not a heavy overlay. */
+.macbook .glare, .monitor .glare, .ipad .glare, .phone .glare {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 22%, transparent 46%);
+}
+.macbook .base {
+  position: relative; height: 15px; margin: 0 auto; border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, #3C4046 0%, #23272B 55%, #16191C 100%);
+  box-shadow: 0 24px 44px -18px rgba(0, 0, 0, 0.85);
+}
+.macbook .base::after {
+  content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 16%; height: 7px; border-radius: 0 0 9px 9px;
+  background: linear-gradient(180deg, #101315, #1D2124);
+}
+
+/* ── Apple Studio Display ─────────────────────────────────────────────── */
+
+.monitor { position: relative; }
+.monitor .mon-panel {
+  position: relative; border-radius: 20px; padding: 14px 14px 40px;
+  background: linear-gradient(160deg, #E3E5E8 0%, #C9CCD1 40%, #AEB2B8 100%);
+  box-shadow: 0 60px 120px -44px rgba(0, 0, 0, 0.72), inset 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+.monitor .bezel { position: relative; border-radius: 8px; overflow: hidden; background: #08090B; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.monitor .chin {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+}
+.monitor .chin::after {
+  content: ''; width: 54px; height: 8px; border-radius: 2px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.1));
+  opacity: 0.5;
+}
+.monitor .neck {
+  width: 132px; height: 92px; margin: -2px auto 0;
+  background: linear-gradient(90deg, #A8ACB2, #D6D9DD 30%, #BFC3C8 62%, #94989E);
+  clip-path: polygon(22% 0, 78% 0, 88% 100%, 12% 100%);
+}
+.monitor .foot {
+  width: 340px; height: 15px; margin: 0 auto; border-radius: 8px;
+  background: linear-gradient(180deg, #D3D6DA, #A5A9AF);
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* ── iPad Pro ─────────────────────────────────────────────────────────── */
+
+.ipad { position: relative; }
+.ipad .body {
+  position: relative; border-radius: 34px; padding: 14px;
+  background: linear-gradient(155deg, #52565C 0%, #2C3035 26%, #1D2125 62%, #3A3E44 100%);
+  box-shadow: 0 50px 100px -36px rgba(0, 0, 0, 0.75), inset 0 2px 0 rgba(255, 255, 255, 0.16);
+}
+.ipad .bezel { position: relative; border-radius: 22px; overflow: hidden; background: #08090B; }
+.ipad .cam {
+  position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+  width: 7px; height: 7px; border-radius: 999px; background: #14171A; z-index: 3;
+}
+
+/* ── iPhone ───────────────────────────────────────────────────────────── */
+
+.phone { position: relative; }
+.phone .body {
+  position: relative; border-radius: 54px; padding: 11px;
+  background: linear-gradient(152deg, #5A5F66 0%, #2E3237 22%, #1C2024 58%, #43474D 100%);
+  box-shadow: 0 44px 90px -32px rgba(0, 0, 0, 0.78), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+.phone .bezel { position: relative; border-radius: 44px; overflow: hidden; background: #000; }
+.phone .island {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  width: 116px; height: 32px; border-radius: 999px; background: #000; z-index: 4;
+}
+.phone .island::after {
+  content: ''; position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+  width: 9px; height: 9px; border-radius: 999px;
+  background: #0C1114; box-shadow: inset 0 0 3px rgba(90, 150, 220, 0.55);
+}
+.phone .home {
+  position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%);
+  width: 132px; height: 5px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); z-index: 4;
+}
+.phone.dark-ui .home { background: rgba(255, 255, 255, 0.4); }
+
+/* ── Premium browser frame ────────────────────────────────────────────── */
+
+.browser {
+  position: relative; border-radius: 16px; overflow: hidden;
+  background: #F3F4F6; border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 50px 100px -34px rgba(0, 0, 0, 0.55), 0 20px 44px -26px rgba(0, 0, 0, 0.4);
+}
+.browser.night { background: #1A1E22; border-color: rgba(255, 255, 255, 0.09); }
+.browser .bar {
+  display: flex; align-items: center; gap: 14px; padding: 0 16px; height: 46px;
+  background: linear-gradient(180deg, #FBFBFC, #EFF0F2); border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+.browser.night .bar { background: linear-gradient(180deg, #23282D, #191D21); border-bottom-color: rgba(255, 255, 255, 0.06); }
+.browser .lights { display: flex; gap: 8px; }
+.browser .lights i { width: 12px; height: 12px; border-radius: 999px; display: block; }
+.browser .lights i:nth-child(1) { background: #FF5F57; }
+.browser .lights i:nth-child(2) { background: #FEBC2E; }
+.browser .lights i:nth-child(3) { background: #28C840; }
+.browser .url {
+  flex: 1; max-width: 460px; margin: 0 auto; height: 28px; border-radius: 999px;
+  background: #fff; border: 1px solid rgba(0, 0, 0, 0.07);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 12.5px; font-weight: 500; color: #6B7280;
+}
+.browser.night .url { background: #0F1418; border-color: rgba(255, 255, 255, 0.07); color: #8696A0; }
+.browser .url svg { width: 12px; height: 12px; color: #16A34A; }
+.browser .viewport { border-radius: 0; }
+
+/* ─── Floating UI card (for exploded / glass compositions) ─────────────── */
+
+.float {
+  position: absolute; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 40px 80px -28px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: #fff;
+}
+.bg-light .float { box-shadow: 0 40px 80px -30px rgba(6, 40, 26, 0.35), 0 0 0 1px rgba(6, 40, 26, 0.06); }
+
+/* ─── Annotation callout — points at a real part of the UI ─────────────── */
+
+.callout {
+  position: absolute; display: flex; align-items: center; gap: 10px;
+  border-radius: 14px; padding: 11px 16px; font-size: 14px; font-weight: 650;
+  background: rgba(10, 18, 14, 0.82); border: 1px solid rgba(37, 211, 102, 0.28);
+  color: #fff; backdrop-filter: blur(18px);
+  box-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.7);
+}
+.callout .n {
+  display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 999px;
+  background: #25D366; color: #04150C; font-size: 12px; font-weight: 800;
+}
+.callout.pale { background: rgba(255, 255, 255, 0.94); color: #06281A; border-color: rgba(22, 163, 74, 0.22); }
+
+.leader { position: absolute; pointer-events: none; }
+.leader path { stroke: rgba(37, 211, 102, 0.5); stroke-width: 2; stroke-dasharray: 5 5; fill: none; }
+.leader circle { fill: #25D366; }
+
+/* ─── Layout helpers ────────────────────────────────────────────────────── */
+
+.abs { position: absolute; }
+.flexc { display: flex; align-items: center; }
+.vstack { display: flex; flex-direction: column; }
+.between { justify-content: space-between; }
+.g8 { gap: 8px; } .g10 { gap: 10px; } .g12 { gap: 12px; } .g14 { gap: 14px; }
+.g16 { gap: 16px; } .g20 { gap: 20px; } .g24 { gap: 24px; } .g32 { gap: 32px; }
+.g40 { gap: 40px; } .g56 { gap: 56px; }
+
+.rule { height: 1px; background: rgba(255, 255, 255, 0.1); }
+.bg-light .rule { background: rgba(6, 40, 26, 0.1); }
+
+/* Logo strip / trust row */
+.trust { display: flex; align-items: center; gap: 36px; opacity: 0.55; }
+.trust .lg { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }

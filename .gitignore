@@ -69,3 +69,8 @@ skills/
 # Misc
 *.xlsx
 New XLSX Worksheet.xlsx
+
+# Marketing render output — regenerate with `node marketing/tools/render.mjs`.
+# Anchored to the repo root so these never match a source dir named out/ or html/.
+/marketing/out/
+/marketing/html/
