@@ -13,10 +13,11 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Pause, Play, Send, Trash2, Copy, Pencil, CalendarX, Loader2, Eye, CircleStop,
-  Image as ImageIcon, Video, FileText, Mic, Layers, Timer, Check,
+  Image as ImageIcon, Video, FileText, Mic, Layers, Timer, Check, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { batchProgress } from '../../lib/smart-sending';
+import { RISK_STYLES, riskLabel, type PreflightReport, type RiskLevel } from '../../lib/preflight';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,16 @@ export interface BroadcastSummary {
   batchIntervalMinutes?: number | null;
   /** When the next batch is due (ISO). Drives the "Next batch in…" countdown. */
   nextBatchAt?: string | null;
+  // ── Deliverability ─────────────────────────────────────────────────────────
+  /** 0–100 pre-flight risk. Higher is riskier. Null on campaigns saved before it existed. */
+  riskScore?: number | null;
+  riskLevel?: RiskLevel | null;
+  pacingProfile?: string | null;
+  /** Set when the circuit breaker paused the run rather than a person. */
+  healthPausedAt?: string | null;
+  healthPauseReason?: string | null;
+  pilotSize?: number | null;
+  pilotCompletedAt?: string | null;
 }
 
 /** What the detail view needs, on top of the summary. */
@@ -57,14 +68,31 @@ export interface BroadcastDetail extends BroadcastSummary {
   sentAt: string | null;
   queuedAt: string | null;
   updatedAt: string;
+  /** The stored safety report from the last save. */
+  preflight?: PreflightReport | null;
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: number;
+  quietHoursEnd?: number;
+  reviewedAt?: string | null;
 }
 
-export type RecipientStatus = 'pending' | 'sent' | 'failed';
+/**
+ * `skipped` is a fourth outcome, distinct from `failed` on purpose: a recipient
+ * who opted out was not a delivery that went wrong, and counting them together
+ * would make a well-behaved campaign look broken.
+ */
+export type RecipientStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 
 export interface BroadcastRecipient {
   id: string;
   phone: string;
   status: string;
+  tier?: string | null;
+  skipReason?: string | null;
+  errorCode?: string | null;
+  lastError?: string | null;
+  sentAt?: string | null;
+  repliedAt?: string | null;
 }
 
 // ─── Status vocabulary ───────────────────────────────────────────────────────
@@ -114,6 +142,35 @@ export function StatusPill({ status, size = 'sm' }: { status: string; size?: 'sm
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[status] ?? 'bg-gray-400')} />
       {t(`status.${status}`, { defaultValue: status })}
+    </span>
+  );
+}
+
+/**
+ * Risk at a glance, for list rows.
+ *
+ * Renders nothing for LOW risk and for campaigns saved before the safety engine
+ * existed. A badge on every row would be wallpaper; a badge on the two rows that
+ * deserve attention is a signal.
+ */
+export function RiskBadge({ level, score, size = 'sm' }: { level?: RiskLevel | null; score?: number | null; size?: 'sm' | 'md' }) {
+  const { t } = useTranslation('broadcasts');
+  if (!level || level === 'LOW') return null;
+
+  const style = RISK_STYLES[level];
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full border font-medium',
+        size === 'md' ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-[10px]',
+        style.ring,
+        style.bg,
+        style.text,
+      )}
+      title={typeof score === 'number' ? `Risk score ${score}/100` : undefined}
+    >
+      <ShieldAlert className={size === 'md' ? 'h-3.5 w-3.5' : 'h-2.5 w-2.5'} />
+      {t(`risk.${level}`, { defaultValue: riskLabel(level) })}
     </span>
   );
 }

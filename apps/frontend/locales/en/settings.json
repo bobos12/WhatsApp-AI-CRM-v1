@@ -14,12 +14,12 @@
     "description": "Manage your WhatsApp Web connection",
     "status": {
       "connected": "Connected",
-      "disconnected": "Disconnected",
-      "connecting": "Connecting..."
+      "disconnected": "Not connected",
+      "connecting": "Connecting…"
     },
     "connectedPhone": "Connected WhatsApp number: {{phone}}",
     "scanQR": "Scan this QR code with your WhatsApp",
-    "noQR": "Click Connect to generate a QR code.",
+    "noQR": "No number linked yet.",
     "connect": "Connect WhatsApp",
     "disconnect": "Disconnect WhatsApp",
     "resetSession": "Reset Session",
@@ -35,7 +35,12 @@
       "on": "On — new number",
       "off": "Off — established number",
       "saving": "Saving…"
-    }
+    },
+    "refreshQR": "New QR code",
+    "qrExpired": "The QR code expired",
+    "qrExpiredHint": "Nobody scanned the last few codes, so we stopped generating them — repeatedly refreshing an unscanned code gets the connection rate-limited by WhatsApp. Press \"New QR code\" when you have your phone ready.",
+    "linkTitle": "Connect your WhatsApp",
+    "linkBody": "Enter your number and we'll give you a code to type into WhatsApp."
   },
   "team": {
     "title": "Team Members",

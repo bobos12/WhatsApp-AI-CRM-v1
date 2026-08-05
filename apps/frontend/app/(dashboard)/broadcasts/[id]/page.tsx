@@ -17,14 +17,14 @@
  *      status tallies as a separate aggregate.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
 import {
   ArrowLeft, ArrowRight, Clock, CalendarClock, Users, AlertCircle, Download,
   Search, X, FileText, Loader2, Megaphone, CheckCircle2, XCircle, CircleDashed,
-  MessageSquare, Send, ExternalLink,
+  MessageSquare, Send, ExternalLink, ShieldCheck, MinusCircle, RefreshCw,
 } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { useSocket } from '../../../../hooks/useSocket';
@@ -36,26 +36,61 @@ import { classifyError } from '../../../../lib/friendly-error';
 import { formatSchedule, timeZoneLabel } from '../../../../lib/schedule';
 import { cn } from '../../../../lib/utils';
 import {
-  BroadcastActions, MEDIA_ICONS, StatusPill, SmartBatchProgress, deliveryStats, useCountdownLabel,
+  BroadcastActions, MEDIA_ICONS, RiskBadge, StatusPill, SmartBatchProgress, deliveryStats, useCountdownLabel,
   type BroadcastDetail, type BroadcastRecipient,
 } from '../../../../components/broadcasts/shared';
+import CampaignMonitor from '../../../../components/broadcasts/CampaignMonitor';
+import SafetyReport from '../../../../components/broadcasts/SafetyReport';
+import ConfirmRiskDialog from '../../../../components/broadcasts/ConfirmRiskDialog';
 
 interface RecipientPage {
   rows: BroadcastRecipient[];
   total: number;
-  counts: { pending: number; sent: number; failed: number; total: number };
+  counts: { pending: number; sent: number; failed: number; skipped: number; total: number };
 }
 
 const RECIPIENT_STATUS_STYLES: Record<string, string> = {
   sent:    'text-[#25D366]',
   failed:  'text-red-400',
   pending: 'text-gray-400 dark:text-[#8696A0]',
+  // Deliberately neutral, not red: an excluded recipient is the system working,
+  // not a delivery that went wrong.
+  skipped: 'text-amber-500 dark:text-amber-300/80',
 };
 
 const RECIPIENT_STATUS_ICONS: Record<string, typeof CheckCircle2> = {
   sent: CheckCircle2,
   failed: XCircle,
   pending: CircleDashed,
+  skipped: MinusCircle,
+};
+
+/**
+ * Plain-language fallbacks for the machine reasons the server records, so a
+ * missing translation degrades to an English sentence rather than to
+ * "COLD_REACHOUT_463".
+ */
+const SKIP_REASON_FALLBACK: Record<string, string> = {
+  OPTED_OUT: 'Asked to stop receiving messages',
+  SUPPRESSED: 'On the do-not-message list',
+  COOLDOWN: 'Received another campaign too recently',
+  INVALID_PHONE: 'Not a valid phone number',
+  COLD_EXCLUDED: 'Has never messaged you — excluded by choice',
+  ALREADY_RECEIVED: 'Already received this message',
+  DUPLICATE: 'Listed more than once',
+  QUOTA: "Beyond today's safe sending volume",
+};
+
+const ERROR_CODE_FALLBACK: Record<string, string> = {
+  COLD_REACHOUT_463: 'WhatsApp blocked this as cold outreach (463)',
+  BLOCKED_403: 'This person has blocked your number',
+  NOT_ON_WHATSAPP: 'This number is not on WhatsApp',
+  DISCONNECTED: 'WhatsApp was disconnected',
+  QUOTA: 'Daily sending limit reached',
+  RATE_LIMITED: 'Sending too quickly — WhatsApp throttled this',
+  TIMEOUT: 'WhatsApp did not respond in time',
+  INVALID_PHONE: 'Not a valid phone number',
+  UNKNOWN: 'Delivery failed',
 };
 
 /** The message-type labels the composer already ships, reused for the badge. */
@@ -189,11 +224,13 @@ export default function BroadcastDetailPage() {
   const [busy, setBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  /** Non-null once the server has answered 428 for this campaign. */
+  const [riskReason, setRiskReason] = useState<string | null>(null);
 
   // ─── Audience paging ──────────────────────────────────────────────────────
   const [recipients, setRecipients] = useState<RecipientPage | null>(null);
   const [recipientsLoading, setRecipientsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'' | 'pending' | 'sent' | 'failed'>('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'pending' | 'sent' | 'failed' | 'skipped'>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -215,6 +252,47 @@ export default function BroadcastDetailPage() {
   }, [id]);
 
   useEffect(() => { fetchBroadcast(); }, [fetchBroadcast]);
+
+  /**
+   * Re-assess a campaign that hasn't finished sending.
+   *
+   * `broadcast.preflight` is the verdict frozen at the last save. A campaign
+   * drafted on Monday for Friday carries Monday's account health, Monday's cold
+   * ratio and Monday's suppression list — and would keep showing "LOW risk" on
+   * Friday even if the number collected three 463s on Wednesday. Since the whole
+   * point of the safety engine is that conditions change, showing a stale
+   * verdict is worse than showing none.
+   *
+   * Only for campaigns that can still send: a SENT campaign's report is a
+   * historical record and re-running it would rewrite history with today's data.
+   */
+  const [refreshingPreflight, setRefreshingPreflight] = useState(false);
+  const [preflightAt, setPreflightAt] = useState<number | null>(null);
+  const reassessable = broadcast
+    ? ['DRAFT', 'SCHEDULED', 'FAILED', 'PAUSED'].includes(broadcast.status)
+    : false;
+
+  const refreshPreflight = useCallback(async () => {
+    if (!id) return;
+    setRefreshingPreflight(true);
+    try {
+      const data = await api.post<BroadcastDetail>(`/api/broadcasts/${id}/preflight`, {});
+      setBroadcast((prev) => (prev ? { ...prev, ...data } : data));
+      setPreflightAt(Date.now());
+    } catch {
+      /* keep the stored report — a failed re-assessment must not blank the card */
+    } finally {
+      setRefreshingPreflight(false);
+    }
+  }, [id]);
+
+  // Re-assess once when the page opens on a still-sendable campaign.
+  const reassessedRef = useRef(false);
+  useEffect(() => {
+    if (!reassessable || reassessedRef.current) return;
+    reassessedRef.current = true;
+    void refreshPreflight();
+  }, [reassessable, refreshPreflight]);
 
   // Debounced so typing a phone number doesn't fire a request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -290,6 +368,29 @@ export default function BroadcastDetailPage() {
       explainToast(err);
     } finally {
       flag(false);
+    }
+  };
+
+  /**
+   * Send, honouring the server's 428 "this is critical, confirm it" answer.
+   * The acknowledgement flag is only ever set after the user has seen the
+   * dialog — sending it on the first attempt would make the gate decorative.
+   */
+  const sendBroadcast = async (acknowledged: boolean) => {
+    try {
+      setSending(true);
+      await api.post(`/api/broadcasts/${id}/send`, acknowledged ? { acknowledged: true } : {});
+      success('Broadcast started sending.');
+      setRiskReason(null);
+      await Promise.all([fetchBroadcast(), fetchRecipients()]);
+    } catch (err) {
+      if ((err as { status?: number })?.status === 428) {
+        setRiskReason(err instanceof Error ? err.message : '');
+        return;
+      }
+      explainToast(err);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -371,11 +472,17 @@ export default function BroadcastDetailPage() {
   const counts = recipients?.counts;
   const totalRecipients = counts?.total ?? broadcast?.recipientCount ?? 0;
 
-  const statusTabs: Array<{ key: '' | 'pending' | 'sent' | 'failed'; label: string; count?: number }> = [
+  const statusTabs: Array<{ key: '' | 'pending' | 'sent' | 'failed' | 'skipped'; label: string; count?: number }> = [
     { key: '',        label: t('detail.allRecipients', { defaultValue: 'All' }), count: counts?.total },
     { key: 'sent',    label: t('recipientStatus.sent', { defaultValue: 'Sent' }), count: counts?.sent },
     { key: 'failed',  label: t('recipientStatus.failed', { defaultValue: 'Failed' }), count: counts?.failed },
     { key: 'pending', label: t('recipientStatus.pending', { defaultValue: 'Pending' }), count: counts?.pending },
+    // Only offered when there is something to see. An "Excluded (0)" tab on
+    // every clean campaign is noise; on a campaign that filtered 200 opt-outs it
+    // is the answer to the first question the user will ask.
+    ...(counts?.skipped
+      ? [{ key: 'skipped' as const, label: t('recipientStatus.skipped', { defaultValue: 'Excluded' }), count: counts.skipped }]
+      : []),
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -421,6 +528,7 @@ export default function BroadcastDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">{broadcast.name}</h1>
                 <StatusPill status={broadcast.status} size="md" />
+                <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} size="md" />
                 {MediaIcon && broadcast.mediaType && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#25D366]/12 px-2 py-1 text-[11px] font-medium text-[#25D366]">
                     <MediaIcon className="h-3 w-3" />
@@ -445,7 +553,7 @@ export default function BroadcastDetailPage() {
                 pausing={pausing}
                 confirming={confirmingDelete}
                 confirmingCancel={confirmingCancel}
-                onSend={() => act(() => api.post(`/api/broadcasts/${id}/send`, {}), 'Broadcast started sending.', setSending)}
+                onSend={() => void sendBroadcast(false)}
                 onPause={() => act(() => api.post(`/api/broadcasts/${id}/pause`, {}), 'Broadcast paused.', setPausing)}
                 onResume={() => act(() => api.post(`/api/broadcasts/${id}/resume`, {}), 'Broadcast resumed.', setPausing)}
                 onEdit={() => router.push(`/broadcasts/${id}/edit`)}
@@ -462,6 +570,12 @@ export default function BroadcastDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Live monitor ──
+          Renders only while the campaign is SENDING or PAUSED, and carries the
+          auto-pause explanation, so a machine-stopped run can never look like an
+          unexplained one. */}
+      <CampaignMonitor broadcastId={id} status={broadcast.status} onResumed={fetchBroadcast} />
 
       {/* ── Why it failed ── */}
       {broadcast.lastError && (
@@ -603,15 +717,35 @@ export default function BroadcastDetailPage() {
                   const Icon = RECIPIENT_STATUS_ICONS[recipient.status] ?? CircleDashed;
                   return (
                     <li key={recipient.id} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
-                      <span className="truncate font-mono text-sm text-gray-900 dark:text-white" dir="ltr">
-                        {recipient.phone}
+                      <span className="min-w-0">
+                        <span className="block truncate font-mono text-sm text-gray-900 dark:text-white" dir="ltr">
+                          {recipient.phone}
+                        </span>
+                        {/* Why this one did not go out, in plain words. A phone
+                            number next to "Excluded" with no reason is the kind
+                            of gap that gets a safety feature reported as a bug. */}
+                        {(recipient.skipReason || recipient.errorCode) && (
+                          <span className="mt-0.5 block truncate text-[11px] text-gray-500 dark:text-[#8696A0]">
+                            {recipient.skipReason
+                              ? t(`skipReason.${recipient.skipReason}`, { defaultValue: SKIP_REASON_FALLBACK[recipient.skipReason] ?? recipient.skipReason })
+                              : t(`errorCode.${recipient.errorCode}`, { defaultValue: ERROR_CODE_FALLBACK[recipient.errorCode!] ?? recipient.errorCode! })}
+                          </span>
+                        )}
                       </span>
-                      <span className={cn(
-                        'inline-flex shrink-0 items-center gap-1.5 text-xs font-medium',
-                        RECIPIENT_STATUS_STYLES[recipient.status] ?? RECIPIENT_STATUS_STYLES.pending,
-                      )}>
-                        <Icon className="h-3.5 w-3.5" />
-                        {t(`recipientStatus.${recipient.status}`, { defaultValue: recipient.status })}
+                      <span className="flex shrink-0 items-center gap-2">
+                        {recipient.repliedAt && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#25D366]/12 px-2 py-0.5 text-[10px] font-medium text-[#25D366]">
+                            <MessageSquare className="h-2.5 w-2.5" />
+                            {t('detail.replied', { defaultValue: 'Replied' })}
+                          </span>
+                        )}
+                        <span className={cn(
+                          'inline-flex items-center gap-1.5 text-xs font-medium',
+                          RECIPIENT_STATUS_STYLES[recipient.status] ?? RECIPIENT_STATUS_STYLES.pending,
+                        )}>
+                          <Icon className="h-3.5 w-3.5" />
+                          {t(`recipientStatus.${recipient.status}`, { defaultValue: recipient.status })}
+                        </span>
                       </span>
                     </li>
                   );
@@ -629,8 +763,50 @@ export default function BroadcastDetailPage() {
           </Card>
         </div>
 
-        {/* ── Right: schedule + delivery + audience source ── */}
+        {/* ── Right: safety + schedule + delivery + audience source ── */}
         <div className="space-y-5 lg:col-span-2">
+
+          {/* Read-only here: the fixes belong in the composer, where the fields
+              they change actually live. But the verdict itself is re-run against
+              today's account whenever the campaign can still send — see
+              `refreshPreflight` above for why a frozen one is misleading. */}
+          {broadcast.preflight && (
+            <Card
+              title={
+                reassessable
+                  ? t('safety.sectionLive', { defaultValue: 'Safety check · re-assessed now' })
+                  : t('safety.sectionAtSend', { defaultValue: 'Safety check · as sent' })
+              }
+              icon={ShieldCheck}
+            >
+              <div className="p-4 sm:p-5">
+                {reassessable && (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">
+                      {refreshingPreflight
+                        ? t('safety.reassessing', { defaultValue: 'Checking against your account right now…' })
+                        : preflightAt
+                          ? t('safety.assessedAt', {
+                              defaultValue: 'Checked {{time}}',
+                              time: new Date(preflightAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            })
+                          : t('safety.assessedAtSave', { defaultValue: 'From the last save' })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void refreshPreflight()}
+                      disabled={refreshingPreflight}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
+                    >
+                      <RefreshCw className={cn('h-3 w-3', refreshingPreflight && 'animate-spin')} />
+                      {t('safety.recheck', { defaultValue: 'Re-check' })}
+                    </button>
+                  </div>
+                )}
+                <SafetyReport report={broadcast.preflight} compact />
+              </div>
+            </Card>
+          )}
 
           <Card title={t('form.deliverySection')} icon={CalendarClock}>
             <div className="space-y-4 p-4 sm:p-5">
@@ -712,6 +888,14 @@ export default function BroadcastDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmRiskDialog
+        open={riskReason !== null}
+        reason={riskReason || null}
+        busy={sending}
+        onConfirm={() => void sendBroadcast(true)}
+        onCancel={() => setRiskReason(null)}
+      />
 
       {/* Mobile bottom-nav spacer */}
       <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />

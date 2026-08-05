@@ -173,9 +173,9 @@
   },
   "waBanner": {
     "disconnectedTitle": "Connect your WhatsApp number to go live",
-    "disconnectedBody": "Your CRM can't send or receive any messages until a WhatsApp number is connected. This takes about a minute.",
+    "disconnectedBody": "Messages can't be sent or received until a number is linked. It takes about a minute.",
     "connectingTitle": "Almost there — finish connecting WhatsApp",
-    "connectingBody": "Open Settings and scan the QR code to link your number.",
+    "connectingBody": "Scan the QR code to link your number — it only takes a minute.",
     "connect": "Connect now",
     "scanQr": "Scan QR code",
     "collapse": "Minimize",
@@ -196,7 +196,35 @@
       "open": "Open WhatsApp on your phone",
       "linked": "Tap Menu, then Linked devices",
       "scan": "Scan this code to link"
-    }
+    },
+    "refresh": "New QR code",
+    "refreshing": "Generating…",
+    "waiting": "Preparing your QR code…",
+    "expired": "This QR code expired",
+    "expiredHint": "Nobody scanned the last few codes, so we stopped generating them — repeatedly refreshing an unscanned code gets the connection rate-limited by WhatsApp. Tap \"New QR code\" when your phone is ready.",
+    "expand": "Expand for easier scanning",
+    "disconnectedShort": "WhatsApp disconnected",
+    "connectingShort": "Connecting…",
+    "tapToScan": "Tap to scan the QR code",
+    "methodQr": "Scan QR code",
+    "methodCode": "Use phone number",
+    "phoneLabel": "Your WhatsApp number",
+    "phoneHint": "Include your country code, for example +971.",
+    "getCode": "Get my code",
+    "gettingCode": "One moment…",
+    "codeHeading": "Type this code into WhatsApp",
+    "copyCode": "Copy code",
+    "codeExpiresIn": "Expires in {{time}}",
+    "codeExpired": "That code expired. Get a new one below.",
+    "useAnotherNumber": "Use a different number",
+    "codeSteps": {
+      "open": "Open WhatsApp on your phone",
+      "linked": "Tap Menu, then Linked devices, then Link a device",
+      "linkWithPhone": "Tap \"Link with phone number instead\"",
+      "enter": "Type in the code above"
+    },
+    "scanInstead": "Linking a number on another phone? Scan a QR code",
+    "useNumberInstead": "Use my phone number instead"
   },
   "appUpdate": {
     "title": "A new version is ready",

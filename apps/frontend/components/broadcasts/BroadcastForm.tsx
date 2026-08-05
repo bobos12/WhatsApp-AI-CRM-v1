@@ -5,7 +5,8 @@ import {
   Users, MessageSquare, Calendar, Send, ChevronDown, ChevronUp,
   Tag, Search, X, Check, Clock, Zap, AlertCircle, Smartphone,
   ChevronLeft, ChevronRight, Type, Image as ImageIcon, Video, FileText, Upload, Loader2,
-  Mic, Square, Play, Globe, Bookmark, Paperclip, Layers, Timer, ShieldCheck,
+  Mic, Square, Play, Globe, Bookmark, Paperclip, ShieldCheck,
+  Moon, Gauge, FlaskConical,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api, apiForm } from '../../lib/api';
@@ -19,10 +20,15 @@ import AudienceFilterBuilder from '../contacts/AudienceFilterBuilder';
 import { EMPTY_FILTER, type AudienceFilter } from '../../lib/audience-filter';
 import { useChatOpen } from '../../stores/chat-open-store';
 import { browserTimeZone, formatSchedule, nowAsWallClock, timeZoneOptions } from '../../lib/schedule';
-import { planBatches, humanizeDuration } from '../../lib/smart-sending';
+import { usePreflight } from '../../hooks/usePreflight';
+import { useWhatsAppConnection } from '../whatsapp/WhatsAppConnectProvider';
+import ConnectWhatsAppModal from '../whatsapp/ConnectWhatsAppModal';
+import SafetyReport from './SafetyReport';
+import { PACING_LABELS, RISK_STYLES, riskLabel, type PacingProfile, type RiskFinding } from '../../lib/preflight';
 
-/** Wait-between-batches choices, in minutes. */
-const INTERVAL_PRESETS = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240];
+/** Slowest → fastest, so a user's choice can be compared against the safe cap. */
+const PACING_ORDER: PacingProfile[] = ['CAREFUL', 'BALANCED', 'STEADY'];
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const QUICK_EMOJI = ['😊', '👋', '🎉', '✅', '🔥', '🙏', '📦', '💳', '📅', '⭐'];
@@ -72,7 +78,17 @@ interface BroadcastFormProps {
     smartSending?: boolean;
     batchSize?: number | null;
     batchIntervalMinutes?: number | null;
+    pacingProfile?: string;
+    quietHoursEnabled?: boolean;
+    quietHoursStart?: number;
+    quietHoursEnd?: number;
+    pilotSize?: number | null;
   };
+  /**
+   * The campaign being edited, so pre-flight does not report the campaign as a
+   * duplicate of itself.
+   */
+  currentBroadcastId?: string;
   submitLabel?: string;
   onBack?: () => void;
   onSave: (broadcast: BroadcastPayload) => void | Promise<void>;
@@ -97,6 +113,13 @@ export interface BroadcastPayload {
   smartSending?: boolean;
   batchSize?: number;
   batchIntervalMinutes?: number;
+  pacingProfile?: PacingProfile;
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: number;
+  quietHoursEnd?: number;
+  pilotSize?: number | null;
+  excludeCold?: boolean;
+  excludeReceivedFrom?: string | null;
 }
 
 interface TemplateSummary {
@@ -121,7 +144,7 @@ const BUILT_IN_VARIABLES = [
   { key: 'email',      labelKey: 'form.varEmail',     fallback: 'Email' },
   { key: 'company',    labelKey: 'form.varCompany',   fallback: 'Company' },
 ];
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 function PhonePreview({ message, mediaType, mediaUrl, mediaFilename }: {
   message: string; mediaType?: MsgType; mediaUrl?: string; mediaFilename?: string;
@@ -215,17 +238,17 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#111B21] p-5 sm:p-6">
+    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 sm:p-6">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#25D366]/30 bg-[#25D366]/10">
           <span className="text-[11px] font-bold text-[#25D366]">{step}</span>
         </div>
         <div>
-          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-white">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
             <Icon className="h-4 w-4 text-[#25D366]" />
             {title}
           </h3>
-          <p className="mt-0.5 text-xs text-[#8696A0]">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">{subtitle}</p>
         </div>
       </div>
       {children}
@@ -236,6 +259,7 @@ function SectionCard({
 export default function BroadcastForm({
   contacts,
   initialValues,
+  currentBroadcastId,
   submitLabel,
   onBack,
   onSave,
@@ -265,12 +289,22 @@ export default function BroadcastForm({
   const minWallClock = useMemo(() => nowAsWallClock(1), []);
   const zones = useMemo(() => timeZoneOptions(), []);
 
-  // Smart Sending — on by default (the recommended safe path). A small audience
-  // that fits in one batch waits for nothing, so this is harmless when it isn't
-  // needed and protective when it is.
-  const [smartSending, setSmartSending] = useState(initialValues?.smartSending ?? true);
-  const [batchSize, setBatchSize] = useState(initialValues?.batchSize ?? 50);
-  const [batchIntervalMinutes, setBatchIntervalMinutes] = useState(initialValues?.batchIntervalMinutes ?? 30);
+  // ── Deliverability controls ────────────────────────────────────────────────
+  // All three default to the protective setting. A user who wants to send faster
+  // has to say so; a user who never opens this step still gets paced, quiet-hour
+  // respecting delivery, which is the outcome that matters.
+  const [pacingProfile, setPacingProfile] = useState<PacingProfile>(
+    (initialValues?.pacingProfile as PacingProfile) ?? 'BALANCED',
+  );
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(initialValues?.quietHoursEnabled ?? true);
+  const [quietHoursStart, setQuietHoursStart] = useState(initialValues?.quietHoursStart ?? 21);
+  const [quietHoursEnd, setQuietHoursEnd] = useState(initialValues?.quietHoursEnd ?? 9);
+  const [pilotSize, setPilotSize] = useState<number | null>(initialValues?.pilotSize ?? null);
+  // Audience exclusions the safety report can switch on. Server-resolved.
+  const [excludeCold, setExcludeCold] = useState(false);
+  const [excludeReceivedFrom, setExcludeReceivedFrom] = useState<string | null>(null);
+  /** Findings whose one-tap fix has already been applied, so the button settles. */
+  const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>(initialRecipientSet);
   const [manualPhones, setManualPhones] = useState('');
@@ -326,6 +360,10 @@ export default function BroadcastForm({
 
   // Mobile wizard step (1-4)
   const [mobileStep, setMobileStep] = useState(1);
+  // Live WhatsApp state — the send gate below reacts to it rather than checking
+  // once at mount, so reconnecting re-enables the button without a reload.
+  const { status: waStatus } = useWhatsAppConnection();
+  const [connectOpen, setConnectOpen] = useState(false);
 
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
@@ -459,8 +497,15 @@ export default function BroadcastForm({
         mediaUrl: isMedia ? (mediaUrl || undefined) : undefined,
         mediaType: isMedia ? messageType : undefined,
         mediaFilename: isMedia ? (mediaFilename || undefined) : undefined,
-        smartSending,
-        ...(smartSending ? { batchSize, batchIntervalMinutes } : {}),
+        // Batch size and interval are no longer sent — the server derives them
+        // from account health so there is exactly one pacing authority.
+        pacingProfile,
+        quietHoursEnabled,
+        quietHoursStart,
+        quietHoursEnd,
+        pilotSize,
+        excludeCold,
+        excludeReceivedFrom,
       });
     } catch (err) {
       // Surface a friendly cause instead of an unhandled rejection.
@@ -675,12 +720,16 @@ export default function BroadcastForm({
 
   const isValid = formData.name.trim().length > 0 && messageReady && hasAudience;
 
-  // Per-step validation for the mobile wizard
+  // Per-step validation for the mobile wizard. The safety step has no gate of
+  // its own: it reports, it does not withhold. The only hard stop is a server
+  // blocker, and that is enforced on the Send button rather than by trapping the
+  // user on a step with no way forward.
   const stepValid = [
     formData.name.trim().length > 0,
     messageReady,
     hasAudience,
     formData.sendNow || (!!formData.scheduledAtLocal && formData.scheduledAtLocal >= minWallClock),
+    true,
   ];
 
   const stepTitles = [
@@ -688,11 +737,201 @@ export default function BroadcastForm({
     t('form.messageSection'),
     t('form.audienceSection'),
     t('form.deliverySection'),
+    t('safety.section', { defaultValue: 'Safety check' }),
   ];
 
   const previewText = formData.message;
 
   const BackIcon = isRtl ? ChevronRight : ChevronLeft;
+
+  // ── Live safety analysis ───────────────────────────────────────────────────
+  // The exact recipient list that would be posted, so the report describes the
+  // campaign the user is about to send rather than an approximation of it.
+  const draftRecipients = useMemo(
+    () => Array.from(new Set([...selectedContacts, ...normalizePhoneList(manualPhones)])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedContacts, manualPhones],
+  );
+
+  const { report: preflight, loading: preflightLoading, error: preflightError } = usePreflight(
+    {
+      message: formData.message,
+      recipients: draftRecipients,
+      tag: formData.tag.trim() || undefined,
+      mediaUrl: isMedia ? mediaUrl || undefined : undefined,
+      pacingProfile,
+      quietHoursEnabled,
+      quietHoursStart,
+      quietHoursEnd,
+      pilotSize,
+      excludeCold,
+      excludeReceivedFrom,
+    },
+    { enabled: hasAudience, excludeId: currentBroadcastId },
+  );
+
+  /**
+   * Apply a finding's remedy to the form.
+   *
+   * Each branch edits the same state the composer already owns, so the change is
+   * visible where the user made the original choice — a fix that silently
+   * mutated a hidden field would be indistinguishable from the system ignoring
+   * them.
+   */
+  const applyFix = useCallback((finding: RiskFinding) => {
+    const fix = finding.fix;
+    if (!fix) return;
+    const value = (fix.value ?? {}) as Record<string, unknown>;
+
+    switch (fix.action) {
+      case 'append_opt_out':
+        setFormData((prev) =>
+          prev.message.toLowerCase().includes('stop')
+            ? prev
+            : { ...prev, message: `${prev.message.trimEnd()}\n\n${t('safety.optOutLine', { defaultValue: 'Reply STOP to unsubscribe' })}` },
+        );
+        break;
+
+      case 'add_personalization':
+        setFormData((prev) =>
+          prev.message.includes('{{first_name}}')
+            ? prev
+            : { ...prev, message: `${t('safety.greeting', { defaultValue: 'Hi {{first_name}}' })}, ${prev.message.trimStart()}` },
+        );
+        break;
+
+      case 'enable_smart_sending':
+        // Batching is automatic now; the safe response to "this is bigger than
+        // the number should send today" is to slow the pace, which is a control
+        // the user still owns.
+        setPacingProfile('CAREFUL');
+        break;
+
+      case 'set_pacing':
+        if (typeof value.profile === 'string') setPacingProfile(value.profile as PacingProfile);
+        break;
+
+      case 'enable_quiet_hours':
+        setQuietHoursEnabled(true);
+        setQuietHoursStart(21);
+        setQuietHoursEnd(9);
+        break;
+
+      case 'enable_pilot':
+        setPilotSize(typeof value.pilotSize === 'number' ? value.pilotSize : 50);
+        break;
+
+      // Both exclusions are server-resolved flags, not client-side filtering:
+      // only the server knows which numbers are cold or already received the
+      // earlier campaign, and shipping that list to the browser so it could
+      // filter its own selection would be a large payload to reach a worse
+      // answer. The flag travels with the draft and with the save.
+      case 'drop_cold':
+        setExcludeCold(true);
+        break;
+
+      case 'exclude_already_received':
+        if (typeof value.excludeReceivedFrom === 'string') setExcludeReceivedFrom(value.excludeReceivedFrom);
+        break;
+
+      case 'reschedule': {
+        // Tomorrow, at the hour quiet hours lift.
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(Math.max(9, quietHoursEnd), 0, 0, 0);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        setFormData((prev) => ({
+          ...prev,
+          sendNow: false,
+          scheduledAtLocal: `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:00`,
+        }));
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    setAppliedFixes((prev) => new Set(prev).add(finding.key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quietHoursEnd, t]);
+
+  /**
+   * The one hard stop in the composer: a server-side blocker. Warnings never
+   * disable the button — a user who has read the report and decided to proceed
+   * gets to proceed, because a system that argues past that point is one people
+   * learn to click through without reading.
+   */
+  /**
+   * The connection gate.
+   *
+   * Sending needs a live WhatsApp socket; scheduling does not — so this tracks
+   * the *message's* state, not just the account's. A campaign set for Friday is
+   * perfectly valid to save while the number is offline, and blocking it would
+   * be wrong. "Send now" with nothing to send from is the case that has to stop.
+   *
+   * Without this the campaign starts, the sender throws "WhatsApp is not
+   * connected" once per recipient, and the run reports a wall of failures for
+   * messages WhatsApp never saw. The server refuses this too (409) — this is the
+   * half that means the user never gets that far.
+   */
+  const connectionGate = useMemo(() => {
+    if (!formData.sendNow || waStatus === 'connected') return null;
+    return waStatus === 'connecting'
+      ? {
+          connecting: true,
+          label: t('form.waConnecting', {
+            defaultValue: 'WhatsApp is still connecting — this will be ready in a moment.',
+          }),
+        }
+      : {
+          connecting: false,
+          label: t('form.waNotConnected', {
+            defaultValue: 'No WhatsApp number is connected, so there is nothing to send from.',
+          }),
+        };
+  }, [formData.sendNow, waStatus, t]);
+
+  const blockedReason = useMemo(() => {
+    // The connection outranks any safety finding: a campaign that cannot leave
+    // the building has no risk profile worth arguing about.
+    if (connectionGate) return connectionGate.label;
+    const blocker = preflight?.findings.find((finding) => finding.kind === 'blocker');
+    return blocker ? blocker.label : null;
+  }, [connectionGate, preflight]);
+
+  /** Shown above both submit bars, with the one action that resolves it. */
+  const connectionNotice = connectionGate ? (
+    <div className={cn(
+      'flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
+      connectionGate.connecting
+        ? 'border-amber-400/30 bg-amber-400/10'
+        : 'border-[#25D366]/30 bg-[#25D366]/10',
+    )}>
+      <div className="flex items-start gap-2.5">
+        {connectionGate.connecting
+          ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber-500" />
+          : <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A] dark:text-[#25D366]" />}
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{connectionGate.label}</p>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">
+            {t('form.waGateHint', {
+              defaultValue: 'You can still schedule this campaign for later — switch off "Send now" to save it.',
+            })}
+          </p>
+        </div>
+      </div>
+      {!connectionGate.connecting && (
+        <button
+          type="button"
+          onClick={() => setConnectOpen(true)}
+          className="shrink-0 rounded-xl bg-[#16A34A] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#15803D] active:scale-95 dark:bg-[#25D366] dark:text-slate-950 dark:hover:bg-[#22c55e]"
+        >
+          {t('form.waConnectCta', { defaultValue: 'Connect WhatsApp' })}
+        </button>
+      )}
+    </div>
+  ) : null;
 
   // ── Template controls — available for every message type, voice notes included ──
   const templateControls = (
@@ -702,7 +941,7 @@ export default function BroadcastForm({
           <button
             type="button"
             onClick={() => setShowTemplates((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#202C33] px-3 py-2 text-xs font-medium text-[#8696A0] transition hover:bg-white/10"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-xs font-medium text-gray-500 dark:text-[#8696A0] transition hover:bg-gray-100 dark:hover:bg-white/10"
           >
             {t('form.useTemplate')}
             {showTemplates ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -719,7 +958,7 @@ export default function BroadcastForm({
               ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
               : templateSaveState === 'error'
                 ? 'border-red-400/40 bg-red-400/10 text-red-400'
-                : 'border-white/10 bg-[#202C33] text-[#8696A0] hover:bg-white/10',
+                : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
           )}
         >
           {templateSaveState === 'saving' ? (
@@ -737,7 +976,7 @@ export default function BroadcastForm({
         </button>
 
         {isMedia && mediaUrl && templateSaveState === 'idle' && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-[#8696A0]">
+          <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 dark:text-[#8696A0]">
             <Paperclip className="h-3 w-3" />
             {t('form.templateIncludesMedia', { defaultValue: 'Attachment included' })}
           </span>
@@ -745,26 +984,26 @@ export default function BroadcastForm({
       </div>
 
       {showTemplates && templates.length > 0 && (
-        <div className="mb-4 rounded-xl border border-white/10 bg-[#0B141A] p-3">
+        <div className="mb-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-3">
           <input
             value={templateSearch}
             onChange={(e) => setTemplateSearch(e.target.value)}
             placeholder={t('form.searchTemplates')}
-            className="mb-2 w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2 text-xs text-white placeholder-[#8696A0] outline-none focus:border-[#25D366]/40"
+            className="mb-2 w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none focus:border-[#25D366]/40"
           />
           <div className="max-h-52 space-y-1.5 overflow-y-auto pe-1">
             {filteredTemplates.length === 0 ? (
-              <p className="py-4 text-center text-xs text-[#8696A0]">{t('form.noTemplates')}</p>
+              <p className="py-4 text-center text-xs text-gray-500 dark:text-[#8696A0]">{t('form.noTemplates')}</p>
             ) : (
               filteredTemplates.map((tpl) => (
                 <button
                   key={tpl.id}
                   type="button"
                   onClick={() => applyTemplate(tpl)}
-                  className="w-full rounded-lg border border-white/5 bg-[#202C33] p-3 text-left transition hover:border-[#25D366]/30 hover:bg-white/5"
+                  className="w-full rounded-lg border border-gray-100 dark:border-white/5 bg-white dark:bg-[#202C33] p-3 text-left transition hover:border-[#25D366]/30 hover:bg-gray-100 dark:hover:bg-white/5"
                 >
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-medium text-white">{tpl.name}</p>
+                    <p className="text-xs font-medium text-gray-900 dark:text-white">{tpl.name}</p>
                     {tpl.mediaUrl && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-[#25D366]/15 px-1.5 py-0.5 text-[9px] font-medium text-[#25D366]">
                         <Paperclip className="h-2.5 w-2.5" />
@@ -772,7 +1011,7 @@ export default function BroadcastForm({
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] text-[#8696A0]">{tpl.content}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] text-gray-500 dark:text-[#8696A0]">{tpl.content}</p>
                 </button>
               ))
             )}
@@ -787,7 +1026,7 @@ export default function BroadcastForm({
     <>
       {allTags.length > 0 && (
         <div className="mb-5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
             {t('form.quickSelectByTag')}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -802,7 +1041,7 @@ export default function BroadcastForm({
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                     active
                       ? 'border-transparent text-white'
-                      : 'border-white/10 bg-white/5 text-[#8696A0] hover:border-white/20 hover:text-white',
+                      : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0] hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white',
                   )}
                   style={active ? { backgroundColor: tag.color, borderColor: tag.color } : undefined}
                 >
@@ -826,7 +1065,7 @@ export default function BroadcastForm({
       )}
 
       <div className="mb-5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
           {t('form.tagFilterLabel')}
         </p>
         {formData.tag ? (
@@ -854,19 +1093,19 @@ export default function BroadcastForm({
         ) : (
           <div className="flex flex-wrap gap-2">
             {allTags.length === 0 && (
-              <p className="text-xs text-[#8696A0]">{t('form.tagFilterPlaceholder')}</p>
+              <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('form.tagFilterPlaceholder')}</p>
             )}
             {allTags.map((tag) => (
               <button
                 key={tag.id}
                 type="button"
                 onClick={() => setFormData({ ...formData, tag: tag.name })}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8696A0] hover:border-white/20 hover:text-white transition-all"
+                className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white transition-all"
               >
                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
                 {tag.name}
                 {tag._count !== undefined && (
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-[#8696A0]">
+                  <span className="rounded-full bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-gray-500 dark:text-[#8696A0]">
                     {tag._count.contacts}
                   </span>
                 )}
@@ -885,7 +1124,7 @@ export default function BroadcastForm({
           onChange={setAudienceFilter}
           summary={
             filterActive ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-[#8696A0]">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-[#8696A0]">
                 {filterLoading ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
@@ -903,7 +1142,7 @@ export default function BroadcastForm({
 
       <div className="mb-5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
             {t('form.contactsLabel', { count: filteredContacts.length })}
             {selectedContacts.length > 0 && (
               <span className="ms-2 rounded-full bg-[#25D366]/15 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-[#25D366]">
@@ -913,7 +1152,7 @@ export default function BroadcastForm({
           </p>
           <div className="flex items-center gap-3">
             {selectedContacts.length > 0 && (
-              <button type="button" onClick={() => setSelectedContacts([])} className="text-[10px] text-[#8696A0] transition hover:text-red-400">
+              <button type="button" onClick={() => setSelectedContacts([])} className="text-[10px] text-gray-500 dark:text-[#8696A0] transition hover:text-red-400">
                 {t('form.clearAll')}
               </button>
             )}
@@ -933,28 +1172,28 @@ export default function BroadcastForm({
         </div>
 
         <div className="relative mb-2">
-          <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8696A0]" />
+          <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500 dark:text-[#8696A0]" />
           <input
             value={contactSearch}
             onChange={(e) => setContactSearch(e.target.value)}
             placeholder={t('form.contactSearchPlaceholder')}
-            className="w-full rounded-xl border border-white/10 bg-[#202C33] py-2.5 ps-9 pe-10 text-sm text-white placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50"
+            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] py-2.5 ps-9 pe-10 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50"
           />
           {contactSearch && (
             <button type="button" onClick={() => setContactSearch('')} className="absolute end-3 top-1/2 -translate-y-1/2">
-              <X className="h-3.5 w-3.5 text-[#8696A0]" />
+              <X className="h-3.5 w-3.5 text-gray-500 dark:text-[#8696A0]" />
             </button>
           )}
         </div>
 
-        <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0B141A]">
+        <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A]">
           {filterLoading && filteredContacts.length === 0 ? (
-            <p className="flex items-center justify-center gap-2 py-8 text-center text-xs text-[#8696A0]">
+            <p className="flex items-center justify-center gap-2 py-8 text-center text-xs text-gray-500 dark:text-[#8696A0]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               {t('form.filtering', { defaultValue: 'Applying filters…' })}
             </p>
           ) : filteredContacts.length === 0 ? (
-            <p className="py-8 text-center text-xs text-[#8696A0]">
+            <p className="py-8 text-center text-xs text-gray-500 dark:text-[#8696A0]">
               {filterActive
                 ? t('form.noFilterMatches', { defaultValue: 'No contacts match these filters.' })
                 : t('form.noContactsFound')}
@@ -971,25 +1210,36 @@ export default function BroadcastForm({
                   aria-pressed={selected}
                   className={cn(
                     'flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors',
-                    selected ? 'bg-[#25D366]/8' : 'hover:bg-white/4',
+                    selected ? 'bg-[#25D366]/8' : 'hover:bg-gray-50 dark:hover:bg-white/4',
                   )}
                 >
                   <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all',
-                    selected ? 'border-[#25D366] bg-[#25D366] text-slate-950' : 'border-white/25 bg-transparent')}>
+                    selected ? 'border-[#25D366] bg-[#25D366] text-slate-950' : 'border-gray-300 dark:border-white/25 bg-transparent')}>
                     {selected && <Check className="h-3 w-3" strokeWidth={3} />}
                   </span>
                   <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all',
-                    selected ? 'bg-[#25D366]/20 text-[#25D366]' : 'bg-white/10 text-[#8696A0]')}>
+                    selected ? 'bg-[#25D366]/20 text-[#25D366]' : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-[#8696A0]')}>
                     {initials}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-xs font-medium', selected ? 'text-white' : 'text-[#8696A0]')}>
+                    <p className={cn('truncate text-xs font-medium', selected ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-[#8696A0]')}>
                       {c.name ?? c.phone}
                     </p>
-                    {c.name && <p className="truncate text-[10px] text-[#8696A0]/60">{c.phone}</p>}
+                    {c.name && <p className="truncate text-[10px] text-gray-400 dark:text-[#8696A0]/60">{c.phone}</p>}
                   </div>
+                  {/* Desktop only, and truncated even there.
+                      These were `shrink-0` with unbounded text, so two long tag
+                      names pushed the name, the avatar and the checkbox off the
+                      side of a phone — inside a container that only scrolls
+                      vertically, which meant they were simply gone. On a 360px
+                      row the contact's name is what matters; the tags are how
+                      you got here. */}
                   {(c.contactTags ?? []).slice(0, 2).map(({ tag }) => (
-                    <span key={tag.id} className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white" style={{ backgroundColor: tag.color }}>
+                    <span
+                      key={tag.id}
+                      className="hidden max-w-[7rem] shrink truncate rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white sm:inline-block"
+                      style={{ backgroundColor: tag.color }}
+                    >
                       {tag.name}
                     </span>
                   ))}
@@ -1001,27 +1251,27 @@ export default function BroadcastForm({
       </div>
 
       <div className="mb-5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
           {t('form.addManually')}
         </p>
         <textarea
           rows={3}
           value={manualPhones}
           onChange={(e) => setManualPhones(e.target.value)}
-          className="w-full resize-none rounded-xl border border-white/10 bg-[#202C33] px-4 py-3 font-mono text-sm text-white placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
+          className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-4 py-3 font-mono text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
           placeholder={'+1234567890\n+0987654321\n+4412345678'}
           dir="ltr"
         />
-        <p className="mt-1 text-[10px] text-[#8696A0]">{t('form.manualHint')}</p>
+        <p className="mt-1 text-[10px] text-gray-500 dark:text-[#8696A0]">{t('form.manualHint')}</p>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-[#0B141A] p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-white">{t('form.resolvedAudience')}</p>
+      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-gray-900 dark:text-white">{t('form.resolvedAudience')}</p>
           <span className={cn('rounded-full border px-2.5 py-1 text-xs font-bold',
             resolvedAudience.count > 0
               ? 'border-[#25D366]/30 bg-[#25D366]/10 text-[#25D366]'
-              : 'border-white/10 bg-white/5 text-[#8696A0]')}>
+              : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]')}>
             {resolvedAudience.count}{' '}{resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')}
           </span>
         </div>
@@ -1031,22 +1281,24 @@ export default function BroadcastForm({
             { label: t('form.sourceManual'), value: resolvedAudience.manualCount },
             { label: t('form.sourceTag'), value: resolvedAudience.tagCount },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-lg bg-white/5 p-2.5 text-center">
-              <p className="text-lg font-semibold text-white">{value}</p>
-              <p className="text-[9px] uppercase tracking-wider text-[#8696A0]">{label}</p>
+            <div key={label} className="min-w-0 rounded-lg bg-gray-50 dark:bg-white/5 p-2.5 text-center">
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{value}</p>
+              {/* `tracking-wider` on a translated label is what turns three even
+                  columns into one that overflows. Let it wrap instead. */}
+              <p className="text-[9px] uppercase leading-tight tracking-wide text-gray-500 dark:text-[#8696A0] break-words">{label}</p>
             </div>
           ))}
         </div>
         {resolvedAudience.preview.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {resolvedAudience.preview.map((r) => (
-              <span key={r.phone} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-white">
-                {r.name ?? r.phone}
-                <span className="text-[#8696A0]">· {r.source}</span>
+              <span key={r.phone} className="inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-2.5 py-1 text-[10px] text-gray-900 dark:text-white">
+                <span className="truncate">{r.name ?? r.phone}</span>
+                <span className="shrink-0 text-gray-500 dark:text-[#8696A0]">· {r.source}</span>
               </span>
             ))}
             {resolvedAudience.count > resolvedAudience.preview.length && (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-[#8696A0]">
+              <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-2.5 py-1 text-[10px] text-gray-500 dark:text-[#8696A0]">
                 {t('form.moreRecipients', { count: resolvedAudience.count - resolvedAudience.preview.length })}
               </span>
             )}
@@ -1056,22 +1308,6 @@ export default function BroadcastForm({
     </>
   );
 
-  // ── Smart Sending: batch plan + live preview strings ──
-  const smartPlan = planBatches(resolvedAudience.count, batchSize, batchIntervalMinutes);
-  const formatInterval = (minutes: number) =>
-    minutes < 60
-      ? `${minutes} ${t('smart.minutes', { defaultValue: 'minutes' })}`
-      : `${minutes / 60} ${minutes / 60 === 1
-          ? t('smart.hour', { defaultValue: 'hour' })
-          : t('smart.hours', { defaultValue: 'hours' })}`;
-  const durationLabel = humanizeDuration(smartPlan.estimatedSeconds, {
-    about: t('smart.about', { defaultValue: 'About' }),
-    hour: t('smart.hour', { defaultValue: 'hour' }),
-    hours: t('smart.hours', { defaultValue: 'hours' }),
-    minute: t('smart.minute', { defaultValue: 'minute' }),
-    minutes: t('smart.minutes', { defaultValue: 'minutes' }),
-    lessThanAMinute: t('smart.lessThanAMinute', { defaultValue: 'less than a minute' }),
-  });
 
   // ── Delivery section content ──
   const deliveryContent = (
@@ -1082,15 +1318,15 @@ export default function BroadcastForm({
           onClick={() => setFormData({ ...formData, sendNow: true })}
           className={cn(
             'flex items-start gap-3 rounded-xl border p-4 text-left transition-all',
-            formData.sendNow ? 'border-[#25D366]/40 bg-[#25D366]/10' : 'border-white/10 bg-[#202C33] hover:border-white/20',
+            formData.sendNow ? 'border-[#25D366]/40 bg-[#25D366]/10' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] hover:border-gray-300 dark:hover:border-white/20',
           )}
         >
-          <Zap className={cn('mt-0.5 h-5 w-5 shrink-0', formData.sendNow ? 'text-[#25D366]' : 'text-[#8696A0]')} />
+          <Zap className={cn('mt-0.5 h-5 w-5 shrink-0', formData.sendNow ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]')} />
           <div className="flex-1">
-            <p className={cn('text-sm font-semibold', formData.sendNow ? 'text-[#25D366]' : 'text-white')}>
+            <p className={cn('text-sm font-semibold', formData.sendNow ? 'text-[#25D366]' : 'text-gray-900 dark:text-white')}>
               {t('form.sendNowOption')}
             </p>
-            <p className="mt-0.5 text-xs text-[#8696A0]">{t('form.sendNowDesc')}</p>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">{t('form.sendNowDesc')}</p>
           </div>
           {formData.sendNow && <Check className="h-4 w-4 shrink-0 text-[#25D366]" />}
         </button>
@@ -1100,15 +1336,15 @@ export default function BroadcastForm({
           onClick={() => setFormData({ ...formData, sendNow: false })}
           className={cn(
             'flex items-start gap-3 rounded-xl border p-4 text-left transition-all',
-            !formData.sendNow ? 'border-[#25D366]/40 bg-[#25D366]/10' : 'border-white/10 bg-[#202C33] hover:border-white/20',
+            !formData.sendNow ? 'border-[#25D366]/40 bg-[#25D366]/10' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] hover:border-gray-300 dark:hover:border-white/20',
           )}
         >
-          <Clock className={cn('mt-0.5 h-5 w-5 shrink-0', !formData.sendNow ? 'text-[#25D366]' : 'text-[#8696A0]')} />
+          <Clock className={cn('mt-0.5 h-5 w-5 shrink-0', !formData.sendNow ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]')} />
           <div className="flex-1">
-            <p className={cn('text-sm font-semibold', !formData.sendNow ? 'text-[#25D366]' : 'text-white')}>
+            <p className={cn('text-sm font-semibold', !formData.sendNow ? 'text-[#25D366]' : 'text-gray-900 dark:text-white')}>
               {t('form.scheduleOption')}
             </p>
-            <p className="mt-0.5 text-xs text-[#8696A0]">{t('form.scheduleDesc')}</p>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">{t('form.scheduleDesc')}</p>
           </div>
           {!formData.sendNow && <Check className="h-4 w-4 shrink-0 text-[#25D366]" />}
         </button>
@@ -1118,24 +1354,24 @@ export default function BroadcastForm({
         <div className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <p className="mb-1.5 text-xs font-medium text-[#8696A0]">{t('form.scheduleTime')}</p>
+              <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.scheduleTime')}</p>
               <input
                 type="datetime-local"
                 value={formData.scheduledAtLocal}
                 min={minWallClock}
                 onChange={(e) => setFormData({ ...formData, scheduledAtLocal: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-[#202C33] px-4 py-3 text-sm text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20 [color-scheme:dark]"
+                className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20 [color-scheme:dark]"
               />
             </div>
             <div>
-              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[#8696A0]">
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">
                 <Globe className="h-3.5 w-3.5" />
                 {t('form.timezone', { defaultValue: 'Time zone' })}
               </p>
               <select
                 value={formData.timezone}
                 onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-[#202C33] px-4 py-3 text-sm text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
+                className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
               >
                 {zones.map((zone) => (
                   <option key={zone} value={zone}>{zone}</option>
@@ -1148,9 +1384,9 @@ export default function BroadcastForm({
           {formData.scheduledAtLocal && (
             <div className="flex items-start gap-2 rounded-xl border border-[#25D366]/20 bg-[#25D366]/5 px-3 py-2.5">
               <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#25D366]" />
-              <p className="text-xs text-[#8696A0]">
+              <p className="text-xs text-gray-500 dark:text-[#8696A0]">
                 {t('form.willSendAt', { defaultValue: 'Sends at' })}{' '}
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-gray-900 dark:text-white">
                   {formatSchedule(formData.scheduledAtLocal, formData.timezone)}
                 </span>
               </p>
@@ -1166,137 +1402,250 @@ export default function BroadcastForm({
         </div>
       )}
 
-      {/* ── Smart Sending ── one card, one toggle, two numbers, a live plan ── */}
-      <div className={cn(
-        'mt-4 rounded-2xl border transition-colors',
-        smartSending ? 'border-[#25D366]/30 bg-[#25D366]/[0.06]' : 'border-white/10 bg-[#0B141A]',
-      )}>
-        <button
-          type="button"
-          onClick={() => setSmartSending((v) => !v)}
-          aria-pressed={smartSending}
-          className="flex w-full items-start gap-3 p-4 text-start"
-        >
-          <span className={cn(
-            'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-            smartSending ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-white/5 text-[#8696A0]',
-          )}>
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-white">{t('smart.title', { defaultValue: 'Smart Sending' })}</span>
-              <span className="rounded-full bg-[#25D366]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#25D366]">
-                {t('smart.recommended', { defaultValue: 'Recommended' })}
-              </span>
-            </span>
-            <span className="mt-0.5 block text-xs text-[#8696A0]">
-              {t('smart.subtitle', { defaultValue: 'Send large campaigns in safe batches to protect your number from WhatsApp limits.' })}
-            </span>
-          </span>
-          {/* Switch */}
-          <span className={cn(
-            'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors',
-            smartSending ? 'bg-[#25D366]' : 'bg-white/15',
-          )}>
-            <span className={cn(
-              'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
-              smartSending ? 'start-[1.375rem]' : 'start-0.5',
-            )} />
-          </span>
-        </button>
-
-        {smartSending && (
-          <div className="space-y-4 border-t border-white/10 p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">
-                  {t('smart.batchSizeLabel', { defaultValue: 'Contacts per batch' })}
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={5000}
-                  value={batchSize}
-                  onChange={(e) => setBatchSize(Math.max(1, Math.min(5000, Math.floor(Number(e.target.value) || 0))))}
-                  className="w-full rounded-xl border border-white/10 bg-[#202C33] px-4 py-3 text-sm text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20 [color-scheme:dark]"
-                />
-                <p className="mt-1 text-[11px] text-[#8696A0]">
-                  {t('smart.batchSizeHint', { defaultValue: 'How many contacts get the message before the system pauses.' })}
-                </p>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">
-                  {t('smart.intervalLabel', { defaultValue: 'Wait between batches' })}
-                </label>
-                <select
-                  value={batchIntervalMinutes}
-                  onChange={(e) => setBatchIntervalMinutes(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-[#202C33] px-4 py-3 text-sm text-white outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
-                >
-                  {(INTERVAL_PRESETS.includes(batchIntervalMinutes)
-                    ? INTERVAL_PRESETS
-                    : [batchIntervalMinutes, ...INTERVAL_PRESETS].sort((a, b) => a - b)
-                  ).map((m) => (
-                    <option key={m} value={m}>{formatInterval(m)}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-[#8696A0]">
-                  {t('smart.intervalHint', { defaultValue: 'How long to wait before sending the next group of contacts.' })}
-                </p>
-              </div>
-            </div>
-
-            {/* Live preview */}
-            <div className="rounded-xl border border-white/10 bg-[#0B141A] p-4">
-              <p className="mb-3 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
-                <Layers className="h-3.5 w-3.5" />
-                {t('smart.previewTitle', { defaultValue: 'Sending plan' })}
-              </p>
-              {resolvedAudience.count === 0 ? (
-                <p className="text-xs text-[#8696A0]">{t('smart.addRecipients', { defaultValue: 'Add recipients to see the plan.' })}</p>
-              ) : (
-                <dl className="space-y-2 text-sm">
-                  {[
-                    { label: t('smart.totalContacts', { defaultValue: 'Total contacts' }), value: resolvedAudience.count.toLocaleString() },
-                    { label: t('smart.batchSizeLabel', { defaultValue: 'Contacts per batch' }), value: batchSize.toLocaleString() },
-                    { label: t('smart.numBatches', { defaultValue: 'Number of batches' }), value: smartPlan.numBatches.toLocaleString() },
-                    { label: t('smart.intervalLabel', { defaultValue: 'Wait between batches' }), value: formatInterval(batchIntervalMinutes) },
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between gap-3">
-                      <dt className="text-[#8696A0]">{row.label}</dt>
-                      <dd className="font-semibold text-white tabular-nums">{row.value}</dd>
-                    </div>
-                  ))}
-                  <div className="mt-1 flex items-center justify-between gap-3 border-t border-white/10 pt-2.5">
-                    <dt className="flex items-center gap-1.5 text-[#8696A0]">
-                      <Timer className="h-3.5 w-3.5" />
-                      {t('smart.estimatedDuration', { defaultValue: 'Estimated duration' })}
-                    </dt>
-                    <dd className="font-bold text-[#25D366]">
-                      {smartPlan.numBatches <= 1
-                        ? t('smart.oneBatchImmediate', { defaultValue: 'Sends in one batch' })
-                        : durationLabel}
-                    </dd>
-                  </div>
-                </dl>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Pacing used to live here as "Smart Sending" — a toggle and two numbers
+          the user typed. It now belongs entirely to the Safety step, which
+          derives batch size and interval from the account's real health instead
+          of a guess. Two controls that both meant "slow down", in different
+          units on different steps, was how people misconfigured the very thing
+          protecting them. See safetyContent below. */}
 
       {/* Mini summary on step 4 mobile */}
       {resolvedAudience.count > 0 && (
         <div className="mt-4 rounded-xl border border-[#25D366]/20 bg-[#25D366]/8 px-4 py-3 sm:hidden">
           <p className="text-center text-2xl font-bold text-[#25D366]">{resolvedAudience.count}</p>
-          <p className="text-center text-xs text-[#8696A0]">
+          <p className="text-center text-xs text-gray-500 dark:text-[#8696A0]">
             {resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')} {t('form.recipientsReady')}
           </p>
         </div>
       )}
     </>
+  );
+
+  // ── Safety step content ──
+  // Three controls and the report. The controls come first because they are what
+  // the report's fixes change — a user who taps "use the slowest speed" should
+  // see the switch move, not just a button turn green.
+  const safetyContent = (
+    <div className="space-y-4">
+      {/* ── The one pacing control ──
+          This replaced "Smart Sending" (a toggle plus two hand-typed numbers on
+          the Delivery step). Everything that used to be manual — batch size,
+          wait between batches, gap between messages — is now derived from this
+          choice and the number's health, so there is a single place to look and
+          a single thing to understand. */}
+      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-4">
+        <div className="mb-1 flex items-center gap-2">
+          <Gauge className="h-4 w-4 text-[#25D366]" />
+          <p className="text-[13px] font-semibold text-gray-900 dark:text-white">
+            {t('safety.pacing', { defaultValue: 'Sending speed' })}
+          </p>
+        </div>
+        <p className="mb-3 text-[11px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+          {t('safety.pacingIntro', {
+            defaultValue: 'We pick the safest speed your number can handle. You can always go slower.',
+          })}
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(Object.keys(PACING_LABELS) as PacingProfile[]).map((profile) => {
+            const active = pacingProfile === profile;
+            const recommended = preflight?.recommended.pacingProfile === profile;
+            // Anything faster than the recommendation is not merely discouraged —
+            // the server clamps it. Saying so up front is better than silently
+            // ignoring the click and leaving the user believing they set it.
+            const capped = preflight != null
+              && PACING_ORDER.indexOf(profile) > PACING_ORDER.indexOf(preflight.recommended.pacingProfile);
+            return (
+              <button
+                key={profile}
+                type="button"
+                onClick={() => setPacingProfile(profile)}
+                disabled={capped}
+                className={cn(
+                  'rounded-xl border p-3 text-start transition-all',
+                  capped
+                    ? 'cursor-not-allowed border-gray-100 dark:border-white/5 bg-[#202C33]/40 opacity-60'
+                    : active
+                      ? 'border-[#25D366]/40 bg-[#25D366]/10'
+                      : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] hover:border-gray-300 dark:hover:border-white/20',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn('text-xs font-semibold', active ? 'text-[#25D366]' : 'text-gray-900 dark:text-white')}>
+                    {t(`safety.pacing_${profile}`, { defaultValue: PACING_LABELS[profile].name })}
+                  </span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0 text-[#25D366]" />}
+                </div>
+                {recommended && !active && (
+                  <span className="mt-1 inline-block rounded-full bg-[#25D366]/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#25D366]">
+                    {t('safety.recommended', { defaultValue: 'Recommended' })}
+                  </span>
+                )}
+                <p className="mt-1 text-[10px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+                  {t(`safety.pacingBlurb_${profile}`, { defaultValue: PACING_LABELS[profile].blurb })}
+                </p>
+                <p className="mt-1.5 text-[10px] tabular-nums text-gray-400 dark:text-[#8696A0]/70">{PACING_LABELS[profile].rate}</p>
+                {capped && (
+                  <p className="mt-1.5 text-[10px] text-amber-300/90">
+                    {t('safety.pacingCapped', {
+                      defaultValue: 'Not available until your number has a longer track record.',
+                    })}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* The plan this choice produces, so "automatic" doesn't mean "opaque". */}
+        {preflight && (
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-gray-100 dark:border-white/5 pt-3 text-[11px] sm:grid-cols-4">
+            {[
+              { label: t('safety.planRate', { defaultValue: 'Speed' }), value: `${preflight.simulation.ratePerHour}/hr` },
+              { label: t('safety.planPerDay', { defaultValue: 'Per day' }), value: preflight.simulation.messagesPerDay.toLocaleString() },
+              { label: t('safety.planBatch', { defaultValue: 'Batch size' }), value: preflight.recommended.smartSending ? preflight.recommended.batchSize.toLocaleString() : t('safety.planOneGo', { defaultValue: 'One run' }) },
+              { label: t('safety.planFinish', { defaultValue: 'Finishes in' }), value: preflight.simulation.summary.replace('about ', '') },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center justify-between gap-2">
+                <dt className="text-gray-500 dark:text-[#8696A0]">{row.label}</dt>
+                <dd className="font-medium tabular-nums text-gray-700 dark:text-white/85">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+
+      {/* Quiet hours */}
+      <div className={cn(
+        'rounded-xl border p-4 transition-colors',
+        quietHoursEnabled ? 'border-[#25D366]/30 bg-[#25D366]/[0.06]' : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A]',
+      )}>
+        <button
+          type="button"
+          onClick={() => setQuietHoursEnabled((v) => !v)}
+          aria-pressed={quietHoursEnabled}
+          className="flex w-full items-center gap-3 text-start"
+        >
+          <span className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+            quietHoursEnabled ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]',
+          )}>
+            <Moon className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold text-gray-900 dark:text-white">
+              {t('safety.quietHours', { defaultValue: 'Respect quiet hours' })}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+              {t('safety.quietHoursHint', {
+                defaultValue: 'Nobody is messaged during their local night. Recipients in other countries are handled on their own clock.',
+              })}
+            </span>
+          </span>
+          <span className={cn(
+            'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+            quietHoursEnabled ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/15',
+          )}>
+            <span className={cn(
+              'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all',
+              quietHoursEnabled ? 'start-[1.375rem]' : 'start-0.5',
+            )} />
+          </span>
+        </button>
+
+        {quietHoursEnabled && (
+          <div className="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-white/5 pt-3">
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] text-gray-500 dark:text-[#8696A0]">
+                {t('safety.quietFrom', { defaultValue: 'Pause from' })}
+              </span>
+              <select
+                value={quietHoursStart}
+                onChange={(e) => setQuietHoursStart(Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50"
+              >
+                {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] text-gray-500 dark:text-[#8696A0]">
+                {t('safety.quietUntil', { defaultValue: 'Resume at' })}
+              </span>
+              <select
+                value={quietHoursEnd}
+                onChange={(e) => setQuietHoursEnd(Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50"
+              >
+                {HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* Pilot batch */}
+      <div className={cn(
+        'rounded-xl border p-4 transition-colors',
+        pilotSize ? 'border-[#25D366]/30 bg-[#25D366]/[0.06]' : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A]',
+      )}>
+        <button
+          type="button"
+          onClick={() => setPilotSize((current) => (current ? null : Math.min(50, Math.max(10, Math.round(resolvedAudience.count * 0.05)))))}
+          aria-pressed={Boolean(pilotSize)}
+          className="flex w-full items-center gap-3 text-start"
+        >
+          <span className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+            pilotSize ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]',
+          )}>
+            <FlaskConical className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold text-gray-900 dark:text-white">
+              {t('safety.pilot', { defaultValue: 'Test on a small group first' })}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+              {t('safety.pilotHint', {
+                defaultValue: 'Send to your most engaged contacts, then pause so you can see the replies before the rest goes out.',
+              })}
+            </span>
+          </span>
+          <span className={cn(
+            'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+            pilotSize ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/15',
+          )}>
+            <span className={cn(
+              'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all',
+              pilotSize ? 'start-[1.375rem]' : 'start-0.5',
+            )} />
+          </span>
+        </button>
+
+        {pilotSize != null && (
+          <div className="mt-3 flex items-center gap-3 border-t border-gray-100 dark:border-white/5 pt-3">
+            <input
+              type="range"
+              min={5}
+              max={Math.max(10, Math.min(500, resolvedAudience.count || 100))}
+              value={pilotSize}
+              onChange={(e) => setPilotSize(Number(e.target.value))}
+              className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-gray-100 dark:bg-white/10 accent-[#25D366]"
+            />
+            <span className="w-20 shrink-0 text-end text-xs tabular-nums text-gray-900 dark:text-white">
+              {pilotSize} {t('safety.pilotContacts', { defaultValue: 'contacts' })}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* The report */}
+      <SafetyReport
+        report={preflight}
+        loading={preflightLoading}
+        error={preflightError}
+        onApplyFix={applyFix}
+        appliedFixes={appliedFixes}
+      />
+    </div>
   );
 
   return (
@@ -1308,16 +1657,16 @@ export default function BroadcastForm({
           <button
             type="button"
             onClick={mobileStep === 1 ? onBack : () => setMobileStep((s) => s - 1)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
           >
             <BackIcon className="h-4 w-4" />
           </button>
           <div className="flex-1 min-w-0">
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-semibold text-white">{stepTitles[mobileStep - 1]}</span>
-              <span className="shrink-0 text-[11px] text-[#8696A0]">{mobileStep}/{TOTAL_STEPS}</span>
+              <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{stepTitles[mobileStep - 1]}</span>
+              <span className="shrink-0 text-[11px] text-gray-500 dark:text-[#8696A0]">{mobileStep}/{TOTAL_STEPS}</span>
             </div>
-            <div className="h-1 w-full rounded-full bg-white/10">
+            <div className="h-1 w-full rounded-full bg-gray-100 dark:bg-white/10">
               <div
                 className="h-1 rounded-full bg-[#25D366] transition-all duration-300"
                 style={{ width: `${(mobileStep / TOTAL_STEPS) * 100}%` }}
@@ -1342,12 +1691,12 @@ export default function BroadcastForm({
                   autoFocus
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-2xl border-2 border-white/10 bg-[#202C33] py-4 ps-12 pe-4 text-base font-semibold text-white placeholder-[#8696A0]/70 outline-none transition focus:border-[#25D366]/60 focus:ring-2 focus:ring-[#25D366]/20"
+                  className="w-full rounded-2xl border-2 border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] py-4 ps-12 pe-4 text-base font-semibold text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0]/70 outline-none transition focus:border-[#25D366]/60 focus:ring-2 focus:ring-[#25D366]/20"
                   placeholder={t('form.namePlaceholder2')}
                 />
               </div>
-              <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-[#8696A0]">
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-[#8696A0]/70" />
+              <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-[#8696A0]">
+                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-[#8696A0]/70" />
                 {t('form.nameHelper', { defaultValue: 'Only you see this — it helps you find the broadcast later. Recipients never see it.' })}
               </p>
             </SectionCard>
@@ -1358,10 +1707,10 @@ export default function BroadcastForm({
             <SectionCard step={2} icon={MessageSquare} title={t('form.messageSection')} subtitle={t('form.messageSubtitle')}>
                   {/* Message type — segmented control */}
                   <div className="mb-4">
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
                       {t('form.messageType', { defaultValue: 'Message type' })}
                     </p>
-                    <div className="grid grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-[#0B141A] p-1.5">
+                    <div className="grid grid-cols-5 gap-1 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-1.5">
                       {MESSAGE_TYPES.map(({ type, icon: Icon, labelKey, fallback }) => {
                         const active = messageType === type;
                         return (
@@ -1371,7 +1720,7 @@ export default function BroadcastForm({
                             onClick={() => changeMessageType(type)}
                             className={cn(
                               'flex flex-col items-center gap-1.5 rounded-xl px-0.5 py-2.5 transition-all',
-                              active ? 'bg-[#202C33] text-[#25D366] shadow-sm' : 'text-[#8696A0] hover:text-white',
+                              active ? 'bg-white dark:bg-[#202C33] text-[#25D366] shadow-sm' : 'text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
                             )}
                           >
                             <Icon className="h-[18px] w-[18px]" />
@@ -1391,13 +1740,13 @@ export default function BroadcastForm({
                   {isVoice && (
                     <div className="mb-4">
                       {mediaUrl && !isRecording ? (
-                        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#0B141A] p-3">
+                        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-3">
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366]">
                             <Mic className="h-6 w-6" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-white">{t('form.voiceNoteReady', { defaultValue: 'Voice note ready' })}</p>
-                            <p className="truncate text-xs text-[#8696A0]">{mediaFilename || 'voice-note'}</p>
+                            <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{t('form.voiceNoteReady', { defaultValue: 'Voice note ready' })}</p>
+                            <p className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{mediaFilename || 'voice-note'}</p>
                           </div>
                           <button type="button" onClick={startRecording} className="text-xs font-medium text-[#25D366] hover:underline">
                             {t('form.reRecord', { defaultValue: 'Re-record' })}
@@ -1405,7 +1754,7 @@ export default function BroadcastForm({
                           <button
                             type="button"
                             onClick={() => { setMediaUrl(''); setMediaFilename(''); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8696A0] transition hover:bg-red-500/10 hover:text-red-400"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-[#8696A0] transition hover:bg-red-500/10 hover:text-red-400"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1419,7 +1768,7 @@ export default function BroadcastForm({
                           <span className="voice-rec-wave inline-flex h-6 items-end gap-[3px] text-red-400">
                             {[0, 1, 2, 3, 4].map((i) => <span key={i} className="w-[3px] rounded-full bg-current" />)}
                           </span>
-                          <span dir="ltr" className="font-mono text-lg font-semibold tabular-nums text-white">{formatDuration(recordingSeconds)}</span>
+                          <span dir="ltr" className="font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-white">{formatDuration(recordingSeconds)}</span>
                           <button
                             type="button"
                             onClick={stopRecording}
@@ -1430,12 +1779,12 @@ export default function BroadcastForm({
                           </button>
                         </div>
                       ) : uploading ? (
-                        <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-[#0B141A] py-8 text-[#8696A0]">
+                        <div className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-[#0B141A] py-8 text-gray-500 dark:text-[#8696A0]">
                           <Loader2 className="h-5 w-5 animate-spin" />
                           <span className="text-sm font-medium">{t('form.uploading', { defaultValue: 'Uploading…' })}</span>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-white/15 bg-[#0B141A] py-7">
+                        <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-[#0B141A] py-7">
                           <button
                             type="button"
                             onClick={startRecording}
@@ -1444,15 +1793,15 @@ export default function BroadcastForm({
                           >
                             <Mic className="h-7 w-7" />
                           </button>
-                          <p className="text-sm font-medium text-white">{t('form.tapToRecord', { defaultValue: 'Tap to record a voice note' })}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{t('form.tapToRecord', { defaultValue: 'Tap to record a voice note' })}</p>
                           <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-medium text-[#25D366] hover:underline">
                             {t('form.orUploadAudio', { defaultValue: 'or upload an audio file' })}
                           </button>
                         </div>
                       )}
                       {(uploadError || recordingError) && <p className="mt-1.5 text-xs text-red-400">{uploadError || recordingError}</p>}
-                      <p className="mt-2 flex items-center gap-1.5 text-[11px] text-[#8696A0]">
-                        <Mic className="h-3.5 w-3.5 shrink-0 text-[#8696A0]/70" />
+                      <p className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-[#8696A0]">
+                        <Mic className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-[#8696A0]/70" />
                         {t('form.voiceHint', { defaultValue: 'Sent as a WhatsApp voice message. No caption.' })}
                       </p>
                     </div>
@@ -1462,7 +1811,7 @@ export default function BroadcastForm({
                   {isMedia && !isVoice && (
                     <div className="mb-4">
                       {mediaUrl ? (
-                        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#0B141A] p-3">
+                        <div className="flex items-center gap-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-3">
                           {messageType === 'IMAGE' ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={mediaUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover"
@@ -1473,7 +1822,7 @@ export default function BroadcastForm({
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-white">{mediaFilename || t('form.fileAttached', { defaultValue: 'File attached' })}</p>
+                            <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{mediaFilename || t('form.fileAttached', { defaultValue: 'File attached' })}</p>
                             <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-[#25D366] hover:underline">
                               {t('form.replaceFile', { defaultValue: 'Replace' })}
                             </button>
@@ -1481,7 +1830,7 @@ export default function BroadcastForm({
                           <button
                             type="button"
                             onClick={() => { setMediaUrl(''); setMediaFilename(''); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8696A0] transition hover:bg-red-500/10 hover:text-red-400"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-[#8696A0] transition hover:bg-red-500/10 hover:text-red-400"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1491,7 +1840,7 @@ export default function BroadcastForm({
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploading}
-                          className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/15 bg-[#0B141A] py-8 text-[#8696A0] transition hover:border-[#25D366]/50 hover:text-[#25D366] disabled:opacity-60"
+                          className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-[#0B141A] py-8 text-gray-500 dark:text-[#8696A0] transition hover:border-[#25D366]/50 hover:text-[#25D366] disabled:opacity-60"
                         >
                           {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                           <span className="text-sm font-medium">
@@ -1511,7 +1860,7 @@ export default function BroadcastForm({
                   <>
                   {/* Personalization variables */}
                   <div className="mb-2.5">
-                    <p className="mb-1.5 text-[10px] text-[#8696A0]">{t('form.insertVariable')}</p>
+                    <p className="mb-1.5 text-[10px] text-gray-500 dark:text-[#8696A0]">{t('form.insertVariable')}</p>
                     <div className="flex flex-wrap gap-2">
                       {variables.map((v) => (
                         <button
@@ -1521,7 +1870,7 @@ export default function BroadcastForm({
                           className="flex flex-col items-center rounded-xl border border-[#25D366]/20 bg-[#25D366]/8 px-3 py-1.5 transition hover:bg-[#25D366]/15 active:scale-95"
                         >
                           <span className="font-mono text-[11px] font-semibold text-[#25D366]">{v.key}</span>
-                          <span className="mt-0.5 text-[9px] text-[#8696A0]">{v.label}</span>
+                          <span className="mt-0.5 text-[9px] text-gray-500 dark:text-[#8696A0]">{v.label}</span>
                         </button>
                       ))}
                     </div>
@@ -1529,30 +1878,30 @@ export default function BroadcastForm({
 
                   {/* Message / caption with embedded emoji toolbar */}
                   <div className={cn(
-                    'rounded-2xl border bg-[#202C33] transition focus-within:ring-1',
+                    'rounded-2xl border bg-white dark:bg-[#202C33] transition focus-within:ring-1',
                     charLimit
                       ? 'border-red-400/50 focus-within:ring-red-400/20'
                       : charWarning
                         ? 'border-amber-400/40 focus-within:ring-amber-400/20'
-                        : 'border-white/10 focus-within:border-[#25D366]/50 focus-within:ring-[#25D366]/20',
+                        : 'border-gray-200 dark:border-white/10 focus-within:border-[#25D366]/50 focus-within:ring-[#25D366]/20',
                   )}>
                     <textarea
                       ref={messageRef}
                       rows={5}
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm text-white placeholder-[#8696A0] outline-none"
+                      className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none"
                       placeholder={isMedia
                         ? t('form.captionPlaceholder', { defaultValue: 'Add a caption… (optional)' })
                         : t('form.messagePlaceholder')}
                     />
-                    <div className="flex flex-wrap items-center gap-1 border-t border-white/5 px-2 py-2">
+                    <div className="flex flex-wrap items-center gap-1 border-t border-gray-100 dark:border-white/5 px-2 py-2">
                       {QUICK_EMOJI.map((e) => (
                         <button
                           key={e}
                           type="button"
                           onClick={() => insertAtCursor(e)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-white/5"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-gray-100 dark:hover:bg-white/5"
                         >
                           {e}
                         </button>
@@ -1561,13 +1910,13 @@ export default function BroadcastForm({
                   </div>
 
                   <div className="mt-1.5 flex items-center justify-between">
-                    <p className="text-[10px] text-[#8696A0]">
+                    <p className="text-[10px] text-gray-500 dark:text-[#8696A0]">
                       {isMedia
                         ? t('form.captionHint', { defaultValue: 'Caption is optional · *bold* _italic_' })
                         : t('form.variablesHint')}
                     </p>
                     <span className={cn('text-[10px] font-semibold tabular-nums',
-                      charLimit ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-[#8696A0]')}>
+                      charLimit ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-gray-500 dark:text-[#8696A0]')}>
                       {charCount.toLocaleString()} / 4,096
                     </span>
                   </div>
@@ -1590,6 +1939,20 @@ export default function BroadcastForm({
             </SectionCard>
           </div>
 
+          {/* 5 · Safety check */}
+          <div className={mobileStep === 5 ? 'block' : 'hidden sm:block'}>
+            <SectionCard
+              step={5}
+              icon={ShieldCheck}
+              title={t('safety.section', { defaultValue: 'Safety check' })}
+              subtitle={t('safety.subtitle', {
+                defaultValue: 'How this campaign will reach people — and what it costs your WhatsApp number.',
+              })}
+            >
+              {safetyContent}
+            </SectionCard>
+          </div>
+
           {/* Validation error (form incomplete) */}
           {error && (
             <div className={cn(
@@ -1608,25 +1971,34 @@ export default function BroadcastForm({
             </div>
           )}
 
+          {/* Connection gate — shown wherever the submit bar is reachable. */}
+          {connectionNotice && (
+            <div className={mobileStep < TOTAL_STEPS ? 'hidden sm:block' : 'block'}>
+              {connectionNotice}
+            </div>
+          )}
+
           {/* Submit bar — desktop only */}
-          <div className="hidden sm:flex items-center justify-between rounded-2xl border border-white/10 bg-[#111B21] px-6 py-4">
+          <div className="hidden sm:flex items-center justify-between rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] px-6 py-4">
             <div>
-              <p className="text-sm font-semibold text-white">
-                {resolvedAudience.count}{' '}
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {preflight ? preflight.audience.deliverable : resolvedAudience.count}{' '}
                 {resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')}
               </p>
-              <p className="mt-0.5 text-xs text-[#8696A0]">
-                {formData.sendNow
-                  ? t('form.sendsNow')
-                  : formData.scheduledAtLocal
-                    ? t('form.scheduledFor', { date: formatSchedule(formData.scheduledAtLocal, formData.timezone) })
-                    : t('form.noScheduleSet')}
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">
+                {blockedReason
+                  ? blockedReason
+                  : formData.sendNow
+                    ? t('form.sendsNow')
+                    : formData.scheduledAtLocal
+                      ? t('form.scheduledFor', { date: formatSchedule(formData.scheduledAtLocal, formData.timezone) })
+                      : t('form.noScheduleSet')}
               </p>
             </div>
             <button
               type="button"
               onClick={submitBroadcast}
-              disabled={!isValid || submitting}
+              disabled={!isValid || submitting || Boolean(blockedReason)}
               className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-[#25D366]/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -1638,10 +2010,10 @@ export default function BroadcastForm({
         {/* ── Right: live preview sidebar — desktop only ── */}
         <div className="hidden lg:block">
           <div className="sticky top-6 space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-[#111B21] p-5">
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Smartphone className="h-4 w-4 text-[#25D366]" />
-                <p className="text-sm font-semibold text-white">{t('form.livePreview')}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('form.livePreview')}</p>
               </div>
               <PhonePreview
                 message={previewText}
@@ -1653,17 +2025,67 @@ export default function BroadcastForm({
 
             {resolvedAudience.count > 0 && (
               <div className="rounded-2xl border border-[#25D366]/20 bg-[#25D366]/8 p-4 text-center">
-                <p className="text-2xl font-bold text-[#25D366]">{resolvedAudience.count}</p>
-                <p className="text-xs text-[#8696A0]">
+                <p className="text-2xl font-bold text-[#25D366]">
+                  {preflight ? preflight.audience.deliverable : resolvedAudience.count}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-[#8696A0]">
                   {resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')} {t('form.recipientsReady')}
                 </p>
+                {preflight && preflight.audience.deliverable !== preflight.audience.requested && (
+                  <p className="mt-1 text-[10px] text-gray-400 dark:text-[#8696A0]/80">
+                    {t('safety.filteredFrom', {
+                      defaultValue: 'filtered from {{count}} selected',
+                      count: preflight.audience.requested,
+                    })}
+                  </p>
+                )}
               </div>
             )}
 
+            {/* Risk at a glance, so the verdict is visible from every step and not
+                only from the one the user might never open.
+                Dimmed while a new analysis is in flight: the numbers on screen
+                describe the audience as it was 700ms ago, and showing them at
+                full confidence is how a verdict for a different audience passes
+                for the current one. */}
+            {preflight && (
+              <button
+                type="button"
+                onClick={() => setMobileStep(5)}
+                className={cn(
+                  'w-full rounded-2xl border p-4 text-start transition hover:brightness-110',
+                  RISK_STYLES[preflight.riskLevel].ring,
+                  RISK_STYLES[preflight.riskLevel].bg,
+                  preflightLoading && 'opacity-50',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5">
+                    {preflightLoading
+                      ? <Loader2 className={cn('h-3.5 w-3.5 animate-spin', RISK_STYLES[preflight.riskLevel].text)} />
+                      : preflight.riskLevel === 'LOW'
+                        ? <ShieldCheck className={cn('h-3.5 w-3.5', RISK_STYLES[preflight.riskLevel].text)} />
+                        : <AlertCircle className={cn('h-3.5 w-3.5', RISK_STYLES[preflight.riskLevel].text)} />}
+                    <span className={cn('text-xs font-semibold', RISK_STYLES[preflight.riskLevel].text)}>
+                      {preflightLoading
+                        ? t('safety.rechecking', { defaultValue: 'Re-checking…' })
+                        : riskLabel(preflight.riskLevel)}
+                    </span>
+                  </span>
+                  <span className="text-[10px] tabular-nums text-gray-500 dark:text-[#8696A0]">{preflight.riskScore}/100</span>
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+                  {preflight.simulation.summary.charAt(0).toUpperCase() + preflight.simulation.summary.slice(1)}
+                  {' · '}
+                  {preflight.simulation.ratePerHour}/hr
+                </p>
+              </button>
+            )}
+
             {formData.name && (
-              <div className="rounded-2xl border border-white/10 bg-[#111B21] p-4">
-                <p className="text-[10px] uppercase tracking-wider text-[#8696A0]">{t('form.campaign')}</p>
-                <p className="mt-1 text-sm font-medium text-white line-clamp-2">{formData.name}</p>
+              <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-4">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{t('form.campaign')}</p>
+                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white line-clamp-2">{formData.name}</p>
               </div>
             )}
           </div>
@@ -1671,13 +2093,13 @@ export default function BroadcastForm({
       </div>
 
       {/* ── Mobile fixed bottom action bar ── */}
-      <div className="fixed bottom-0 inset-x-0 z-30 sm:hidden border-t border-white/10 bg-[#0B141A] px-4 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-30 sm:hidden border-t border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] px-4 py-3">
         <div className="flex gap-3">
           {mobileStep > 1 && (
             <button
               type="button"
               onClick={() => setMobileStep((s) => s - 1)}
-              className="h-12 rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white transition hover:bg-white/10 active:scale-95"
+              className="h-12 rounded-xl border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 px-5 text-sm font-semibold text-gray-900 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10 active:scale-95"
             >
               {t('form.back')}
             </button>
@@ -1695,7 +2117,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={submitBroadcast}
-              disabled={!isValid || submitting}
+              disabled={!isValid || submitting || Boolean(blockedReason)}
               className="flex flex-1 h-12 items-center justify-center gap-2 rounded-xl bg-[#25D366] text-sm font-bold text-slate-950 transition hover:bg-[#25D366]/90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -1704,6 +2126,8 @@ export default function BroadcastForm({
           )}
         </div>
       </div>
+
+      <ConnectWhatsAppModal open={connectOpen} onClose={() => setConnectOpen(false)} />
     </form>
   );
 }

@@ -17,6 +17,7 @@ import { getCapabilities } from '../messaging/capabilities';
 import { persistNormalizedMessage } from '../messaging/persist';
 import { aiBotService } from '../services/ai-bot.service';
 import { scheduleQualification } from '../lead-qualification/debounce';
+import { applyInboundConsent } from '../broadcasts/safety/suppression';
 import type { ProviderName } from '@crm/messaging-schema';
 
 export type InboundResultStatus = 'processed' | 'duplicate' | 'ignored' | 'failed';
@@ -598,22 +599,43 @@ export async function processIncomingMessage(rawMessage: any, context: { session
       }, teamId);
       logStep('conversation_updated', { sessionId, conversationId: conversation.id });
 
-      await checkAutomationRules(normalized.phone, normalized.content || body);
-      void stopFlowExecutionsOnReply(normalized.phone).catch(() => {});
-      const teamId2 = teamId ?? undefined;
-      void triggerFlows(normalized.phone, normalized.content || body, 'ANY_MESSAGE', teamId2).catch(() => {});
-      if (normalized.content) {
-        void triggerFlows(normalized.phone, normalized.content, 'KEYWORD', teamId2).catch(() => {});
+      // ── Marketing consent ──────────────────────────────────────────────────
+      // Runs before automations and the bot, and deliberately so. A customer who
+      // types STOP must not receive an automated reply, a flow trigger, or a
+      // chatbot greeting: answering an opt-out with more messages is precisely
+      // what converts an annoyed recipient into a spam report, and a spam report
+      // is what gets the business number restricted.
+      let optedOut = false;
+      try {
+        ({ optedOut } = await applyInboundConsent(normalized.phone, normalized.content || body));
+      } catch (consentError) {
+        logger.warn('inbound.consent_check_failed', {
+          phone: normalized.phone,
+          error: consentError instanceof Error ? consentError.message : String(consentError),
+        });
       }
-      logStep('automations_triggered', { sessionId, conversationId: conversation.id, messageId: persistedId });
 
-      // ── Sprint 5: AI Bot hook ──────────────────────────────────────────────
-      // Debounced: a burst of rapid messages → one reply, after the customer pauses.
-      aiBotService.scheduleInboundReply(
-        conversation.id,
-        normalized.content || body,
-        { phone: normalized.phone, sessionId, teamId },
-      );
+      if (optedOut) {
+        logStep('opt_out_honoured', { sessionId, conversationId: conversation.id });
+        emitRealtime('contact:opted_out', { phone: normalized.phone, conversationId: conversation.id }, teamId);
+      } else {
+        await checkAutomationRules(normalized.phone, normalized.content || body);
+        void stopFlowExecutionsOnReply(normalized.phone).catch(() => {});
+        const teamId2 = teamId ?? undefined;
+        void triggerFlows(normalized.phone, normalized.content || body, 'ANY_MESSAGE', teamId2).catch(() => {});
+        if (normalized.content) {
+          void triggerFlows(normalized.phone, normalized.content, 'KEYWORD', teamId2).catch(() => {});
+        }
+        logStep('automations_triggered', { sessionId, conversationId: conversation.id, messageId: persistedId });
+
+        // ── Sprint 5: AI Bot hook ────────────────────────────────────────────
+        // Debounced: a burst of rapid messages → one reply, after the customer pauses.
+        aiBotService.scheduleInboundReply(
+          conversation.id,
+          normalized.content || body,
+          { phone: normalized.phone, sessionId, teamId },
+        );
+      }
 
       // ── AI Lead Qualification hook ────────────────────────────────────────────
       // Debounced so a burst of messages triggers a single LLM pass after a quiet period.

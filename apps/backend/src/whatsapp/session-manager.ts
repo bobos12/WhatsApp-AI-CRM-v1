@@ -24,10 +24,32 @@ export type WaStatus = 'connected' | 'disconnected' | 'connecting';
  */
 const MAX_QR_CYCLES = 5;
 
+/**
+ * How long to offer a "link with phone number" code before asking for a new one.
+ *
+ * Bounded by the socket, not by WhatsApp: Baileys runs the pairing-ref rotation
+ * on a timer that `requestPairingCode` does not cancel (first ref ~60s, each
+ * subsequent one ~20s), and when the refs run out it ends the connection — which
+ * takes the code's ephemeral keypair with it. Two minutes stays comfortably
+ * inside that budget, so the countdown on screen means what it says.
+ */
+const PAIRING_CODE_TTL_MS = 120_000;
+
+/** How long to wait for a socket that is ready to accept a pairing request. */
+const PAIRABLE_TIMEOUT_MS = 25_000;
+
 export interface ConnectionError {
   statusCode?: number;
   reason?: string;
   message?: string;
+}
+
+/** A live "link with phone number" code, as handed to the UI. */
+export interface PairingCode {
+  code: string;
+  /** Digits only, no `+` — the number the code was issued for. */
+  phone: string;
+  expiresAt: Date;
 }
 
 /**
@@ -47,6 +69,12 @@ interface TenantSession {
   connectedAt: Date | null;
   /** Consecutive QR pairing cycles with no successful scan. Reset on a fresh connect or on open. */
   qrCycles: number;
+  /**
+   * The live "link with phone number" code, when the user chose that route
+   * instead of scanning. Bound to this socket's ephemeral keypair, so it dies
+   * with the connection — cleared on both close and open.
+   */
+  pairing: PairingCode | null;
 }
 
 /**
@@ -78,6 +106,7 @@ class SessionManager {
         lastError: null,
         connectedAt: null,
         qrCycles: 0,
+        pairing: null,
       };
       this.sessions.set(tenantId, s);
     }
@@ -94,6 +123,22 @@ class SessionManager {
 
   getQR(tenantId: string): string | null {
     return this.sessions.get(tenantId)?.qr ?? null;
+  }
+
+  /**
+   * True once pairing has given up: enough QR codes expired unscanned that the
+   * session stopped generating new ones.
+   *
+   * Without this the idle state is invisible — the client polls a disconnected
+   * status with a null QR forever, which on screen is a blank box that never
+   * explains itself and never recovers. That is the "QR went dead silently"
+   * failure. Surfacing it lets the UI say what happened and offer the one action
+   * that fixes it.
+   */
+  isPairingIdle(tenantId: string): boolean {
+    const s = this.sessions.get(tenantId);
+    if (!s) return false;
+    return s.status !== 'connected' && s.qr === null && s.qrCycles >= MAX_QR_CYCLES;
   }
 
   getLastError(tenantId: string): ConnectionError | null {
@@ -127,6 +172,94 @@ class SessionManager {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * The live pairing code, or null once it has expired or the socket that
+   * issued it went away.
+   */
+  getPairingCode(tenantId: string): PairingCode | null {
+    const s = this.sessions.get(tenantId);
+    if (!s?.pairing) return null;
+    if (s.pairing.expiresAt.getTime() <= Date.now()) {
+      s.pairing = null;
+      return null;
+    }
+    return s.pairing;
+  }
+
+  /**
+   * Link a number without a QR code — WhatsApp's "Link with phone number".
+   *
+   * A QR is useless to anyone running this CRM on the phone they want to link:
+   * you cannot scan a code with the same screen that is displaying it, and a
+   * second device is not something a small business always has to hand. This is
+   * the same pairing handshake, keyed on an 8-character code the user types into
+   * WhatsApp instead.
+   *
+   * The code is bound to the ephemeral keypair of the socket that issued it, so
+   * it is worthless after a reconnect — hence it lives on the session rather
+   * than in the database, and is cleared whenever the connection changes state.
+   */
+  async requestPairingCode(tenantId: string, rawPhone: string): Promise<PairingCode> {
+    const phone = String(rawPhone ?? '').replace(/\D/g, '');
+    // E.164 allows 15 digits; below 8 is not a dialable international number.
+    if (phone.length < 8 || phone.length > 15) {
+      throw new Error('INVALID_PHONE');
+    }
+
+    const s = this.ensure(tenantId);
+    if (s.status === 'connected') throw new Error('ALREADY_CONNECTED');
+
+    // Reuse the socket already offering a QR when there is one: it has finished
+    // its handshake and is waiting to be paired, which is exactly what this
+    // needs. Tearing it down to build an identical one only adds a round trip
+    // and another entry in WhatsApp's rate limiter.
+    const usable = s.sock && !s.sock.authState?.creds?.registered;
+    if (!usable) {
+      await runWithTenant(tenantId, () => clearDbAuthState(s.sessionId));
+      s.qrCycles = 0;
+      await this.connect(tenantId);
+    }
+
+    const sock = await this.waitForPairable(s);
+    const code: string = await sock.requestPairingCode(phone);
+
+    s.pairing = { code, phone, expiresAt: new Date(Date.now() + PAIRING_CODE_TTL_MS) };
+    // The code supersedes the QR. Leaving both on screen invites the user to
+    // keep trying the one that cannot work on the device in their hand.
+    this.clearQr(s);
+    logger.info('wa.pairing_code_issued', { tenantId, phone: `***${phone.slice(-4)}` });
+    runWithTenant(tenantId, () =>
+      emitRealtime('wa:pairing-code', { code, phone, expiresAt: s.pairing!.expiresAt.toISOString() }),
+    );
+
+    return s.pairing;
+  }
+
+  /**
+   * Wait for a socket that can actually accept a pairing request.
+   *
+   * `requestPairingCode` writes an IQ node straight to the websocket. Called
+   * before the transport handshake finishes it does not throw — it silently
+   * never resolves, which on screen is a spinner that runs until the user gives
+   * up. A QR having arrived is proof the socket got far enough to pair.
+   */
+  private async waitForPairable(s: TenantSession, timeoutMs = PAIRABLE_TIMEOUT_MS): Promise<any> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (s.status === 'connected') throw new Error('ALREADY_CONNECTED');
+      const sock = s.sock;
+      if (sock && !sock.authState?.creds?.registered && (s.qr || sock.ws?.isOpen)) return sock;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error('PAIRING_TIMEOUT');
+  }
+
+  private clearPairing(s: TenantSession): void {
+    if (!s.pairing) return;
+    s.pairing = null;
+    runWithTenant(s.tenantId, () => emitRealtime('wa:pairing-code', { code: null }));
   }
 
   private clearQr(s: TenantSession): void {
@@ -201,12 +334,19 @@ class SessionManager {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      // A live pairing code means the user is linking by typing, on a device
+      // that by definition cannot scan. Baileys keeps rotating QRs regardless;
+      // surfacing them would swap the code out from under them mid-entry.
+      if (this.getPairingCode(s.tenantId)) return;
       logger.info('WhatsApp QR code received', { tenantId: s.tenantId });
       s.qr = qr;
       emitRealtime('wa:qr', { qr });
     }
 
     if (connection === 'close') {
+      // Captured before the teardown below clears them.
+      const hadPairingCode = Boolean(s.pairing);
+      const registered = Boolean(s.sock?.authState?.creds?.registered);
       const disconnectStatus = (lastDisconnect?.error as Boom)?.output?.statusCode;
       const boomPayload = (lastDisconnect?.error as Boom)?.output?.payload as any;
       const boomData = (lastDisconnect?.error as any)?.data as any;
@@ -220,15 +360,27 @@ class SessionManager {
         [401, 403, 405].includes(Number(disconnectStatus)) ||
         /unauthorized|forbidden|session|auth|logged out|connection failure/i.test(errorMessage);
 
-      s.lastError = { statusCode: disconnectStatus, reason: boomData?.reason, message: errorMessage };
+      // `lastError` answers "why did my connection break", which is a question
+      // that only exists once there was a connection to break. Before pairing
+      // completes, every close here is part of the pairing dance — a QR cycle
+      // ending, the socket recycling between codes — and surfacing those made
+      // the settings page show a permanent red "Something went wrong" to users
+      // whose only crime was not having linked a number yet.
+      s.lastError = registered
+        ? { statusCode: disconnectStatus, reason: boomData?.reason, message: errorMessage }
+        : null;
       logger.warn('WhatsApp connection closed', {
         tenantId: s.tenantId,
         shouldReconnect,
         isAuthFailure,
+        registered,
         error: errorMessage,
       });
 
       this.clearQr(s);
+      // The code was keyed to this socket's ephemeral keypair — it is dead now,
+      // and leaving it on screen means the user types a code that cannot work.
+      this.clearPairing(s);
       s.status = 'disconnected';
       emitRealtime('wa:status', { status: 'disconnected' });
 
@@ -239,6 +391,20 @@ class SessionManager {
       if (loggedOut || isAuthFailure) {
         void clearDbAuthState(s.sessionId);
         return;
+      }
+
+      // A pairing code was outstanding and never completed.
+      //
+      // `requestPairingCode` stamps `creds.me` the moment it issues a code, and
+      // Baileys chooses login-vs-register on `creds.me` ALONE — it never looks
+      // at `registered`. So the credentials left behind by an abandoned code
+      // attempt make every subsequent connect try to log in as an identity that
+      // was never registered, which fails auth every time. Wiping them here
+      // means the retry pairs cleanly instead of burning failed logins against
+      // WhatsApp, which is precisely what attracts a rate limit.
+      if (hadPairingCode && !registered) {
+        logger.info('wa.pairing_code_abandoned', { tenantId: s.tenantId });
+        void clearDbAuthState(s.sessionId);
       }
 
       // A QR that expired unscanned ("QR refs attempts ended") means nobody was
@@ -268,6 +434,7 @@ class SessionManager {
     } else if (connection === 'open') {
       logger.info('WhatsApp connected', { tenantId: s.tenantId });
       this.clearQr(s);
+      this.clearPairing(s);
       s.status = 'connected';
       s.lastError = null;
       s.connectedAt = new Date();
@@ -356,12 +523,21 @@ class SessionManager {
       where: { tenantId: { not: null } },
       select: { tenantId: true, data: true },
     });
-    // Only reconnect sessions that actually FINISHED pairing (creds.me present).
-    // An empty/pending row must never auto-connect: at boot it would spin up a
-    // perpetual QR-pairing loop for a number nobody is currently linking — the
-    // exact behaviour that gets the server rate-limited by WhatsApp.
+    // Only reconnect sessions that actually FINISHED pairing. An empty/pending
+    // row must never auto-connect: at boot it would spin up a perpetual pairing
+    // loop for a number nobody is currently linking — the exact behaviour that
+    // gets the server rate-limited by WhatsApp.
+    //
+    // `creds.me.id` alone is NOT proof of that. `requestPairingCode` stamps
+    // `me.id` the moment a code is issued, minutes before the user types it in —
+    // so an abandoned "link with phone number" attempt used to look identical to
+    // a linked account here. `registered` is the flag Baileys sets only once
+    // pairing completes.
     const tenantIds = stored
-      .filter((r) => Boolean((r.data as any)?.creds?.me?.id))
+      .filter((r) => {
+        const creds = (r.data as any)?.creds;
+        return Boolean(creds?.registered) && Boolean(creds?.me?.id);
+      })
       .map((r) => r.tenantId)
       .filter((id): id is string => Boolean(id));
     if (tenantIds.length === 0) return;

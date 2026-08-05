@@ -8,7 +8,14 @@ import { authMiddleware, checkPermission } from '../../auth/auth.middleware';
 import { processIncomingMessage } from '../../workflow/inbound-workflow';
 import { logger } from '../../lib/logger';
 import { prisma } from '../../lib/prisma';
-import { getSessionId, getAuthSessionId, getSock } from '../../whatsapp/client';
+import {
+  getSessionId,
+  getAuthSessionId,
+  getSock,
+  isPairingIdle,
+  requestPairingCode,
+  getPairingCode,
+} from '../../whatsapp/client';
 import { getTenantId } from '../../lib/tenant-context';
 import { clearDbAuthState } from '../../whatsapp/db-auth-state';
 import { getWarmupPhase, startOfToday } from '../../whatsapp/warmup';
@@ -73,6 +80,15 @@ router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
 
     // Get connection status immediately (from memory, no DB queries)
     const { status, connectedPhone, error } = providerManager.getStatus();
+    // Pairing having given up is a distinct state from "not connected yet": the
+    // former needs a button, the latter needs patience. Read live, never cached.
+    const pairingIdle = isPairingIdle();
+    // A live "link with phone number" code, so a refresh mid-entry doesn't lose
+    // it. Read live and never cached — it expires on a clock of its own.
+    const live = getPairingCode();
+    const pairing = live
+      ? { code: live.code, phone: live.phone, expiresAt: live.expiresAt.toISOString() }
+      : null;
 
     // Check in-memory cache first (30-second TTL)
     const sessionId = getAuthSessionId();
@@ -84,6 +100,8 @@ router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
         status,
         connectedPhone,
         error,
+        pairingIdle,
+        pairing,
         queueDepth: 0,
         session: cachedSession,
       });
@@ -173,6 +191,8 @@ router.get('/status', checkPermission('read', 'whatsapp'), async (req, res) => {
       status,
       connectedPhone,
       error,
+      pairingIdle,
+      pairing,
       queueDepth: 0,
       session,
     });
@@ -208,6 +228,41 @@ router.patch('/session-settings', checkPermission('update', 'whatsapp'), async (
     res.json({ success: true, warmupEnabled });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+/**
+ * Link by phone number instead of by QR.
+ *
+ * The QR route assumes a second screen: you cannot scan a code with the same
+ * phone that is displaying it. Anyone running this CRM from their phone — which
+ * is most of them — has no way through that flow at all. WhatsApp's "Link with
+ * phone number" issues an 8-character code they type in instead.
+ */
+router.post('/pairing-code', checkPermission('update', 'whatsapp'), async (req, res) => {
+  if (!getTenantId()) {
+    return res.status(409).json({ error: 'WhatsApp is managed per client.', code: 'NO_TENANT' });
+  }
+  try {
+    const pairing = await requestPairingCode(String(req.body?.phone ?? ''));
+    res.json({
+      code: pairing.code,
+      phone: pairing.phone,
+      expiresAt: pairing.expiresAt.toISOString(),
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'UNKNOWN';
+    // These are all user-actionable states, not server faults — a 500 would make
+    // the client show "something went wrong" for "check the number you typed".
+    const known: Record<string, { status: number; error: string }> = {
+      INVALID_PHONE: { status: 400, error: 'Enter the full number including its country code.' },
+      ALREADY_CONNECTED: { status: 409, error: 'WhatsApp is already connected.' },
+      PAIRING_TIMEOUT: { status: 504, error: 'WhatsApp did not respond in time. Please try again.' },
+    };
+    const mapped = known[code];
+    if (mapped) return res.status(mapped.status).json({ error: mapped.error, code });
+    logger.error('whatsapp_pairing_code_failed', { error: code });
+    res.status(500).json({ error: 'Could not get a pairing code. Please try again.' });
   }
 });
 

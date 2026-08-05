@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
-import QRCodeDisplay from '../../../components/shared/QRCodeDisplay';
+import WhatsAppLinkPanel from '../../../components/whatsapp/WhatsAppLinkPanel';
+import { useWhatsAppConnection } from '../../../components/whatsapp/WhatsAppConnectProvider';
 import ConnectionStatus from '../../../components/shared/ConnectionStatus';
 import FriendlyError from '../../../components/ui/FriendlyError';
 import { useSocket } from '../../../hooks/useSocket';
@@ -47,9 +48,16 @@ export default function SettingsPage() {
   );
 
   // ── WhatsApp state ────────────────────────────────────────────────────────
+  //
+  // The pairing half (QR, expired-pairing flag, refresh) comes from the shell's
+  // shared handshake. This page used to run its own, which meant its "New QR
+  // code" button issued a second `POST /connect` against a socket the shared one
+  // was already pairing — each wiping the other's credentials mid-handshake.
+  // What stays local is everything the shared connector has no concept of:
+  // warm-up, session reset, and the detailed error read-out.
+  const { refreshQr } = useWhatsAppConnection();
   const [status, setStatus]               = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
-  const [qrCode, setQrCode]               = useState<string | null>(null);
   const [whatsAppError, setWhatsAppError] = useState<string>('');
   const [waLoading, setWaLoading]         = useState(false);
   const [warmupEnabled, setWarmupEnabled] = useState(false);
@@ -91,37 +99,27 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const fetchQR = useCallback(async () => {
-    try {
-      const data = await api.get('/api/whatsapp/qr');
-      setQrCode(data.qr);
-      setWhatsAppError('');
-    } catch {}
-  }, []);
-
   useEffect(() => {
     if (sessionStatus === 'loading' || sessionStatus !== 'authenticated') return;
     fetchStatus();
-    fetchQR();
-    const iv = setInterval(() => {
-      fetchStatus();
-      if (status !== 'connected') fetchQR();
-    }, 5000);
+    const iv = setInterval(fetchStatus, 5000);
     return () => clearInterval(iv);
-  }, [sessionStatus, status, fetchStatus, fetchQR]);
+  }, [sessionStatus, fetchStatus]);
 
   useSocket('wa:status', fetchStatus);
-  useSocket('wa:qr', fetchQR);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  //
+  // Anything that starts a pairing goes through the shared connector's
+  // `refreshQr`, so this page can never be handshaking against a socket the rest
+  // of the shell is already pairing with.
   const handleConnect = async () => {
     setWaLoading(true);
     try {
       setWhatsAppError('');
       setStatus('connecting');
-      await api.post('/api/whatsapp/connect', {});
+      await refreshQr();
       await fetchStatus();
-      await fetchQR();
     } catch (err) {
       setWhatsAppError(err instanceof Error ? err.message : 'Failed to connect');
     } finally { setWaLoading(false); }
@@ -133,7 +131,6 @@ export default function SettingsPage() {
       await api.post('/api/whatsapp/disconnect', {});
       setStatus('disconnected');
       setConnectedPhone(null);
-      setQrCode(null);
     } catch {} finally { setWaLoading(false); }
   };
 
@@ -151,12 +148,10 @@ export default function SettingsPage() {
       setWhatsAppError('');
       setStatus('disconnected');
       setConnectedPhone(null);
-      setQrCode(null);
       await api.post('/api/whatsapp/reset-auth', {});
-      await api.post('/api/whatsapp/connect', {});
+      await refreshQr();
       setStatus('connecting');
       await fetchStatus();
-      await fetchQR();
     } catch (err) {
       setWhatsAppError(err instanceof Error ? err.message : 'Failed to reset');
     } finally { setWaLoading(false); }
@@ -223,7 +218,9 @@ export default function SettingsPage() {
   function WhatsAppSection() {
     const statusConfig = {
       connected:    { color: 'text-[#25D366]', bg: 'bg-[#25D366]/10', border: 'border-[#25D366]/30', dot: 'bg-[#25D366]', icon: Wifi },
-      disconnected: { color: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/30',   dot: 'bg-red-400',   icon: WifiOff },
+      // Not red. Having no number linked is a setup step, not a fault — and this
+      // card sits directly above the form that resolves it.
+      disconnected: { color: 'text-gray-600 dark:text-[#8696A0]', bg: 'bg-gray-100 dark:bg-white/5', border: 'border-gray-200 dark:border-white/10', dot: 'bg-gray-400', icon: WifiOff },
       connecting:   { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', dot: 'bg-amber-400', icon: RefreshCw },
     }[status];
 
@@ -260,18 +257,30 @@ export default function SettingsPage() {
         </div>
 
         {/* Error — friendly, actionable explanation. Action is hidden since the
-            connect controls live right here on this page. */}
+            connect controls live right here on this page.
+            Suppressed while connected-less by design: the server no longer
+            reports pairing-cycle closes as account errors, and anything left is
+            worth reading. */}
         {whatsAppError && (
           <FriendlyError error={whatsAppError} hideAction compact onRetry={handleConnect} />
         )}
 
-        {/* QR Code */}
-        {status !== 'connected' && qrCode && (
+        {/* Linking — the same panel the dashboard and the connect popup render,
+            so both routes (scan, or type a code) behave identically wherever the
+            user happens to be looking. */}
+        {status !== 'connected' && (
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-white/10 dark:bg-[#202C33]">
-            <p className="mb-4 text-sm font-medium text-gray-900 dark:text-white">{t('whatsapp.scanQR')}</p>
-            <div className="flex justify-center">
-              <QRCodeDisplay qrCode={qrCode} />
-            </div>
+            {/* Not "scan this QR code" — on a phone there is no QR on screen to
+                scan, and the panel decides which route to offer. */}
+            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">
+              {t('whatsapp.linkTitle', { defaultValue: 'Connect your WhatsApp' })}
+            </p>
+            <p className="mb-4 text-xs leading-relaxed text-gray-500 dark:text-[#8696A0]">
+              {t('whatsapp.linkBody', {
+                defaultValue: "Enter your number and we'll give you a code to type into WhatsApp.",
+              })}
+            </p>
+            <WhatsAppLinkPanel size="lg" />
           </div>
         )}
 

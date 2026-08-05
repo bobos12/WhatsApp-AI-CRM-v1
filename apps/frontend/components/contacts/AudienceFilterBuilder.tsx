@@ -242,27 +242,32 @@ export default function AudienceFilterBuilder({
                 ))}
               </select>
 
-              <div className="min-w-0 flex-1">
-                <ValueInput
-                  field={field}
-                  kind={kind}
-                  value={condition.value}
-                  onChange={(next) => patch(index, { value: next })}
-                  styles={styles}
-                />
-              </div>
+              {/* Value + remove share a row on mobile. Stacked, the 36px square
+                  button sat alone on its own line under a full-width input,
+                  which read as a fourth field rather than a delete. */}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <ValueInput
+                    field={field}
+                    kind={kind}
+                    value={condition.value}
+                    onChange={(next) => patch(index, { value: next })}
+                    styles={styles}
+                  />
+                </div>
 
-              <button
-                type="button"
-                onClick={() => removeCondition(index)}
-                aria-label={t('filters.advanced.remove', { defaultValue: 'Remove condition' })}
-                className={cn(
-                  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:text-red-400',
-                  styles.ghost,
-                )}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => removeCondition(index)}
+                  aria-label={t('filters.advanced.remove', { defaultValue: 'Remove condition' })}
+                  className={cn(
+                    'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:text-red-400',
+                    styles.ghost,
+                  )}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}

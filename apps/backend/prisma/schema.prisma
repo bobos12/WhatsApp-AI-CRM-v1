@@ -110,6 +110,13 @@ model WhatsAppSession {
   sessionId     String   @unique
   data          Json
   warmupEnabled Boolean  @default(false)
+  /// When this number started being used on WhatsApp — NOT when it was linked
+  /// here. A business connecting a number it has run for three years is not
+  /// operating a new account, and pacing it like one destroys its throughput for
+  /// no safety gain. Declared by the operator during setup; `createdAt` is only
+  /// a floor, and the CRM's own message history is used as evidence when it has
+  /// any. See broadcasts/safety/account-health.ts.
+  accountActiveSince DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 }
@@ -130,6 +137,23 @@ model Contact {
   /// Also holds a few reserved system keys (avatarUrl, avatarUrlAt) that are
   /// never exposed as custom fields — see contacts/custom-fields.service.ts.
   customFields   Json?
+
+  // ── Marketing consent ───────────────────────────────────────────────────────
+  /// True once the contact asks to stop hearing from us. Set automatically when
+  /// an inbound message matches an opt-out keyword, or by an agent. Broadcast
+  /// audiences exclude these unconditionally — there is no override flag on
+  /// purpose.
+  marketingOptOut   Boolean   @default(false)
+  optOutAt          DateTime?
+  /// How the opt-out happened, for the audit trail ("replied: STOP").
+  optOutReason      String?
+  /// When permission to send marketing was recorded, and where it came from
+  /// ("inbound_message" | "import" | "manual" | "form"). A contact who has
+  /// written to us has implied consent; one bulk-imported from a list has none,
+  /// and the risk engine scores those audiences very differently.
+  consentAt         DateTime?
+  consentSource     String?
+
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now()) @updatedAt
   conversations  Conversation[]
@@ -569,6 +593,50 @@ model Broadcast {
   /// scheduler polls it exactly like `scheduledAt`. Null while a batch is
   /// actively sending or the campaign is finished.
   nextBatchAt          DateTime?
+
+  // ── Deliverability & account-safety (see broadcasts/safety/*) ───────────────
+  /// Pre-flight risk score 0–100. Higher is riskier. Written by the risk engine
+  /// every time the campaign is saved or sent, so the list view can warn before
+  /// the user opens anything.
+  riskScore            Int?
+  /// LOW | MODERATE | HIGH | CRITICAL — the bucket `riskScore` fell into.
+  riskLevel            String?
+  /// Snapshot of the full pre-flight report at the moment of the last send, so a
+  /// post-mortem can show what we knew and what we advised.
+  preflight            Json?
+  /// CAREFUL | BALANCED | STEADY. Picks the throughput envelope and the shape of
+  /// the inter-message delay distribution. Defaults to BALANCED; the risk engine
+  /// downgrades it automatically when account health is poor.
+  pacingProfile        String               @default("BALANCED")
+  /// Hard ceiling on messages/hour for this campaign, derived from account health
+  /// and warm-up age at claim time. Null means "use the profile default".
+  throttlePerHour      Int?
+  /// Never deliver inside the recipient's local night. On by default — a 3 a.m.
+  /// marketing message is the fastest route to a block-and-report.
+  quietHoursEnabled    Boolean              @default(true)
+  /// Local hours (0–23) bounding the do-not-disturb window. Start > end wraps
+  /// midnight, which is the normal case (21:00 → 09:00).
+  quietHoursStart      Int                  @default(21)
+  quietHoursEnd        Int                  @default(9)
+  /// Stable fingerprint of the message body + media, used to detect a campaign
+  /// that re-sends the same content to an overlapping audience.
+  contentHash          String?
+  /// Set when the circuit breaker auto-paused the run (WhatsApp started refusing
+  /// sends). Distinguishes a machine pause from a user pause in the UI.
+  healthPausedAt       DateTime?
+  healthPauseReason    String?
+  /// Expanded message variations. Sending a byte-identical body to thousands of
+  /// numbers is one of the strongest spam fingerprints there is; the worker
+  /// rotates through these instead.
+  variants             Json?
+  /// Progressive rollout: deliver this many recipients, then hold and re-check
+  /// account health before releasing the rest. Null disables the pilot phase.
+  pilotSize            Int?
+  pilotCompletedAt     DateTime?
+  /// Set once the user has seen and accepted the pre-flight report for the
+  /// current `contentHash` + audience. Cleared on every edit.
+  reviewedAt           DateTime?
+
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @default(now()) @updatedAt
   recipients           BroadcastRecipient[]
@@ -578,6 +646,8 @@ model Broadcast {
   /// Drives the scheduler's due-batch poll (smart sending continuations).
   @@index([status, nextBatchAt])
   @@index([tenantId])
+  /// Duplicate-campaign detection looks up recent sends of the same content.
+  @@index([tenantId, contentHash])
 }
 
 enum BroadcastStatus {
@@ -615,11 +685,112 @@ model BroadcastRecipient {
   tenantId    String?
   broadcastId String
   broadcast   Broadcast @relation(fields: [broadcastId], references: [id])
+  /// Always E.164. Normalizing at audience-resolution time is what stops the
+  /// same human being messaged twice in one campaign because they were stored
+  /// once as "+971501234567" and once as "0501234567".
   phone       String
+  /// pending | sent | failed | skipped
   status      String    @default("pending")
+
+  // ── Delivery forensics ─────────────────────────────────────────────────────
+  /// Resolved at audience time so the worker never has to look a contact up.
+  contactId   String?
+  /// Quality tier at send time (HOT | WARM | COOL | COLD). Drives send ORDER:
+  /// engaged contacts go first, so if a run has to stop early it stopped on the
+  /// safest possible slice.
+  tier        String?
+  /// Materialized delivery position, written once when the audience is built.
+  /// The ordering is by tier then quality score, which cannot be expressed as a
+  /// Prisma `orderBy` over a String column — and re-sorting in memory would mean
+  /// loading every recipient row on every batch.
+  sortOrder   Int       @default(0)
+  /// Which message variant this recipient received.
+  variantIndex Int      @default(0)
+  attempts    Int       @default(0)
+  /// WhatsApp/transport error class — 463 (cold reachout), 403 (blocked),
+  /// NOT_ON_WHATSAPP, DISCONNECTED, … The circuit breaker reads these.
+  errorCode   String?
+  lastError   String?
+  /// Why this recipient was never attempted: SUPPRESSED, OPTED_OUT, COOLDOWN,
+  /// INVALID_PHONE, DUPLICATE, QUOTA. A skip is not a failure and must never be
+  /// counted as one.
+  skipReason  String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  /// The customer wrote back after receiving this. The single best signal that a
+  /// campaign was welcome rather than spam.
+  repliedAt   DateTime?
+  /// CRM Message row created by the send, so receipts can be reconciled.
+  messageId   String?
 
   @@index([broadcastId, status])
   @@index([tenantId])
+  /// Cooldown lookups: "did this phone get a broadcast in the last N hours?"
+  @@index([tenantId, phone, sentAt])
+  @@index([messageId])
+  /// The worker's hot path: next N pending recipients in delivery order.
+  @@index([broadcastId, status, sortOrder])
+}
+
+/// ─── Suppression list ────────────────────────────────────────────────────────
+///
+/// The one table every broadcast is filtered against, unconditionally. It lives
+/// at the phone level rather than on Contact so it survives a contact being
+/// deleted and re-imported — which is exactly how an opt-out normally gets lost.
+///
+/// Hard reasons (OPTED_OUT, COMPLAINT, BLOCKED_US) never expire. Soft reasons
+/// (NOT_ON_WHATSAPP, HARD_FAIL) carry an `expiresAt` so a number that was
+/// temporarily unreachable is retried weeks later instead of being blacklisted
+/// forever.
+model SuppressionEntry {
+  id        String    @id @default(cuid())
+  tenantId  String?
+  phone     String
+  /// OPTED_OUT | COMPLAINT | BLOCKED_US | NOT_ON_WHATSAPP | HARD_FAIL | MANUAL
+  reason    String
+  /// Free text shown to the operator ("replied STOP on 12 Mar").
+  detail    String?
+  /// inbound_keyword | send_error | manual | import
+  source    String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@index([tenantId, expiresAt])
+}
+
+/// ─── Daily account-health rollup ─────────────────────────────────────────────
+///
+/// One row per tenant per day. Everything the health score needs is here, so
+/// scoring an account costs one indexed read of ~30 rows instead of aggregating
+/// the Message table. Written incrementally by the broadcast worker and the
+/// inbound pipeline.
+model AccountHealthDay {
+  id                 String   @id @default(cuid())
+  tenantId           String?
+  date               DateTime @db.Date
+  /// Broadcast sends WhatsApp accepted.
+  broadcastSent      Int      @default(0)
+  /// Broadcast sends that errored for any reason.
+  broadcastFailed    Int      @default(0)
+  /// Of those, sends to contacts who have never written to us. The riskiest
+  /// traffic there is, and the numerator of the cold-ratio health signal.
+  coldSent           Int      @default(0)
+  /// WhatsApp refused with 403 — the recipient blocked this number.
+  hardBlocks         Int      @default(0)
+  /// WhatsApp refused with 463 — cold-reachout time lock. The loudest possible
+  /// "you are about to be restricted" signal.
+  coldReachoutBlocks Int      @default(0)
+  /// Recipients who replied within 24h of a broadcast.
+  broadcastReplies   Int      @default(0)
+  /// Contacts who opted out today.
+  optOuts            Int      @default(0)
+
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
 }
 
 model Analytics {

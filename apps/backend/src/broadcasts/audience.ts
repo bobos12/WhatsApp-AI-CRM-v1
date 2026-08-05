@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { normalizePhone } from '../lib/phone';
 import { RESERVED_CUSTOM_FIELD_KEYS } from '../contacts/custom-fields.constants';
 
 /**
@@ -187,45 +188,102 @@ export interface AudienceInput {
   teamId?: string | null;
 }
 
-/** Resolve an audience definition into a deduplicated list of phone numbers. */
-export async function resolveAudience(input: AudienceInput): Promise<string[]> {
-  const direct = (input.recipients ?? []).map((phone) => phone.trim()).filter(Boolean);
+export interface ResolvedAudience {
+  /** Deliverable, E.164-normalized, deduplicated. */
+  phones: string[];
+  /** How many entries the request nominally contained, before any cleaning. */
+  requested: number;
+  /** Entries that are not usable phone numbers at all. */
+  invalid: string[];
+  /**
+   * How many entries collapsed into an existing number once normalized. Almost
+   * always a person listed twice in different formats — and, before this,
+   * a person who received the campaign twice.
+   */
+  duplicates: number;
+}
+
+/**
+ * Resolve an audience definition into deliverable E.164 numbers.
+ *
+ * Normalization is the point. The old resolver deduplicated raw strings, so
+ * "+971501234567", "971501234567" and "0501234567" were three distinct
+ * recipients — one human, three messages, in a single campaign. WhatsApp reads
+ * that as a duplicate-send pattern and the recipient reads it as spam; both are
+ * right. Everything downstream (suppression, cooldown, per-contact history) keys on
+ * phone, so a non-canonical number silently escapes every one of those checks.
+ */
+export async function resolveAudienceDetailed(input: AudienceInput): Promise<ResolvedAudience> {
+  const rawDirect = (input.recipients ?? []).map((phone) => phone.trim()).filter(Boolean);
   const legacyTag = input.tag?.trim();
   const filter = input.filter ?? undefined;
   const filterTags = (filter?.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
   const hasConditions = Boolean(filter?.conditions?.length);
 
-  if (!legacyTag && !filterTags.length && !hasConditions) {
-    return Array.from(new Set(direct));
+  const rawMatched: string[] = [];
+
+  if (legacyTag || filterTags.length || hasConditions) {
+    const tagNames = Array.from(new Set([...(legacyTag ? [legacyTag] : []), ...filterTags]));
+
+    const contacts = await prisma.contact.findMany({
+      where: {
+        ...(input.teamId ? { teamId: input.teamId } : {}),
+        ...(tagNames.length
+          ? { contactTags: { some: { tag: { name: { in: tagNames, mode: 'insensitive' } } } } }
+          : {}),
+        // Opted-out contacts never enter an audience. Filtering here rather than
+        // only at send time means the count the user is shown is the truth.
+        marketingOptOut: false,
+      },
+      select: {
+        phone: true,
+        name: true,
+        email: true,
+        company: true,
+        notes: true,
+        status: true,
+        lifecycleStage: true,
+        source: true,
+        createdAt: true,
+        customFields: true,
+      },
+    });
+
+    for (const contact of contacts) {
+      if (!contact.phone) continue;
+      if (filter && !matchesFilter(contact, filter)) continue;
+      rawMatched.push(contact.phone);
+    }
   }
 
-  const tagNames = Array.from(new Set([...(legacyTag ? [legacyTag] : []), ...filterTags]));
+  const all = [...rawDirect, ...rawMatched];
+  const seen = new Set<string>();
+  const invalid: string[] = [];
+  let duplicates = 0;
 
-  const contacts = await prisma.contact.findMany({
-    where: {
-      ...(input.teamId ? { teamId: input.teamId } : {}),
-      ...(tagNames.length
-        ? { contactTags: { some: { tag: { name: { in: tagNames, mode: 'insensitive' } } } } }
-        : {}),
-    },
-    select: {
-      phone: true,
-      name: true,
-      email: true,
-      company: true,
-      notes: true,
-      status: true,
-      lifecycleStage: true,
-      source: true,
-      createdAt: true,
-      customFields: true,
-    },
-  });
+  for (const entry of all) {
+    const normalized = normalizePhone(entry);
+    if (!normalized) {
+      invalid.push(entry);
+      continue;
+    }
+    if (seen.has(normalized)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(normalized);
+  }
 
-  const matched = contacts
-    .filter((contact) => (filter ? matchesFilter(contact, filter) : true))
-    .map((contact) => contact.phone)
-    .filter((phone): phone is string => Boolean(phone));
+  return {
+    phones: Array.from(seen),
+    requested: all.length,
+    invalid,
+    duplicates,
+  };
+}
 
-  return Array.from(new Set([...direct, ...matched]));
+/** Back-compatible shape: just the deliverable numbers. */
+export async function resolveAudience(input: AudienceInput): Promise<string[]> {
+  const { phones } = await resolveAudienceDetailed(input);
+  return phones;
 }

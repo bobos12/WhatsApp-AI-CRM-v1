@@ -73,10 +73,17 @@ export function simpleRole(role?: Role | string): 'SYSTEM_MANAGER' | 'EMPLOYEE' 
 /** Base HTTP-aware error so routes/global handler can map to a status code. */
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /**
+   * Optional machine-readable reason, so a client can offer the right next
+   * action instead of only printing the sentence. A refusal the user can fix
+   * ("no number connected") deserves a button, not a toast.
+   */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
+    this.code = code;
   }
 }
 

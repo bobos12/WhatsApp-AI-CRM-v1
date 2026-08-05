@@ -8,7 +8,7 @@
  * request or a `runWithTenant()` job keep working unchanged.
  */
 import { getTenantId, requireTenantId } from '../lib/tenant-context';
-import { sessionManager, type WaStatus, type ConnectionError } from './session-manager';
+import { sessionManager, type WaStatus, type ConnectionError, type PairingCode } from './session-manager';
 
 /** Connect (or return) the current tenant's WhatsApp socket. */
 export async function connectToWhatsApp(tenantId: string = requireTenantId()) {
@@ -35,6 +35,27 @@ export function getCurrentQR(tenantId: string | null = getTenantId()): string | 
 
 export function getLastError(tenantId: string | null = getTenantId()): ConnectionError | null {
   return tenantId ? sessionManager.getLastError(tenantId) : null;
+}
+
+/** Pairing gave up after too many unscanned QR codes — the UI must offer a retry. */
+export function isPairingIdle(tenantId: string | null = getTenantId()): boolean {
+  return tenantId ? sessionManager.isPairingIdle(tenantId) : false;
+}
+
+/**
+ * Link by typing an 8-character code into WhatsApp instead of scanning.
+ * The only route that works when the CRM is open on the phone being linked.
+ */
+export async function requestPairingCode(
+  phone: string,
+  tenantId: string = requireTenantId(),
+): Promise<PairingCode> {
+  return sessionManager.requestPairingCode(tenantId, phone);
+}
+
+/** The live pairing code, or null once expired / superseded. */
+export function getPairingCode(tenantId: string | null = getTenantId()): PairingCode | null {
+  return tenantId ? sessionManager.getPairingCode(tenantId) : null;
 }
 
 export function getConnectedAt(tenantId: string | null = getTenantId()): Date | null {

@@ -27,9 +27,36 @@ interface StoredAuthData {
  * every key mutation and credential save — Baileys calls these infrequently
  * (handshake + periodic key rotations), so the write amplification is low.
  */
+/**
+ * Drop the stored credentials so the next connect issues a fresh QR.
+ *
+ * Clears the credential blob rather than deleting the row. The row is not only
+ * an auth store — it also carries operator settings that have nothing to do with
+ * the Baileys session and must outlive a re-pairing:
+ *
+ *   • `warmupEnabled` — the operator's own choice, silently reset to false on
+ *     every reconnect while this deleted the row.
+ *   • `accountActiveSince` — how long the *number* has been in real use. Losing
+ *     it makes a years-old business number look brand new again and drops it to
+ *     the new-account sending ceiling.
+ *
+ * `readRow()` already treats an empty `data` object exactly like a missing row,
+ * so the pairing behaviour is unchanged: no credentials, therefore a new QR.
+ *
+ * `createdAt` IS reset, deliberately. Everything reads it as "when this device
+ * was linked", and a re-pair genuinely is a new companion device — which is what
+ * WhatsApp's 463 cold-reachout restriction keys on. Preserving the old date
+ * would understate that risk, and understating is the direction that gets an
+ * account banned.
+ */
 export async function clearDbAuthState(sessionId: string): Promise<void> {
   try {
-    await prisma.whatsAppSession.delete({ where: { sessionId } }).catch(() => undefined);
+    await prisma.whatsAppSession
+      .update({
+        where: { sessionId },
+        data: { data: {} as any, createdAt: new Date() },
+      })
+      .catch(() => undefined);
   } catch (err) {
     logger.warn('db_auth_state.clear_failed', { sessionId, error: String(err) });
   }

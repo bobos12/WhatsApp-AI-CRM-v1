@@ -30,6 +30,11 @@ interface Broadcast {
   smartSending?: boolean;
   batchSize?: number | null;
   batchIntervalMinutes?: number | null;
+  pacingProfile?: string;
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: number;
+  quietHoursEnd?: number;
+  pilotSize?: number | null;
 }
 
 export default function EditBroadcastPage() {
@@ -73,14 +78,14 @@ export default function EditBroadcastPage() {
       <div className="hidden sm:flex items-center gap-4">
         <Link
           href="/broadcasts"
-          className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+          className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
         >
           <BackIcon className="h-4 w-4" />
           {t('back')}
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">{t('form.editTitle')}</h1>
-          <p className="text-[#8696A0]">{t('form.editSubtitle')}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('form.editTitle')}</h1>
+          <p className="text-gray-500 dark:text-[#8696A0]">{t('form.editSubtitle')}</p>
         </div>
       </div>
 
@@ -101,7 +106,15 @@ export default function EditBroadcastPage() {
             smartSending: broadcast.smartSending,
             batchSize: broadcast.batchSize,
             batchIntervalMinutes: broadcast.batchIntervalMinutes,
+            pacingProfile: broadcast.pacingProfile,
+            quietHoursEnabled: broadcast.quietHoursEnabled,
+            quietHoursStart: broadcast.quietHoursStart,
+            quietHoursEnd: broadcast.quietHoursEnd,
+            pilotSize: broadcast.pilotSize,
           }}
+          // Without this the campaign is flagged as a duplicate of itself the
+          // moment its own content hash is looked up.
+          currentBroadcastId={broadcast.id}
           submitLabel={t('form.saveChanges')}
           onBack={() => router.push('/broadcasts')}
           onSave={handleSave}

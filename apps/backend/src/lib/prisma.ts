@@ -26,6 +26,8 @@ const TENANT_SCOPED_MODELS = new Set<string>([
   'AutomationFlowExecution',
   'Broadcast',
   'BroadcastRecipient',
+  'SuppressionEntry',
+  'AccountHealthDay',
   'Analytics',
   'AuditLog',
   'SavedReply',

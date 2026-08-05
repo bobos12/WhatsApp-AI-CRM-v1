@@ -23,10 +23,10 @@ function genId() {
 function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-1.5 flex items-center gap-1.5">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-[#8696A0]">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
         {children}
       </span>
-      {hint && <span className="text-[10px] text-[#8696A0]/60">({hint})</span>}
+      {hint && <span className="text-[10px] text-gray-400 dark:text-[#8696A0]/60">({hint})</span>}
     </div>
   );
 }
@@ -48,10 +48,10 @@ function FieldInput({
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
-        className="w-full rounded-xl border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20 disabled:opacity-50"
+        className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20 disabled:opacity-50"
       />
       {maxLength && (
-        <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/20">
+        <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 dark:text-white/20">
           {value.length}/{maxLength}
         </span>
       )}
@@ -76,10 +76,10 @@ function FieldTextarea({
         placeholder={placeholder}
         maxLength={maxLength}
         rows={rows}
-        className="w-full resize-none rounded-xl border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
+        className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] outline-none transition focus:border-[#25D366]/50 focus:ring-1 focus:ring-[#25D366]/20"
       />
       {maxLength && (
-        <span className="pointer-events-none absolute bottom-2.5 end-2.5 text-[10px] text-white/20">
+        <span className="pointer-events-none absolute bottom-2.5 end-2.5 text-[10px] text-gray-400 dark:text-white/20">
           {value.length}/{maxLength}
         </span>
       )}
@@ -182,7 +182,7 @@ function MediaUploader({
               'rounded-lg border px-3 py-1 text-xs transition-colors',
               mode === m
                 ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                : 'border-white/10 text-[#8696A0] hover:border-white/20',
+                : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8696A0] hover:border-gray-300 dark:hover:border-white/20',
             )}
           >
             {m === 'upload' ? t('interactive.upload') : t('interactive.uploadUrl')}
@@ -193,7 +193,7 @@ function MediaUploader({
       {mode === 'upload' ? (
         <label
           className={cn(
-            'flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-white/10 py-4 transition-colors',
+            'flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/10 py-4 transition-colors',
             uploading ? 'opacity-60' : 'hover:border-[#25D366]/40 hover:bg-[#25D366]/3',
           )}
         >
@@ -213,12 +213,12 @@ function MediaUploader({
           ) : mediaName ? (
             <>
               <CheckCircle2 className="h-4 w-4 text-[#25D366]" />
-              <span className="max-w-full truncate px-4 text-xs text-white">{mediaName}</span>
+              <span className="max-w-full truncate px-4 text-xs text-gray-900 dark:text-white">{mediaName}</span>
             </>
           ) : (
             <>
-              <Plus className="h-4 w-4 text-[#8696A0]" />
-              <span className="text-xs text-[#8696A0]">{t('interactive.uploadClick', { kind })}</span>
+              <Plus className="h-4 w-4 text-gray-500 dark:text-[#8696A0]" />
+              <span className="text-xs text-gray-500 dark:text-[#8696A0]">{t('interactive.uploadClick', { kind })}</span>
             </>
           )}
         </label>
@@ -272,7 +272,7 @@ function HeaderEditor({
   return (
     <div className="space-y-2">
       <FieldLabel hint={t('interactive.optional')}>{t('interactive.headerLabel')}</FieldLabel>
-      <div className="flex gap-1 rounded-xl border border-white/10 bg-[#0B141A] p-1">
+      <div className="flex gap-1 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-1">
         {KINDS.map(({ value, label }) => (
           <button
             key={value}
@@ -282,7 +282,7 @@ function HeaderEditor({
               'flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
               kind === value
                 ? 'bg-[#25D366] text-slate-950'
-                : 'text-[#8696A0] hover:bg-white/5 hover:text-white',
+                : 'text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white',
             )}
           >
             {label}
@@ -410,14 +410,14 @@ function ButtonsTab({
               <button
                 type="button"
                 onClick={() => update({ buttons: content.buttons.filter((_, j) => j !== i) })}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
           {content.buttons.length === 0 && (
-            <p className="text-xs italic text-[#8696A0]">{t('interactive.noButtons')}</p>
+            <p className="text-xs italic text-gray-500 dark:text-[#8696A0]">{t('interactive.noButtons')}</p>
           )}
         </div>
       </div>
@@ -498,39 +498,39 @@ function ListTab({
         </div>
 
         {content.sections.length === 0 && (
-          <p className="text-xs italic text-[#8696A0]">{t('interactive.noSections')}</p>
+          <p className="text-xs italic text-gray-500 dark:text-[#8696A0]">{t('interactive.noSections')}</p>
         )}
 
         <div className="space-y-2">
           {content.sections.map((sec, si) => (
-            <div key={si} className="overflow-hidden rounded-xl border border-white/10">
-              <div className="flex items-center gap-2 bg-white/5 px-3 py-2">
+            <div key={si} className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-white/5 px-3 py-2">
                 <button
                   type="button"
                   onClick={() => setOpenSection(openSection === si ? null : si)}
                   className="flex flex-1 items-center gap-2 text-start"
                 >
                   {openSection === si ? (
-                    <ChevronUp className="h-3.5 w-3.5 text-[#8696A0]" />
+                    <ChevronUp className="h-3.5 w-3.5 text-gray-500 dark:text-[#8696A0]" />
                   ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-[#8696A0]" />
+                    <ChevronDown className="h-3.5 w-3.5 text-gray-500 dark:text-[#8696A0]" />
                   )}
-                  <span className="truncate text-sm font-medium text-white">
+                  <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
                     {sec.title || `${t('interactive.sectionTitle')} ${si + 1}`}
                   </span>
-                  <span className="text-xs text-[#8696A0]">{t('interactive.rowsCount', { count: sec.rows.length })}</span>
+                  <span className="text-xs text-gray-500 dark:text-[#8696A0]">{t('interactive.rowsCount', { count: sec.rows.length })}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onChange({ ...content, sections: content.sections.filter((_, i) => i !== si) })}
-                  className="flex h-6 w-6 items-center justify-center rounded-lg text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
+                  className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-500 dark:text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
 
               {openSection === si && (
-                <div className="space-y-3 border-t border-white/10 p-3">
+                <div className="space-y-3 border-t border-gray-200 dark:border-white/10 p-3">
                   <div>
                     <FieldLabel>{t('interactive.sectionTitle')}</FieldLabel>
                     <FieldInput
@@ -545,7 +545,7 @@ function ListTab({
 
                   <div className="space-y-2">
                     {sec.rows.map((row, ri) => (
-                      <div key={row.id} className="space-y-1.5 rounded-lg border border-white/10 p-2.5">
+                      <div key={row.id} className="space-y-1.5 rounded-lg border border-gray-200 dark:border-white/10 p-2.5">
                         <div className="flex items-center gap-2">
                           <FieldInput
                             value={row.title}
@@ -566,7 +566,7 @@ function ListTab({
                               );
                               onChange({ ...content, sections });
                             }}
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-[#8696A0] transition-colors hover:bg-red-400/10 hover:text-red-400"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -593,7 +593,7 @@ function ListTab({
                           );
                           onChange({ ...content, sections });
                         }}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/10 py-2 text-xs text-[#8696A0] transition-colors hover:border-[#25D366]/40 hover:text-[#25D366]"
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-200 dark:border-white/10 py-2 text-xs text-gray-500 dark:text-[#8696A0] transition-colors hover:border-[#25D366]/40 hover:text-[#25D366]"
                       >
                         <Plus className="h-3 w-3" /> {t('interactive.addRow')}
                       </button>
@@ -649,10 +649,10 @@ function CtaTab({
         />
       </div>
 
-      <div className="space-y-3 rounded-xl border border-white/10 bg-[#0B141A] p-4">
+      <div className="space-y-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-4">
         <FieldLabel>{t('interactive.ctaButtonLabel')}</FieldLabel>
         <div className="space-y-1.5">
-          <p className="text-[10px] text-[#8696A0]">{t('interactive.ctaDisplayLabel', { max: 20 })}</p>
+          <p className="text-[10px] text-gray-500 dark:text-[#8696A0]">{t('interactive.ctaDisplayLabel', { max: 20 })}</p>
           <FieldInput
             value={content.cta.displayText}
             onChange={(v) => update({ cta: { ...content.cta, displayText: v } })}
@@ -661,7 +661,7 @@ function CtaTab({
           />
         </div>
         <div className="space-y-1.5">
-          <p className="text-[10px] text-[#8696A0]">{t('interactive.ctaUrlLabel')}</p>
+          <p className="text-[10px] text-gray-500 dark:text-[#8696A0]">{t('interactive.ctaUrlLabel')}</p>
           <FieldInput
             value={content.cta.url}
             onChange={(v) => update({ cta: { ...content.cta, url: v } })}
@@ -746,7 +746,7 @@ export default function InteractiveBuilder({ onChange }: InteractiveBuilderProps
   return (
     <div>
       {/* Tab bar */}
-      <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-[#0B141A] p-1">
+      <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] p-1">
         {(Object.entries(TAB_LABELS) as [Tab, { label: string; description: string }][]).map(
           ([tabKey, { label, description }]) => (
             <button
@@ -757,13 +757,13 @@ export default function InteractiveBuilder({ onChange }: InteractiveBuilderProps
                 'rounded-lg px-2 py-2 text-center transition-colors',
                 tab === tabKey
                   ? 'bg-[#25D366] text-slate-950'
-                  : 'text-[#8696A0] hover:bg-white/5 hover:text-white',
+                  : 'text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white',
               )}
             >
-              <p className={cn('text-xs font-semibold', tab === tabKey ? 'text-slate-950' : 'text-white')}>
+              <p className={cn('text-xs font-semibold', tab === tabKey ? 'text-slate-950' : 'text-gray-900 dark:text-white')}>
                 {label}
               </p>
-              <p className={cn('mt-0.5 text-[9px]', tab === tabKey ? 'text-slate-800' : 'text-[#8696A0]')}>
+              <p className={cn('mt-0.5 text-[9px]', tab === tabKey ? 'text-slate-800' : 'text-gray-500 dark:text-[#8696A0]')}>
                 {description}
               </p>
             </button>

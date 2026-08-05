@@ -146,7 +146,10 @@
     "aria": "WhatsApp connection",
     "connected": "Connected",
     "copy": "Copy number",
-    "manage": "Manage"
+    "manage": "Manage",
+    "setupTitle": "Connect your WhatsApp",
+    "setupBody": "Enter your number and we'll give you a code to type into WhatsApp.",
+    "moreOptions": "More connection options"
   },
   "pipelineEmpty": "No deals yet",
   "pipelineEmptyCta": "Open the deals board"

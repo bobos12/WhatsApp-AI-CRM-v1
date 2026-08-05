@@ -20,8 +20,10 @@ import { formatSchedule } from '../../../lib/schedule';
 import { cn } from '../../../lib/utils';
 import {
   ALL_STATUSES, BroadcastActions, MEDIA_ICONS, STATUS_DOTS, STATUS_STYLES,
-  deliveryStats, useCountdownLabel, type BroadcastSummary as Broadcast,
+  RiskBadge, deliveryStats, useCountdownLabel, type BroadcastSummary as Broadcast,
 } from '../../../components/broadcasts/shared';
+import AccountHealthBanner from '../../../components/broadcasts/AccountHealthBanner';
+import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
 
 type BroadcastSortKey = 'name' | 'status' | 'recipientCount' | 'totalSent' | 'progress' | 'createdAt';
 
@@ -126,6 +128,8 @@ export default function BroadcastsPage() {
 
   // ─── row actions ──────────────────────────────────────────────────────────
   const [sendingId, setSendingId]             = useState<string | null>(null);
+  /** Set when the server answered 428 — the campaign and the reason to show. */
+  const [riskConfirm, setRiskConfirm]         = useState<{ id: string; reason: string | null } | null>(null);
   const [deletingId, setDeletingId]           = useState<string | null>(null);
   const [pausingId, setPausingId]             = useState<string | null>(null);
   const [busyId, setBusyId]                   = useState<string | null>(null);
@@ -306,13 +310,24 @@ export default function BroadcastsPage() {
 
   // ─── Row actions ──────────────────────────────────────────────────────────
 
-  const handleSendBroadcast = async (id: string) => {
+  /**
+   * 428 means the server rated this campaign critical risk and wants an explicit
+   * acknowledgement. Anything else is a real failure. Sending `acknowledged`
+   * blindly on the first attempt would defeat the check entirely, so the retry
+   * only ever happens after the user has seen the dialog.
+   */
+  const handleSendBroadcast = async (id: string, acknowledged = false) => {
     try {
       setSendingId(id);
-      await api.post(`/api/broadcasts/${id}/send`, {});
+      await api.post(`/api/broadcasts/${id}/send`, acknowledged ? { acknowledged: true } : {});
       success('Broadcast started sending.');
+      setRiskConfirm(null);
       await fetchBroadcasts();
     } catch (err) {
+      if ((err as { status?: number })?.status === 428) {
+        setRiskConfirm({ id, reason: err instanceof Error ? err.message : null });
+        return;
+      }
       explainToast(err);
     } finally {
       setSendingId(null);
@@ -456,6 +471,11 @@ export default function BroadcastsPage() {
         </div>
       </section>
 
+      {/* ── Account health ──
+          Above the stats on purpose: what the number can safely send today is
+          more decision-relevant than how many campaigns have ever been created. */}
+      <AccountHealthBanner />
+
       {/* ── Stats cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label={t('stats.totalBroadcasts')} value={totals.total}    sub={t('stats.allCampaigns')} />
@@ -516,7 +536,7 @@ export default function BroadcastsPage() {
                 checked={allPageSelected}
                 ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                 onChange={toggleAll}
-                className="h-4 w-4 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
               />
             </label>
             <p className="text-xs text-gray-500 dark:text-[#8696A0]">
@@ -667,7 +687,7 @@ export default function BroadcastsPage() {
                     type="checkbox"
                     checked={selectedIds.has(broadcast.id)}
                     onChange={() => toggleSelect(broadcast.id)}
-                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -686,6 +706,7 @@ export default function BroadcastsPage() {
                         <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[broadcast.status] ?? 'bg-gray-400')} />
                         {t(`status.${broadcast.status}`, { defaultValue: broadcast.status })}
                       </span>
+                      <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} />
                     </div>
 
                     {/* meta row */}
@@ -752,7 +773,7 @@ export default function BroadcastsPage() {
                     checked={allPageSelected}
                     ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                     onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                    className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
                   />
                 </th>
                 <SortTh k="name"           label={t('table.campaign', { defaultValue: 'Campaign' })} />
@@ -819,7 +840,7 @@ export default function BroadcastsPage() {
                         type="checkbox"
                         checked={selectedIds.has(broadcast.id)}
                         onChange={() => toggleSelect(broadcast.id)}
-                        className="h-4 w-4 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                        className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
                       />
                     </td>
                     <td className="max-w-[12rem] px-3 py-3 lg:px-5 xl:max-w-none xl:px-6">
@@ -847,10 +868,13 @@ export default function BroadcastsPage() {
                       )}
                     </td>
                     <td className="px-3 py-3 lg:px-5 xl:px-6">
-                      <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_STYLES[broadcast.status] ?? STATUS_STYLES.DRAFT)}>
-                        <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[broadcast.status] ?? 'bg-gray-400')} />
-                        {t(`status.${broadcast.status}`, { defaultValue: broadcast.status })}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_STYLES[broadcast.status] ?? STATUS_STYLES.DRAFT)}>
+                          <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[broadcast.status] ?? 'bg-gray-400')} />
+                          {t(`status.${broadcast.status}`, { defaultValue: broadcast.status })}
+                        </span>
+                        <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} />
+                      </div>
                     </td>
                     <td className="hidden px-3 py-3 lg:px-5 xl:table-cell xl:px-6">
                       <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-gray-500 dark:text-[#8696A0]">
@@ -931,6 +955,18 @@ export default function BroadcastsPage() {
           )}
         </div>
       )}
+
+      <ConfirmRiskDialog
+        open={riskConfirm !== null}
+        reason={riskConfirm?.reason ?? null}
+        busy={sendingId === riskConfirm?.id}
+        onConfirm={() => riskConfirm && handleSendBroadcast(riskConfirm.id, true)}
+        onCancel={() => {
+          const target = riskConfirm?.id;
+          setRiskConfirm(null);
+          if (target) router.push(`/broadcasts/${target}`);
+        }}
+      />
 
       {/* Mobile bottom-nav spacer */}
       <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />

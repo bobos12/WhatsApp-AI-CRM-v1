@@ -189,7 +189,11 @@
     "templateSaved": "Saved as template",
     "templateSaveFailed": "Could not save",
     "templateIncludesMedia": "Attachment included",
-    "untitledTemplate": "Untitled template"
+    "untitledTemplate": "Untitled template",
+    "waNotConnected": "No WhatsApp number is connected, so there is nothing to send from.",
+    "waConnecting": "WhatsApp is still connecting — this will be ready in a moment.",
+    "waGateHint": "You can still schedule this campaign for later — switch off \"Send now\" to save it.",
+    "waConnectCta": "Connect WhatsApp"
   },
   "interactive": {
     "tabButtons": "Quick Reply",
@@ -293,7 +297,8 @@
   "recipientStatus": {
     "sent": "Sent",
     "failed": "Failed",
-    "pending": "Pending"
+    "pending": "Pending",
+    "skipped": "Excluded"
   },
   "detail": {
     "allRecipients": "All",
@@ -307,7 +312,8 @@
     "noRecipientsMatch": "No recipients match this filter.",
     "nothingToDeliver": "No recipients yet.",
     "openFile": "Open",
-    "searchPhone": "Search phone…"
+    "searchPhone": "Search phone…",
+    "replied": "Replied"
   },
   "smart": {
     "title": "Smart Sending",
@@ -333,5 +339,113 @@
     "nextBatch": "Next batch {{when}}",
     "sendingBatch": "Sending…",
     "batch": "Batch"
+  },
+  "risk": {
+    "LOW": "Low risk",
+    "MODERATE": "Some risk",
+    "HIGH": "High risk",
+    "CRITICAL": "Critical risk",
+    "confirmTitle": "This campaign could get your number restricted",
+    "confirmBody": "The safety check rated this campaign critical risk. Sending it as it stands may lead WhatsApp to restrict this Business account.",
+    "sendAnyway": "Send anyway",
+    "reviewFirst": "Review the report first"
+  },
+  "health": {
+    "title": "WhatsApp number health",
+    "grade_EXCELLENT": "Excellent",
+    "grade_GOOD": "Good",
+    "grade_FAIR": "Fair",
+    "grade_AT_RISK": "At risk",
+    "grade_CRITICAL": "Critical",
+    "budgetLine": "{{used}} of {{limit}} campaign messages sent today · {{remaining}} left",
+    "replyRate": "Reply rate",
+    "blocks": "Blocked by",
+    "optOuts": "Unsubscribes",
+    "coldRatio": "One-way traffic",
+    "allClear": "No warning signs in the last {{days}} days. Keep replies flowing and this stays green.",
+    "noHistory": "No campaign history yet",
+    "gradeSoFar": "{{grade}} so far"
+  },
+  "safety": {
+    "section": "Safety check",
+    "subtitle": "How this campaign will reach people — and what it costs your WhatsApp number.",
+    "pacing": "Sending speed",
+    "pacing_CAREFUL": "Careful",
+    "pacing_BALANCED": "Balanced",
+    "pacing_STEADY": "Steady",
+    "pacingBlurb_CAREFUL": "Long, irregular gaps. Best for new numbers or cold audiences.",
+    "pacingBlurb_BALANCED": "Natural, hand-paced delivery. The safe default.",
+    "pacingBlurb_STEADY": "Faster. Only for mature numbers with engaged audiences.",
+    "pacingCapped": "Not available until your number has a longer track record.",
+    "quietHours": "Respect quiet hours",
+    "quietHoursHint": "Nobody is messaged during their local night. Recipients in other countries are handled on their own clock.",
+    "quietFrom": "Pause from",
+    "quietUntil": "Resume at",
+    "pilot": "Test on a small group first",
+    "pilotHint": "Send to your most engaged contacts, then pause so you can see the replies before the rest goes out.",
+    "pilotContacts": "contacts",
+    "optOutLine": "Reply STOP to unsubscribe",
+    "greeting": "Hi {{first_name}}",
+    "filteredFrom": "filtered from {{count}} selected",
+    "pacingIntro": "We pick the safest speed your number can handle. You can always go slower.",
+    "recommended": "Recommended",
+    "planRate": "Speed",
+    "planPerDay": "Per day",
+    "planBatch": "Batch size",
+    "planFinish": "Finishes in",
+    "planOneGo": "One run",
+    "sectionLive": "Safety check · re-assessed now",
+    "sectionAtSend": "Safety check · as sent",
+    "reassessing": "Checking against your account right now…",
+    "assessedAt": "Checked {{time}}",
+    "assessedAtSave": "From the last save",
+    "recheck": "Re-check",
+    "rechecking": "Re-checking…"
+  },
+  "monitor": {
+    "autoPaused": "Stopped automatically to protect your WhatsApp number",
+    "resumeAnyway": "Resume anyway",
+    "resumeWarning": "Only if you have fixed what caused it — the same refusals will otherwise repeat.",
+    "pilotDone": "Pilot batch delivered",
+    "pilotHint": "Check for replies and blocks, then release the rest of the campaign.",
+    "releaseRest": "Send to the remaining {{count}}",
+    "throughput": "Last hour",
+    "messagesSent": "messages sent",
+    "remaining": "Remaining",
+    "eta": "about {{eta}} left",
+    "pace": "Pace",
+    "excluded": "Excluded",
+    "excludedSub": "opted out or on cooldown",
+    "waiting": "Pausing between batches — delivery resumes at {{time}}.",
+    "safetyLive": "Ban protection · measured",
+    "safetyForecast": "Ban protection · forecast",
+    "healthScore": "{{score}}/100 account health",
+    "noHistory": "No sending history yet",
+    "budgetToday": "Today",
+    "attempted": "Attempted",
+    "failureRate": "Failed",
+    "pushback": "Refused by WhatsApp",
+    "forecastBeaten": "This was rated low risk before sending, but WhatsApp has refused messages since. Trust the measurement."
+  },
+  "skipReason": {
+    "OPTED_OUT": "Asked to stop receiving messages",
+    "SUPPRESSED": "On the do-not-message list",
+    "COOLDOWN": "Received another campaign too recently",
+    "INVALID_PHONE": "Not a valid phone number",
+    "COLD_EXCLUDED": "Has never messaged you — excluded by choice",
+    "ALREADY_RECEIVED": "Already received this message",
+    "DUPLICATE": "Listed more than once",
+    "QUOTA": "Beyond today's safe sending volume"
+  },
+  "errorCode": {
+    "COLD_REACHOUT_463": "WhatsApp blocked this as cold outreach (463)",
+    "BLOCKED_403": "This person has blocked your number",
+    "NOT_ON_WHATSAPP": "This number is not on WhatsApp",
+    "DISCONNECTED": "WhatsApp was disconnected",
+    "QUOTA": "Daily sending limit reached",
+    "RATE_LIMITED": "Sending too quickly — WhatsApp throttled this",
+    "TIMEOUT": "WhatsApp did not respond in time",
+    "INVALID_PHONE": "Not a valid phone number",
+    "UNKNOWN": "Delivery failed"
   }
 }
