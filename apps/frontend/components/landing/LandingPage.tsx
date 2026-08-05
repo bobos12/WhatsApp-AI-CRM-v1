@@ -20,6 +20,13 @@ import SpotlightCard from '@/components/reactbits/SpotlightCard'
 
 type Icon = ComponentType<LucideProps>
 
+// ─── WhatsApp contact — every CTA opens a chat with the owner instead of
+// a self-serve sign-up, since only the owner provisions new accounts.
+const WHATSAPP_NUMBER = '201115655645'
+function waLink(message: string) {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+}
+
 const FEATURE_ICONS: Record<string, Icon> = {
   inbox: Users, ai: BotMessageSquare, broadcast: Megaphone,
   automation: Workflow, crm: Contact, analytics: BarChart3,
@@ -96,6 +103,10 @@ function LangToggle({ className = '' }: { className?: string }) {
 function LandingNav() {
   const { language } = useLanguage()
   const t = LANDING[language]
+  const isAr = language === 'ar'
+  const getStartedMsg = isAr
+    ? 'مرحبًا، أرغب في البدء مع NexusCRM'
+    : "Hi, I'd like to get started with NexusCRM"
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
 
@@ -130,12 +141,14 @@ function LandingNav() {
           <Link href="/login" className="text-sm font-medium text-white/70 transition-colors hover:text-white">
             {t.nav.signIn}
           </Link>
-          <Link
-            href="/login"
+          <a
+            href={waLink(getStartedMsg)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="lux-btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95"
           >
             {t.nav.getStarted}
-          </Link>
+          </a>
         </div>
 
         {/* Mobile */}
@@ -171,9 +184,14 @@ function LandingNav() {
               <Link href="/login" className="rounded-lg border border-white/12 px-4 py-2.5 text-center text-sm font-semibold text-white/80">
                 {t.nav.signIn}
               </Link>
-              <Link href="/login" className="lux-btn-primary rounded-lg px-4 py-2.5 text-center text-sm font-bold text-white">
+              <a
+                href={waLink(getStartedMsg)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lux-btn-primary rounded-lg px-4 py-2.5 text-center text-sm font-bold text-white"
+              >
                 {t.nav.getStarted}
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -321,13 +339,15 @@ export default function LandingPage() {
 
             <Reveal delay={200}>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/login"
+                <a
+                  href={waLink(isAr ? 'مرحبًا، أرغب في بدء تجربتي المجانية مع NexusCRM' : "Hi, I'd like to start my free NexusCRM trial")}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="lux-btn-primary group inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-7 py-3.5 text-base font-bold text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 sm:w-auto"
                 >
                   {t.hero.ctaPrimary}
                   <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
-                </Link>
+                </a>
                 <InstallButton
                   variant="hero"
                   className="lux-pulse-ring w-full sm:w-auto"
@@ -494,13 +514,15 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/login"
+                <a
+                  href={waLink(isAr ? 'مرحبًا، أرغب في البدء مع NexusCRM' : "Hi, I'd like to get started with NexusCRM")}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="group mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-[#5cf0a0] transition-colors hover:text-[#f3d98b]"
                 >
                   {t.nav.getStarted}
                   <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
-                </Link>
+                </a>
               </div>
 
               <div className="order-1 lg:order-2">
@@ -888,8 +910,10 @@ export default function LandingPage() {
                       ))}
                     </ul>
 
-                    <Link
-                      href="/login"
+                    <a
+                      href={waLink(isAr ? `مرحبًا، أنا مهتم بخطة ${p.name}` : `Hi, I'm interested in the ${p.name} plan`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-transform duration-200 hover:scale-[1.02] active:scale-95 ${
                         p.highlight
                           ? 'lux-btn-gold'
@@ -898,7 +922,7 @@ export default function LandingPage() {
                     >
                       {p.cta}
                       <ArrowRight className={`h-4 w-4 ${arrowFlip}`} />
-                    </Link>
+                    </a>
                   </div>
                 </Reveal>
               ))}
@@ -934,13 +958,15 @@ export default function LandingPage() {
                 </h2>
                 <p className="mx-auto mt-5 max-w-xl text-pretty leading-relaxed text-white/55">{t.finalCta.subtitle}</p>
                 <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <Link
-                    href="/login"
+                  <a
+                    href={waLink(isAr ? 'مرحبًا، أرغب في بدء تجربتي المجانية مع NexusCRM' : "Hi, I'd like to start my free NexusCRM trial")}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="lux-btn-primary group inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-8 py-4 text-base font-bold text-white transition-transform duration-200 hover:scale-[1.03] active:scale-95 sm:w-auto"
                   >
                     {t.finalCta.primary}
                     <ArrowRight className={`h-5 w-5 transition-transform group-hover:translate-x-1 ${arrowFlip}`} />
-                  </Link>
+                  </a>
                   <InstallButton
                     variant="hero"
                     className="w-full justify-center sm:w-auto"
