@@ -30,7 +30,19 @@ import {
   Zap,
   Bot,
   Tag,
+  Plus,
+  CheckCheck,
+  RotateCcw,
+  PanelRight,
+  UserPlus,
+  UserRound,
+  CheckSquare,
+  BriefcaseBusiness,
+  FlaskConical,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Skeleton } from '../ui/Skeleton';
+import { localeFor } from '../../lib/format';
 import MessageBubble from '../messages/MessageRenderer';
 import InteractiveComposer from '../chat/InteractiveComposer';
 import InteractiveSidebar, { type SidebarMessage } from '../chat/InteractiveSidebar';
@@ -116,10 +128,10 @@ interface ChatWindowProps {
 }
 
 const ATTACHMENT_OPTIONS = [
-  { labelKey: 'composer.attachPhoto',    accept: 'image/*',                                    icon: ImageIcon, color: 'from-violet-500 to-purple-600' },
-  { labelKey: 'message.videoMessage',    accept: 'video/*',                                    icon: Video,     color: 'from-rose-500 to-pink-600' },
-  { labelKey: 'composer.attachAudio',    accept: 'audio/*',                                    icon: Music2,    color: 'from-amber-500 to-orange-600' },
-  { labelKey: 'composer.attachDocument', accept: '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx', icon: FileText,  color: 'from-sky-500 to-blue-600' },
+  { labelKey: 'composer.attachPhoto',    accept: 'image/*',                                    icon: ImageIcon, tone: 'bg-sky-500/12 text-sky-600 dark:text-sky-300' },
+  { labelKey: 'message.videoMessage',    accept: 'video/*',                                    icon: Video,     tone: 'bg-rose-500/12 text-rose-600 dark:text-rose-300' },
+  { labelKey: 'composer.attachAudio',    accept: 'audio/*',                                    icon: Music2,    tone: 'bg-amber-500/12 text-amber-700 dark:text-amber-300' },
+  { labelKey: 'composer.attachDocument', accept: '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx', icon: FileText,  tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-300' },
 ];
 
 const PIPELINE_STAGES = ['', 'LEAD', 'QUALIFIED', 'NEGOTIATION', 'WON', 'LOST'] as const;
@@ -231,6 +243,7 @@ function dtoToMsg(dto: any): Message & { clientId?: string; schemaVersion?: numb
 
 function BotTestPanel({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation('chat');
+  const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -253,37 +266,47 @@ function BotTestPanel({ conversationId }: { conversationId: string }) {
     }
   };
 
-  return (
-    <div className="mt-3 rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] p-3">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-[#8696A0]">
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-2xs font-medium text-ink-3 transition-colors hover:text-ink">
+        <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" />
         {t('details.aiBotTest')}
-      </p>
-      <div className="flex gap-2">
+      </button>
+    );
+  }
+
+  return (
+    <div className="pop-enter rounded-lg border border-dashed border-line-strong p-2.5">
+      <p className="mb-2 text-2xs font-medium text-ink-3">{t('details.aiBotTest')}</p>
+      <div className="flex gap-1.5">
         <input
           type="text"
           value={input}
+          autoFocus
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSimulate()}
           placeholder={t('details.aiBotTestPlaceholder')}
-          className="min-w-0 flex-1 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#8696A0] focus:border-[#25D366] focus:outline-none"
+          className="field field-sm flex-1"
         />
         <button
           type="button"
           onClick={runSimulate}
           disabled={loading || !input.trim()}
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-white transition-colors hover:bg-[#1FAA5C] disabled:opacity-40"
+          className="btn btn-primary btn-icon btn-sm"
+          aria-label={t('composer.sendMessage')}
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          {loading ? <Loader2 className="animate-spin" /> : <Send className="icon-mirror" />}
         </button>
       </div>
-      {sent && <p className="mt-1.5 text-[11px] text-[#25D366]">↑ {t('details.aiBotSimulated')}</p>}
-      {error && <p className="mt-1.5 text-[11px] text-red-500">{error}</p>}
+      {sent && <p className="mt-1.5 text-2xs text-brand">{t('details.aiBotSimulated')}</p>}
+      {error && <p className="mt-1.5 text-2xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 }
 
 export default function ChatWindow({ conversationId, recipientContacts = [], onContactSaved, onConversationNotFound, onBack }: ChatWindowProps) {
-  const { t } = useTranslation(['chat', 'common', 'templates']);
+  const { t, i18n } = useTranslation(['chat', 'common', 'templates']);
+  const chatLocale = localeFor(i18n.language);
   const router = useRouter();
   const { data: session } = useSession();
   const { dir, isRTL } = useDirection();
@@ -337,6 +360,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isBotToggling, setIsBotToggling] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
 
   // Global AI-bot master switch (synced live with the AI settings page).
   const { enabled: globalBotEnabled, saving: globalBotSaving, toggle: toggleGlobalBot } = useGlobalBot();
@@ -528,7 +552,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 80)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }, [message]);
 
   // Open the details panel by default only where it docks inline (2xl+),
@@ -1108,26 +1132,47 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     }
   };
 
+  // ── Saved replies as slash commands ──────────────────────────────────────
+  // "/" opens the matching saved replies above the composer, so a shortcut no
+  // longer has to be remembered exactly to be useful.
+  const slashQuery = message.startsWith('/') && !/\s/.test(message) ? message.slice(1).toLowerCase() : null;
+  const slashMatches = slashQuery === null ? [] : savedReplies
+    .filter((r) => r.shortcut.toLowerCase().replace(/^\//, '').includes(slashQuery))
+    .slice(0, 6);
+  const expandReply = (text: string) => text.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) => {
+    if (k === 'name') return conversation?.contact?.name ?? '';
+    if (k === 'phone') return conversation?.contact?.phone ?? '';
+    return '';
+  });
+  const pickSlash = (r: { shortcut: string; message: string }) => {
+    setMessage(expandReply(r.message));
+    setSlashIndex(0);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+  const onComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashMatches.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((i) => (i + 1) % slashMatches.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((i) => (i - 1 + slashMatches.length) % slashMatches.length); return; }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') { e.preventDefault(); pickSlash(slashMatches[Math.min(slashIndex, slashMatches.length - 1)]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setMessage(''); return; }
+    }
+    handleKeyDown(e);
+  };
+
   if (!conversationId) {
     return (
-      <div dir={dir} className="relative flex h-full w-full min-w-0 items-center justify-center overflow-hidden bg-[#f0f2f5] dark:bg-[#0B141A]">
-        <div className="absolute inset-0 chat-doodle-bg opacity-40 dark:opacity-20 pointer-events-none" />
-        <div className="relative z-10 max-w-md px-8 text-center">
-          <div className="mx-auto mb-6 flex h-32 w-32 items-center justify-center">
-            <div className="absolute h-32 w-32 rounded-full bg-[#25D366]/10 blur-2xl" />
-            <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] via-[#1FAA5C] to-[#128C7E] shadow-[0_20px_60px_-15px_rgba(37,211,102,0.5)]">
-              <MessageSquare className="h-10 w-10 text-white" strokeWidth={1.75} />
-            </div>
-          </div>
-          <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">{t('window.emptyTitle')}</h2>
-          <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-[#8696A0]">
-            {t('window.emptySubtitle')}
+      <div dir={dir} className="relative flex h-full w-full min-w-0 items-center justify-center overflow-hidden bg-chat">
+        <div className="chat-doodle pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div className="enter relative max-w-sm px-8 text-center">
+          <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl border border-line bg-surface shadow-soft">
+            <MessageSquare className="h-6 w-6 text-brand" strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">{t('window.emptyTitle')}</h2>
+          <p className="mt-1.5 text-[13px] leading-6 text-ink-3">{t('window.emptySubtitle')}</p>
+          <p className="mt-6 inline-flex items-center gap-1.5 text-2xs text-ink-4">
+            <span className="kbd">⌘</span><span className="kbd">K</span>
+            <span className="ms-1">{t('common:palette.placeholder')}</span>
           </p>
-          <div className="mt-8 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.18em] text-gray-400 dark:text-[#5C6970]">
-            <span className="h-px w-8 bg-gray-300 dark:bg-white/10" />
-            {t('window.emptyBadge')}
-            <span className="h-px w-8 bg-gray-300 dark:bg-white/10" />
-          </div>
         </div>
       </div>
     );
@@ -1135,345 +1180,152 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
 
   if (!conversation) {
     return (
-      <div dir={dir} className="relative flex h-full w-full min-w-0 items-center justify-center bg-[#f0f2f5] dark:bg-[#0B141A]">
-        <div className="absolute inset-0 chat-doodle-bg opacity-30 dark:opacity-15 pointer-events-none" />
-        <div className="relative flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 animate-ping rounded-full bg-[#25D366]/20" />
-            <div className="relative h-12 w-12 animate-spin rounded-full border-[3px] border-gray-200 dark:border-white/10 border-t-[#25D366]" />
-          </div>
-          <p className="text-sm font-medium text-gray-500 dark:text-[#8696A0]">{t('window.loading')}</p>
+      <div dir={dir} className="relative flex h-full w-full min-w-0 flex-col bg-chat">
+        <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="space-y-2"><Skeleton className="h-3 w-36 rounded" /><Skeleton className="h-2.5 w-24 rounded" /></div>
+        </div>
+        <div className="flex-1 space-y-3 px-[6%] py-6" aria-hidden="true">
+          {[52, 38, 64, 30, 46].map((w, i) => (
+            <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
+              <Skeleton className="h-10 rounded-lg" style={{ width: `${w}%` } as React.CSSProperties} />
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
+  const assignee = conversation.assignedUser ? (conversation.assignedUser.name || conversation.assignedUser.email) : null;
+  const headerSub = peerTyping
+    ? null
+    : [contactPhone, assignee ? t('header.assignedTo', { name: assignee }) : null].filter(Boolean).join(' · ');
+  const resolved = conversation.status === 'RESOLVED' || conversation.status === 'ARCHIVED';
+
+  // ── AI control, shared by the header pill and the details panel ──────────
+  const botOverride: boolean | null = conversation.botOverride ?? (conversation.botEnabled ? true : null);
+  const botPaused = botOverride === null && !!conversation.botPausedUntil && new Date(conversation.botPausedUntil) > new Date();
+  const headerBot = (() => {
+    if (globalBotEnabled === null) return null;
+    if (canToggleGlobalBot) {
+      const on = globalBotEnabled === true;
+      return {
+        on, busy: globalBotSaving,
+        label: on ? t('header.aiGlobalOn') : t('header.aiGlobalOff'),
+        title: t('details.headerBotTitle'),
+        toggle: () => toggleGlobalBot(!on).catch(() => toast.error(t('details.headerBotError', { defaultValue: 'Failed to update the AI bot' }))),
+      };
+    }
+    const forcedOff = conversation.botOverride === false;
+    const on = !forcedOff && globalBotEnabled === true;
+    return {
+      on, busy: isBotToggling,
+      label: on ? t('header.aiOn') : t('header.aiOff'),
+      title: forcedOff
+        ? t('details.headerBotEnableChat', { defaultValue: 'Enable bot for this conversation' })
+        : t('details.headerBotDisableChat', { defaultValue: 'Disable bot for this conversation' }),
+      toggle: () => setBotOverride(forcedOff ? null : false),
+    };
+  })();
+
+  const selectCls = 'field field-sm appearance-none bg-no-repeat pe-8';
+  const selectStyle: React.CSSProperties = {
+    backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2389938E' d='M3 5l3 3 3-3z'/%3E%3C/svg%3E")`,
+    backgroundPosition: isRTL ? 'left 10px center' : 'right 10px center',
+  };
+
+  const iconBtn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-raised hover:text-ink';
+
   return (
-    <div dir={dir} className="relative flex h-full w-full min-w-0 overflow-hidden rounded-tr-2xl chat-shell-light">
-      <style>{`
-        /* WhatsApp's iconic doodle pattern background */
-        .chat-doodle-bg {
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='none' stroke='%23000' stroke-width='1' opacity='0.08'%3E%3Ccircle cx='50' cy='50' r='4'/%3E%3Cpath d='M120 80 q15 -20 30 0 t30 0' stroke-linecap='round'/%3E%3Crect x='220' y='40' width='40' height='30' rx='4'/%3E%3Cpath d='M310 60 l10 -15 l10 15 z' stroke-linejoin='round'/%3E%3Cpath d='M40 150 q20 -10 40 0 q20 10 40 0' stroke-linecap='round'/%3E%3Ccircle cx='200' cy='160' r='10'/%3E%3Cpath d='M280 140 l30 30 M310 140 l-30 30'/%3E%3Cpath d='M60 240 q25 -25 50 0 q25 25 50 0' stroke-linecap='round'/%3E%3Crect x='200' y='220' width='25' height='25' rx='3' transform='rotate(15 212 232)'/%3E%3Cpath d='M280 240 a15 15 0 1 1 30 0 a15 15 0 1 1 -30 0'/%3E%3Cpath d='M30 320 l20 -10 l20 10 l20 -10 l20 10' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='180' cy='340' r='6'/%3E%3Cpath d='M260 320 q15 15 30 0 q15 -15 30 0' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E");
-          background-size: 400px 400px;
-        }
-        :is(.dark .chat-doodle-bg) {
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='1' opacity='0.06'%3E%3Ccircle cx='50' cy='50' r='4'/%3E%3Cpath d='M120 80 q15 -20 30 0 t30 0' stroke-linecap='round'/%3E%3Crect x='220' y='40' width='40' height='30' rx='4'/%3E%3Cpath d='M310 60 l10 -15 l10 15 z' stroke-linejoin='round'/%3E%3Cpath d='M40 150 q20 -10 40 0 q20 10 40 0' stroke-linecap='round'/%3E%3Ccircle cx='200' cy='160' r='10'/%3E%3Cpath d='M280 140 l30 30 M310 140 l-30 30'/%3E%3Cpath d='M60 240 q25 -25 50 0 q25 25 50 0' stroke-linecap='round'/%3E%3Crect x='200' y='220' width='25' height='25' rx='3' transform='rotate(15 212 232)'/%3E%3Cpath d='M280 240 a15 15 0 1 1 30 0 a15 15 0 1 1 -30 0'/%3E%3Cpath d='M30 320 l20 -10 l20 10 l20 -10 l20 10' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='180' cy='340' r='6'/%3E%3Cpath d='M260 320 q15 15 30 0 q15 -15 30 0' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E");
-        }
-
-        .chat-shell-light {
-          background-color: #f0f2f5;
-          background-image:
-            radial-gradient(at 20% 0%, rgba(37, 211, 102, 0.04) 0px, transparent 50%),
-            radial-gradient(at 80% 100%, rgba(18, 140, 126, 0.03) 0px, transparent 50%);
-        }
-        :is(.dark) .chat-shell-light {
-          background-color: #111B21;
-          background-image:
-            radial-gradient(at 20% 0%, rgba(37, 211, 102, 0.05) 0px, transparent 50%),
-            radial-gradient(at 80% 100%, rgba(18, 140, 126, 0.04) 0px, transparent 50%);
-        }
-
-        .glass-header-light {
-          background: rgba(255, 255, 255, 0.92);
-          backdrop-filter: saturate(180%) blur(16px);
-          -webkit-backdrop-filter: saturate(180%) blur(16px);
-        }
-        :is(.dark) .glass-header-light {
-          background: rgba(17, 27, 33, 0.85);
-          backdrop-filter: saturate(180%) blur(16px);
-          -webkit-backdrop-filter: saturate(180%) blur(16px);
-        }
-
-        .message-input-focus:focus {
-          outline: none;
-          border-color: transparent;
-          box-shadow: 0 0 0 2px rgba(37,211,102,0.45), 0 8px 24px -12px rgba(37,211,102,0.25);
-        }
-
-        .float-in {
-          animation: float-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        @keyframes float-in {
-          from { opacity: 0; transform: translateY(8px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .pop-in { animation: pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes pop-in {
-          from { opacity: 0; transform: scale(0.9) translateY(8px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .slide-down { animation: slide-down 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes slide-down {
-          from { opacity: 0; max-height: 0; }
-          to { opacity: 1; max-height: 240px; }
-        }
-
-        .pulse-dot::before {
-          content: '';
-          position: absolute;
-          inset: -2px;
-          border-radius: 9999px;
-          background: inherit;
-          animation: pulse-ring 2s ease-out infinite;
-          opacity: 0.6;
-        }
-        @keyframes pulse-ring {
-          0% { transform: scale(1); opacity: 0.6; }
-          100% { transform: scale(2.4); opacity: 0; }
-        }
-
-        .recording-wave span {
-          display: inline-block;
-          width: 3px;
-          margin: 0 1px;
-          background: currentColor;
-          border-radius: 2px;
-          animation: wave 1.2s ease-in-out infinite;
-        }
-        .recording-wave span:nth-child(1) { animation-delay: 0s; height: 8px; }
-        .recording-wave span:nth-child(2) { animation-delay: 0.15s; height: 14px; }
-        .recording-wave span:nth-child(3) { animation-delay: 0.3s; height: 18px; }
-        .recording-wave span:nth-child(4) { animation-delay: 0.45s; height: 12px; }
-        .recording-wave span:nth-child(5) { animation-delay: 0.6s; height: 16px; }
-        @keyframes wave {
-          0%, 100% { transform: scaleY(0.5); }
-          50% { transform: scaleY(1); }
-        }
-
-        .icon-btn {
-          position: relative;
-          isolation: isolate;
-        }
-        .icon-btn::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: inherit;
-          background: currentColor;
-          opacity: 0;
-          transition: opacity 0.18s ease;
-          z-index: -1;
-        }
-        .icon-btn:hover::before { opacity: 0.08; }
-        .icon-btn:active::before { opacity: 0.14; }
-
-        /* Custom scrollbar */
-        .chat-scroll::-webkit-scrollbar { width: 6px; }
-        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-        .chat-scroll::-webkit-scrollbar-thumb {
-          background: rgba(134, 150, 160, 0.25);
-          border-radius: 3px;
-        }
-        .chat-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(134, 150, 160, 0.5);
-        }
-
-        /* Subtle gradient ring for avatars */
-        .avatar-ring {
-          background: linear-gradient(135deg, #25D366 0%, #1FAA5C 50%, #128C7E 100%);
-          padding: 2px;
-        }
-
-        /* Right panel slides in as an overlay on all screens except 2xl+ where it docks inline */
-        .right-panel-mobile {
-          position: absolute;
-          top: 0;
-          inset-inline-end: 0;
-          bottom: 0;
-          z-index: 50;
-          box-shadow: -20px 0 50px -10px rgba(0,0,0,0.25);
-          animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          width: min(85vw, 360px);
-        }
-        [dir="rtl"] .right-panel-mobile {
-          box-shadow: 20px 0 50px -10px rgba(0,0,0,0.25);
-          animation: slide-in-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        @media (min-width: 1536px) {
-          .right-panel-mobile {
-            position: relative;
-            width: 320px;
-            box-shadow: none;
-            animation: none;
-          }
-          [dir="rtl"] .right-panel-mobile {
-            box-shadow: none;
-          }
-        }
-        @keyframes slide-in-right {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-        @keyframes slide-in-left {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(0); }
-        }
-
-        /* Send button shine */
-        .send-btn-active {
-          background: linear-gradient(135deg, #25D366 0%, #1FAA5C 100%);
-          box-shadow: 0 6px 16px -4px rgba(37, 211, 102, 0.5), 0 2px 4px rgba(37, 211, 102, 0.3);
-        }
-        .send-btn-active:hover {
-          background: linear-gradient(135deg, #2ee06f 0%, #25b568 100%);
-          box-shadow: 0 8px 20px -4px rgba(37, 211, 102, 0.6), 0 4px 8px rgba(37, 211, 102, 0.4);
-        }
-
-        .reply-bar {
-          background: linear-gradient(90deg, rgba(37,211,102,0.08), rgba(37,211,102,0.02));
-        }
-        :is(.dark .reply-bar) {
-          background: linear-gradient(90deg, rgba(37,211,102,0.14), rgba(37,211,102,0.04));
-        }
-      `}</style>
-
+    <div dir={dir} className="relative flex h-full w-full min-w-0 overflow-hidden bg-chat">
       {/* ===== MAIN CHAT AREA ===== */}
       <div className="relative flex min-w-0 flex-1 flex-col">
-        {/* Header — forced LTR so layout is identical in EN and AR */}
-        <div dir="ltr" className="relative z-20 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 glass-header-light rounded-tr-2xl px-3 sm:px-5 py-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="md:hidden icon-btn -ms-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-600 dark:text-[#AEBAC1]"
-                aria-label={t('common:actions.back', 'Back')}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-            )}
+        {/* Header */}
+        <header className="relative z-20 flex h-[60px] shrink-0 items-center gap-1.5 border-b border-line bg-surface px-2 sm:gap-2 sm:px-3">
+          {onBack && (
+            <button type="button" onClick={onBack} className={`${iconBtn} md:hidden`} aria-label={t('common:actions.back', 'Back')}>
+              <ArrowLeft className="h-5 w-5 icon-mirror" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowRightPanel((v) => !v)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-start transition-colors hover:bg-raised/60"
+            title={t('header.details')}
+          >
             <div className="relative shrink-0">
-              <div className="avatar-ring rounded-full">
-                <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={44} />
-              </div>
-              {statusLabel === 'open' && (
-                <div className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-[#25D366] ring-2 ring-white dark:ring-[#111B21]">
-                  <div className="pulse-dot absolute inset-0 rounded-full bg-[#25D366]" />
-                </div>
-              )}
-              {statusLabel !== 'open' && (
-                <div
-                  className={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#111B21] ${
-                    statusLabel === 'pending' ? 'bg-amber-400' : 'bg-slate-400'
-                  }`}
-                />
-              )}
+              <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={40} />
+              <span className={`absolute -bottom-0.5 -end-0.5 h-3 w-3 rounded-full ring-2 ring-surface ${
+                statusLabel === 'open' ? 'bg-brand' : statusLabel === 'pending' ? 'bg-amber-400' : 'bg-ink-4'
+              }`} aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="truncate text-[15px] font-semibold tracking-tight text-gray-900 dark:text-white"><bdi>{contactName}</bdi></h3>
-                {!isOpen && (
-                  <span className="shrink-0 rounded-md bg-gray-200/80 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">
-                    {conversation.status}
-                  </span>
-                )}
+                <h3 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink"><bdi>{contactName}</bdi></h3>
+                {!isOpen && <span className="chip chip-neutral shrink-0">{t(`details.statusOptions.${conversation.status}`, { defaultValue: conversation.status })}</span>}
               </div>
-              <div className="flex items-center gap-1.5">
-                {peerTyping ? (
-                  <p className="flex items-center gap-1 text-xs text-[#25D366]">
-                    <span className="recording-wave inline-flex h-3 items-end">
-                      <span /><span /><span />
-                    </span>
-                    {t('window.typing')}
-                  </p>
-                ) : (
-                  <p dir="ltr" className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{contactPhone || 'Online'}</p>
-                )}
-              </div>
+              {peerTyping ? (
+                <p className="flex items-center gap-1 text-xs font-medium text-brand">{t('window.typing')}</p>
+              ) : (
+                <p className="truncate text-xs text-ink-3"><bdi>{headerSub}</bdi></p>
+              )}
             </div>
-          </div>
+          </button>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            {conversation && globalBotEnabled !== null && (() => {
-              if (canToggleGlobalBot) {
-                // Managers: button controls the GLOBAL bot master switch.
-                const botOn = globalBotEnabled === true;
-                return (
-                  <button
-                    type="button"
-                    disabled={globalBotSaving}
-                    onClick={() => toggleGlobalBot(!botOn).catch(() =>
-                      toast.error(t('details.headerBotError', { defaultValue: 'Failed to update the AI bot' })),
-                    )}
-                    title={t('details.headerBotTitle')}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 ${
-                      botOn
-                        ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#1FAA5C] dark:text-[#25D366]'
-                        : 'border-gray-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]'
-                    }`}
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{botOn ? t('details.headerBotOn') : t('details.headerBotOff')}</span>
-                    <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${botOn ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/20'}`}>
-                      <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${botOn ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                    </span>
-                  </button>
-                );
-              }
-              // Employees: button controls the PER-CONVERSATION bot override.
-              // forcedOff = botOverride is explicitly false; otherwise bot is on/auto.
-              const forcedOff = conversation.botOverride === false;
-              const effectiveOn = !forcedOff && globalBotEnabled === true;
-              return (
-                <button
-                  type="button"
-                  disabled={isBotToggling}
-                  onClick={() => setBotOverride(forcedOff ? null : false)}
-                  title={forcedOff
-                    ? t('details.headerBotEnableChat', { defaultValue: 'Enable bot for this conversation' })
-                    : t('details.headerBotDisableChat', { defaultValue: 'Disable bot for this conversation' })}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 ${
-                    effectiveOn
-                      ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#1FAA5C] dark:text-[#25D366]'
-                      : 'border-gray-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]'
-                  }`}
-                >
-                  <Bot className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{effectiveOn ? t('details.headerBotOn') : t('details.headerBotOff')}</span>
-                  <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${effectiveOn ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/20'}`}>
-                    <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${effectiveOn ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                  </span>
-                </button>
-              );
-            })()}
-            {!conversation?.contact?.name && (
-              <button
-                type="button"
-                onClick={() => setShowSaveContactModal(true)}
-                title={t('details.saveContactBtn')}
-                className="rounded-full bg-gradient-to-br from-[#25D366] to-[#1FAA5C] px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-[#25D366]/30 transition-all hover:shadow-lg hover:shadow-[#25D366]/40 active:scale-95"
-              >
-                {t('details.saveContactBtn')}
-              </button>
-            )}
+          {headerBot && (
+            <button
+              type="button"
+              disabled={headerBot.busy}
+              onClick={headerBot.toggle}
+              title={headerBot.title}
+              className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-full border px-2.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                headerBot.on ? 'border-brand/30 bg-brand/10 text-brand' : 'border-line bg-surface text-ink-3 hover:text-ink'
+              }`}
+            >
+              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden lg:inline">{headerBot.label}</span>
+              <span className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${headerBot.on ? 'bg-brand' : 'bg-line-strong'}`} aria-hidden="true">
+                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow transition-transform duration-base ease-spring ${headerBot.on ? 'translate-x-3 rtl:-translate-x-3' : 'translate-x-0.5 rtl:-translate-x-0.5'}`} />
+              </span>
+            </button>
+          )}
 
-            {/* Divider between the primary bot control and the utility icons */}
-            <span className="mx-0.5 hidden h-6 w-px bg-black/10 dark:bg-white/10 sm:block" />
+          {!conversation?.contact?.name && (
+            <button type="button" onClick={() => setShowSaveContactModal(true)} className="btn btn-secondary btn-sm hidden sm:inline-flex">
+              <UserPlus aria-hidden="true" />
+              {t('details.saveContactBtn')}
+            </button>
+          )}
 
-            {/* Utility icons */}
-            <div className="flex items-center gap-0.5">
-              {/* Toggle right panel */}
-              <button
-                type="button"
-                onClick={() => setShowRightPanel((v) => !v)}
-                className={`icon-btn flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-                  showRightPanel ? 'bg-[#25D366]/15 text-[#25D366]' : 'text-gray-600 dark:text-[#AEBAC1]'
-                }`}
-                aria-label={showRightPanel ? 'Hide details' : 'Show details'}
-              >
-                <Info className="h-[18px] w-[18px]" />
-              </button>
-            </div>
-          </div>
-        </div>
+          {/* One-click resolve: the most common way a conversation ends. */}
+          <button
+            type="button"
+            onClick={() => handleStatusChange(resolved ? 'OPEN' : 'RESOLVED')}
+            className={`btn btn-sm shrink-0 ${resolved ? 'btn-secondary' : 'btn-secondary'}`}
+            title={resolved ? t('header.reopen') : t('header.resolve')}
+          >
+            {resolved ? <RotateCcw aria-hidden="true" /> : <CheckCheck aria-hidden="true" />}
+            <span className="hidden sm:inline">{resolved ? t('header.reopen') : t('header.resolve')}</span>
+          </button>
 
-        {/* Search bar */}
-        {/* Messages area */}
-        <div className="relative flex-1 overflow-hidden chat-shell-light">
-          <div className="absolute inset-0 chat-doodle-bg pointer-events-none" />
+          <button
+            type="button"
+            onClick={() => setShowRightPanel((v) => !v)}
+            className={`${iconBtn} ${showRightPanel ? 'bg-raised text-ink' : ''}`}
+            aria-label={t('header.details')}
+            aria-pressed={showRightPanel}
+            title={t('header.details')}
+          >
+            <PanelRight className="h-[18px] w-[18px] icon-mirror" />
+          </button>
+        </header>
+
+        {/* Messages */}
+        <div className="relative flex-1 overflow-hidden">
+          <div className="chat-doodle pointer-events-none absolute inset-0" aria-hidden="true" />
           <div
             ref={scrollContainerRef}
-            className="chat-scroll relative h-full overflow-y-auto overflow-x-hidden px-3 sm:px-6 pt-4 pb-4"
+            className="relative h-full overflow-y-auto overflow-x-hidden px-3 pb-3 pt-3 sm:px-[5%] xl:px-[8%]"
             onScroll={() => {
               const el = scrollContainerRef.current;
               if (!el) return;
@@ -1485,103 +1337,93 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               if (el.scrollTop < 80) loadOlderMessages();
             }}
           >
-              {messages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="flex h-full min-h-[300px] items-center justify-center">
-                <div className="pop-in rounded-3xl border border-dashed border-gray-300/70 dark:border-white/10 bg-white/80 dark:bg-[#111B21]/80 backdrop-blur-sm px-10 py-12 text-center shadow-sm max-w-sm">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/10">
-                    <MessageSquare className="h-7 w-7 text-[#25D366]" strokeWidth={1.75} />
-                  </div>
-                  <p className="text-base font-semibold text-gray-900 dark:text-white">{t('window.noMessages')}</p>
-                  <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
-                    {t('window.noMessagesSubtitle')}
-                  </p>
+                <div className="pop-enter max-w-xs rounded-xl bg-surface/90 px-6 py-5 text-center shadow-soft ring-1 ring-line">
+                  <p className="text-[13px] font-semibold text-ink">{t('window.noMessages')}</p>
+                  <p className="mt-1 text-xs text-ink-3">{t('window.noMessagesSubtitle')}</p>
                 </div>
               </div>
-              ) : (
+            ) : (
               <>
-              {isLoadingOlder && (
-                <div className="flex justify-center py-3">
-                  <div className="flex items-center gap-2 rounded-full bg-white/80 dark:bg-[#202C33] px-4 py-2 text-xs text-gray-500 dark:text-[#8696A0] shadow-sm">
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 dark:border-white/20 border-t-[#25D366]" />
-                    {t('window.loadingOlder')}
+                {isLoadingOlder && (
+                  <div className="flex justify-center py-2">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-2xs text-ink-3 shadow-soft">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      {t('window.loadingOlder')}
+                    </span>
                   </div>
-                </div>
-              )}
-              {messages.map((msg, idx) => {
-                // Group consecutive messages from same sender within 2 minutes
-                const prev = messages[idx - 1];
-                const msgDate = new Date(msg.timestamp);
-                const prevDate = prev ? new Date(prev.timestamp) : null;
-                const sameSender = prev?.fromMe === msg.fromMe;
-                const isGrouped = prev && sameSender &&
-                  (msgDate.getTime() - new Date(prev.timestamp).getTime() < 120000);
+                )}
+                {messages.map((msg, idx) => {
+                  const prev = messages[idx - 1];
+                  const msgDate = new Date(msg.timestamp);
+                  const prevDate = prev ? new Date(prev.timestamp) : null;
+                  const sameSender = prev?.fromMe === msg.fromMe;
+                  const showDateSeparator = !prev || (prevDate && msgDate.toDateString() !== prevDate.toDateString());
+                  // Runs from one sender within 2 minutes stack tightly; only the first gets the tail.
+                  const isGrouped = !!prev && sameSender && !showDateSeparator &&
+                    (msgDate.getTime() - new Date(prev.timestamp).getTime() < 120000);
 
-                // Date separator: show when day changes
-                const showDateSeparator = !prev || (
-                  prevDate &&
-                  (msgDate.toDateString() !== prevDate.toDateString())
-                );
+                  const dateLabel = (() => {
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    if (msgDate.toDateString() === today.toDateString()) return t('window.today');
+                    if (msgDate.toDateString() === yesterday.toDateString()) return t('window.yesterday');
+                    return msgDate.toLocaleDateString(chatLocale, { weekday: 'long', month: 'long', day: 'numeric' });
+                  })();
 
-                const dateLabel = (() => {
-                  const today = new Date();
-                  const yesterday = new Date(today);
-                  yesterday.setDate(yesterday.getDate() - 1);
-                  if (msgDate.toDateString() === today.toDateString()) return t('window.today');
-                  if (msgDate.toDateString() === yesterday.toDateString()) return t('window.yesterday');
-                  return msgDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-                })();
-
-                return (
-                  <div key={msg.id}>
-                  {showDateSeparator && (
-                    <div className="flex items-center gap-3 my-4 px-2">
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/10" />
-                      <span className="text-[11px] font-medium text-gray-400 dark:text-[#8696A0] bg-white dark:bg-[#111B21] px-3 py-1 rounded-full border border-gray-200/60 dark:border-white/10 shadow-sm">
-                        {dateLabel}
-                      </span>
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/10" />
+                  return (
+                    <div key={msg.id}>
+                      {showDateSeparator && (
+                        <div className="sticky top-1 z-[5] my-3 flex justify-center">
+                          <span className="rounded-md bg-surface px-2.5 py-1 text-2xs font-medium text-ink-3 shadow-soft">
+                            {dateLabel}
+                          </span>
+                        </div>
+                      )}
+                      <div className={`${String(msg.id).startsWith('optimistic-') ? 'pop-enter' : ''} w-full ${isGrouped ? 'mt-0.5' : 'mt-2'}`}>
+                        <MessageBubble
+                          message={msg as any}
+                          conversationId={conversationId ?? undefined}
+                          first={!isGrouped}
+                          onReactionUpdate={(messageId, reactions) => {
+                            setConversation((prev) => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                messages: prev.messages?.map((m) =>
+                                  m.id === messageId ? { ...m, reactions } : m
+                                ),
+                              };
+                            });
+                          }}
+                          onReply={(legacyMsg: any) => {
+                            setReplyTo({ id: legacyMsg.id, body: legacyMsg.body || legacyMsg.mediaCaption || '', fromMe: legacyMsg.fromMe });
+                            textareaRef.current?.focus();
+                          }}
+                          onDelete={handleDeleteMessage}
+                          onForward={(m: any) => setForwardMessage(m)}
+                        />
+                      </div>
                     </div>
-                  )}
-                  <div className={`float-in w-full ${isGrouped ? 'mt-0.5' : 'mt-2'}`}>
-                    <MessageBubble
-                      message={msg as any}
-                      conversationId={conversationId ?? undefined}
-                      onReactionUpdate={(messageId, reactions) => {
-                        setConversation((prev) => {
-                          if (!prev) return prev;
-                          return {
-                            ...prev,
-                            messages: prev.messages?.map((m) =>
-                              m.id === messageId ? { ...m, reactions } : m
-                            ),
-                          };
-                        });
-                      }}
-                      onReply={(legacyMsg: any) => {
-                        setReplyTo({ id: legacyMsg.id, body: legacyMsg.body || legacyMsg.mediaCaption || '', fromMe: legacyMsg.fromMe });
-                        textareaRef.current?.focus();
-                      }}
-                      onDelete={handleDeleteMessage}
-                      onForward={(msg: any) => setForwardMessage(msg)}
-                    />
-                  </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               </>
             )}
             <div ref={messagesEndRef} />
           </div>
-          {/* Scroll-to-bottom button */}
+
+          {/* Scroll-to-bottom */}
           {!isScrolledToBottom && (
             <button
               type="button"
               onClick={scrollToBottom}
-              className="pop-in absolute bottom-4 end-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white dark:bg-[#202C33] border border-gray-200 dark:border-white/10 shadow-xl text-gray-600 dark:text-[#AEBAC1] hover:text-[#25D366] hover:border-[#25D366]/30 transition-all hover:scale-105"
-              aria-label="Scroll to bottom"
+              className="pop-enter absolute bottom-4 end-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink-3 shadow-pop transition-colors hover:text-ink"
+              aria-label={t('window.scrollToBottom')}
             >
               {unreadWhileScrolled > 0 && (
-                <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#1FAA5C] px-1.5 text-[10px] font-bold text-white shadow-md ring-2 ring-white dark:ring-[#0B141A]">
+                <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold tabular-nums text-brand-fg">
                   {unreadWhileScrolled > 99 ? '99+' : unreadWhileScrolled}
                 </span>
               )}
@@ -1590,97 +1432,101 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
           )}
         </div>
 
-        {/* Input area */}
-        <div className="relative z-10 border-t border-black/5 dark:border-white/5 bg-[#f0f2f5] dark:bg-[#1F2C33] px-3 sm:px-5 pt-3 pb-3">
-          {/* Peer agent typing indicator */}
-          {peerTyping && (
-            <div className="mb-2 flex items-center gap-2 px-1 text-xs text-gray-500 dark:text-[#8696A0]">
-              <span className="inline-flex gap-0.5">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#25D366] [animation-delay:0ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#25D366] [animation-delay:150ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#25D366] [animation-delay:300ms]" />
-              </span>
-              <span className="font-medium">{t('window.anotherAgentTyping')}</span>
-            </div>
-          )}
-          {sendError && (
-            <div className="pop-in mb-2.5 flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500/20">
-                <X className="h-3 w-3 text-red-600" />
-              </div>
-              <p className="text-xs font-medium text-red-700 dark:text-red-200">{sendError}</p>
-            </div>
-          )}
-          {recordingError && (
-            <div className="pop-in mb-2.5 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3 py-2">
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-200">{recordingError}</p>
-            </div>
-          )}
-          {replyTo && (
-            <div className="pop-in reply-bar mb-2 flex items-start gap-3 rounded-xl border-s-[3px] border-[#25D366] px-3 py-2 pe-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#25D366]">
-                  {replyTo.fromMe ? t('window.replyingToSelf') : t('window.replyingTo', { name: contactName })}
+        {/* Composer */}
+        <footer className="relative z-10 shrink-0 border-t border-line bg-surface px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3">
+          {(peerTyping || sendError || recordingError || replyTo || attachment || recordedAudio || isRecording || slashMatches.length > 0) && (
+            <div className="mb-2 space-y-2">
+              {peerTyping && (
+                <p className="flex items-center gap-2 px-1 text-xs text-ink-3">
+                  <span className="inline-flex gap-0.5" aria-hidden="true">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand [animation-delay:0ms]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand [animation-delay:300ms]" />
+                  </span>
+                  {t('window.anotherAgentTyping')}
                 </p>
-                <p className="mt-0.5 text-xs text-gray-600 dark:text-[#AEBAC1] truncate">{replyTo.body}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReplyTo(null)}
-                className="shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-600 dark:hover:text-white transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-          {(attachment || recordedAudio) && (
-            <div className="pop-in mb-2.5 flex items-center gap-3 rounded-2xl border border-[#25D366]/30 bg-gradient-to-r from-[#25D366]/10 via-[#25D366]/5 to-transparent dark:from-[#25D366]/15 px-3 py-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
-                {recordedAudio ? <Mic className="h-4 w-4" /> : attachment?.type?.startsWith('image/') ? <ImageIcon className="h-4 w-4" /> : attachment?.type?.startsWith('video/') ? <Video className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#1FAA5C]">
-                  {recordedAudio ? t('window.voiceNoteReady') : t('window.attachmentReady')}
-                </p>
-                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                  {recordedAudio?.name || attachment?.name}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setAttachment(null); setRecordedAudio(null); setRecordingSeconds(0); }}
-                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-white transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              )}
+              {sendError && (
+                <div className="pop-enter flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300">
+                  <X className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <p className="flex-1">{sendError}</p>
+                </div>
+              )}
+              {recordingError && (
+                <div className="pop-enter rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                  {recordingError}
+                </div>
+              )}
+              {slashMatches.length > 0 && (
+                <div className="pop-enter overflow-hidden rounded-lg border border-line bg-surface shadow-soft" role="listbox" aria-label={t('composer.savedReplies')}>
+                  <p className="eyebrow border-b border-line px-3 py-1.5">{t('composer.savedReplies')}</p>
+                  {slashMatches.map((r, i) => (
+                    <button
+                      key={r.shortcut}
+                      type="button"
+                      role="option"
+                      aria-selected={i === slashIndex}
+                      onMouseEnter={() => setSlashIndex(i)}
+                      onClick={() => pickSlash(r)}
+                      className={`flex w-full items-baseline gap-3 px-3 py-2 text-start transition-colors ${i === slashIndex ? 'bg-raised' : ''}`}
+                    >
+                      <span className="shrink-0 font-mono text-xs font-medium text-brand">{r.shortcut}</span>
+                      <span className="truncate text-[13px] text-ink-2"><bdi>{expandReply(r.message)}</bdi></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {replyTo && (
+                <div className="pop-enter flex items-start gap-3 rounded-lg border-s-[3px] border-brand bg-raised px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-brand">
+                      {replyTo.fromMe ? t('window.replyingToSelf') : t('window.replyingTo', { name: contactName })}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-ink-3"><bdi>{replyTo.body}</bdi></p>
+                  </div>
+                  <button type="button" onClick={() => setReplyTo(null)} className="btn btn-ghost btn-icon btn-sm -me-1" aria-label={t('composer.cancelReply')}>
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              {(attachment || recordedAudio) && (
+                <div className="pop-enter flex items-center gap-3 rounded-lg border border-line bg-raised px-3 py-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                    {recordedAudio ? <Mic className="h-4 w-4" /> : attachment?.type?.startsWith('image/') ? <ImageIcon className="h-4 w-4" /> : attachment?.type?.startsWith('video/') ? <Video className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-2xs font-medium text-ink-3">{recordedAudio ? t('window.voiceNoteReady') : t('window.attachmentReady')}</p>
+                    <p className="truncate text-[13px] font-medium text-ink">{recordedAudio?.name || attachment?.name}</p>
+                  </div>
+                  <button type="button" onClick={() => { setAttachment(null); setRecordedAudio(null); setRecordingSeconds(0); }} className="btn btn-ghost btn-icon btn-sm" aria-label={t('composer.cancelRecording')}>
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              {isRecording && (
+                <div className="pop-enter flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-500/25 dark:bg-red-500/10">
+                  <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                  </span>
+                  <span className="voice-rec-wave inline-flex h-5 items-end gap-[3px] text-red-500" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map((i) => <span key={i} className="w-[3px] rounded-full bg-current" />)}
+                  </span>
+                  <span dir="ltr" className="font-mono text-sm font-semibold tabular-nums text-red-600 dark:text-red-300">{recordingLabel}</span>
+                  <span className="ms-auto text-xs text-red-600 dark:text-red-300">{t('window.recording')}</span>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Recording active state */}
-          {isRecording && (
-            <div className="pop-in mb-2.5 flex items-center gap-3 rounded-2xl border border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-2.5">
-              <div className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-              </div>
-              <span className="recording-wave inline-flex h-5 items-end text-red-500">
-                <span /><span /><span /><span /><span />
-              </span>
-              <span dir="ltr" className="font-mono text-sm font-semibold text-red-600 dark:text-red-300">{recordingLabel}</span>
-              <span className="ml-auto text-xs text-red-500">{t('window.recording')}</span>
-            </div>
-          )}
-
-          <div className="flex items-end gap-1.5 sm:gap-2">
+          <div className="flex items-end gap-1">
             <div className="relative" ref={emojiBarRef}>
               <button
                 ref={emojiButtonRef}
                 onClick={() => setShowEmojiBar((v) => !v)}
-                className={`icon-btn flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-                  showEmojiBar ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]'
-                }`}
+                className={`${iconBtn} h-10 w-10 ${showEmojiBar ? 'bg-raised text-ink' : ''}`}
                 type="button"
-                aria-label="Emoji"
+                aria-label={t('composer.pickEmoji')}
               >
                 <Smile className="h-[22px] w-[22px]" />
               </button>
@@ -1696,72 +1542,62 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
             <div className="relative" ref={attachmentMenuRef}>
               <button
                 onClick={() => setShowAttachmentMenu((v) => !v)}
-                className={`icon-btn flex h-10 w-10 items-center justify-center rounded-full transition-all ${
-                  showAttachmentMenu ? 'rotate-45 text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]'
-                }`}
+                className={`${iconBtn} h-10 w-10 ${showAttachmentMenu ? 'bg-raised text-ink' : ''}`}
                 type="button"
-                aria-label="Attach"
+                aria-label={t('composer.attachFile')}
+                aria-expanded={showAttachmentMenu}
               >
-                <Paperclip className="h-[22px] w-[22px]" />
+                <Plus className={`h-[22px] w-[22px] transition-transform duration-base ease-out ${showAttachmentMenu ? 'rotate-45' : ''}`} />
               </button>
+              <input ref={fileInputRef} type="file" onChange={handleAttachmentChange} className="hidden" />
               {showAttachmentMenu && (
-                <div className="float-in absolute bottom-full start-0 z-50 mb-3 min-w-[220px] overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#233138] shadow-2xl">
-                  <input ref={fileInputRef} type="file" onChange={handleAttachmentChange} className="hidden" />
-                  <div className="border-b border-gray-100 dark:border-white/5 px-4 py-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-[#8696A0]">{t('details.share')}</p>
-                  </div>
-                  <div className="p-2">
-                    {ATTACHMENT_OPTIONS.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.labelKey}
-                          type="button"
-                          onClick={() => openAttachmentPicker(option.accept)}
-                          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-gray-700 dark:text-[#E9EDEF] transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
-                        >
-                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${option.color} text-white shadow-sm`}>
-                            <Icon className="h-4 w-4" />
-                          </span>
-                          {t(option.labelKey)}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="pop-enter absolute bottom-full start-0 z-50 mb-2 w-56 rounded-xl bg-surface p-1.5 shadow-pop">
+                  {ATTACHMENT_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.labelKey}
+                        type="button"
+                        onClick={() => openAttachmentPicker(option.accept)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-start text-[13px] font-medium text-ink-2 transition-colors hover:bg-raised hover:text-ink"
+                      >
+                        <span className={`flex h-8 w-8 items-center justify-center rounded-full ${option.tone}`}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        {t(option.labelKey)}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Template picker */}
             {templates.length > 0 && (
               <div id="template-picker-container" className="relative hidden sm:block">
                 <button
                   type="button"
                   onClick={() => setShowTemplatePicker((v) => !v)}
-                  className={`icon-btn flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-                    showTemplatePicker ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]'
-                  }`}
-                  title="Insert template"
+                  className={`${iconBtn} h-10 w-10 ${showTemplatePicker ? 'bg-raised text-ink' : ''}`}
+                  title={t('composer.insertTemplate')}
+                  aria-label={t('composer.insertTemplate')}
                 >
-                  <FileText className="h-[20px] w-[20px]" />
+                  <FileText className="h-5 w-5" />
                 </button>
                 {showTemplatePicker && (
-                  <div className="float-in absolute bottom-full start-0 z-50 mb-3 w-80 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#233138] shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 px-4 py-2.5">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-[#8696A0]">
-                        {t('templates:title')} · {templates.length}
-                      </span>
-                      <button type="button" onClick={() => setShowTemplatePicker(false)} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10">
-                        <X className="h-3.5 w-3.5" />
+                  <div className="pop-enter absolute bottom-full start-0 z-50 mb-2 w-80 overflow-hidden rounded-xl bg-surface shadow-pop">
+                    <div className="flex items-center justify-between border-b border-line px-3 py-2">
+                      <span className="eyebrow">{t('templates:title')} · {templates.length}</span>
+                      <button type="button" onClick={() => setShowTemplatePicker(false)} className="btn btn-ghost btn-icon btn-sm" aria-label={t('common:actions.close', 'Close')}>
+                        <X aria-hidden="true" />
                       </button>
                     </div>
-                    <div className="max-h-72 overflow-y-auto chat-scroll p-2 space-y-1">
+                    <div className="max-h-72 space-y-0.5 overflow-y-auto p-1.5">
                       {templates.map((tpl) => {
-                        const contactName = conversation?.contact?.name ?? '';
-                        const contactPhone = conversation?.contact?.phone ?? '';
+                        const contactNameV = conversation?.contact?.name ?? '';
+                        const contactPhoneV = conversation?.contact?.phone ?? '';
                         const subst = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) => {
-                          if (k === 'name') return contactName;
-                          if (k === 'phone') return contactPhone;
+                          if (k === 'name') return contactNameV;
+                          if (k === 'phone') return contactPhoneV;
                           return '';
                         });
 
@@ -1798,13 +1634,9 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                             }).join('\n');
                           }
                         } else {
-                          const nonMediaBlocks = blocks.filter((b) => b.type !== 'media');
                           bodyText = blocks.length > 0
                             ? subst((legacyMediaBlock?.caption as string) || '')
                             : subst(tpl.content);
-                          const followUpText = nonMediaBlocks.length > 0 ? subst(blocksToText(nonMediaBlocks)) : '';
-                          // For legacy format, store follow-up text separately (set below)
-                          void followUpText;
                         }
 
                         const previewText = isCanonical
@@ -1844,14 +1676,14 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                               setShowTemplatePicker(false);
                               textareaRef.current?.focus();
                             }}
-                            className="group/tpl w-full rounded-xl border border-transparent px-3 py-2.5 text-left transition-all hover:border-[#25D366]/30 hover:bg-[#25D366]/5 dark:hover:bg-[#25D366]/10"
+                            className="w-full rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-raised"
                           >
                             <div className="flex items-center gap-1.5">
-                              <p className="flex-1 text-sm font-semibold text-gray-900 dark:text-white group-hover/tpl:text-[#1FAA5C]">{tpl.name}</p>
-                              {hasMedia && <span className="rounded-full bg-violet-100 dark:bg-violet-900/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">Media</span>}
-                              {hasButtons && <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-300">Btns</span>}
+                              <p className="flex-1 truncate text-[13px] font-semibold text-ink">{tpl.name}</p>
+                              {hasMedia && <span className="chip chip-violet">Media</span>}
+                              {hasButtons && <span className="chip chip-info">Btns</span>}
                             </div>
-                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-[#8696A0]">{previewText}</p>
+                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-ink-3"><bdi>{previewText}</bdi></p>
                           </button>
                         );
                       })}
@@ -1865,16 +1697,17 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               <textarea
                 ref={textareaRef}
                 value={message}
-                onChange={handleMessageChange}
-                onKeyDown={handleKeyDown}
+                onChange={(e) => { handleMessageChange(e); setSlashIndex(0); }}
+                onKeyDown={onComposerKeyDown}
                 placeholder={t('composer.placeholder')}
-                className="message-input-focus min-h-[36px] max-h-20 w-full resize-none rounded-2xl border border-transparent bg-white dark:bg-[#2A3942] px-4 py-2 pe-12 text-[15px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#8696A0] shadow-sm transition-all"
+                dir="auto"
+                className="block max-h-[140px] min-h-[40px] w-full resize-none rounded-xl border border-transparent bg-raised px-4 py-2.5 text-[14px] leading-5 text-ink outline-none transition-[border-color,box-shadow,background-color] placeholder:text-ink-4 focus:border-line focus:bg-surface focus:ring-[3px] focus:ring-brand/10"
                 rows={1}
               />
               {typingHint && (
-                <div className="pointer-events-none absolute bottom-2.5 end-3 rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-semibold text-[#1FAA5C]">
+                <span className="pointer-events-none absolute bottom-2.5 end-3 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
                   {typingHint}
-                </div>
+                </span>
               )}
             </div>
 
@@ -1882,330 +1715,233 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               <button
                 onClick={sendMessage}
                 disabled={isSending}
-                className="send-btn-active group/send flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-all active:scale-95 disabled:opacity-70"
+                className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg shadow-brand transition-colors hover:bg-brand-strong disabled:opacity-70"
                 type="button"
-                aria-label="Send"
+                aria-label={t('composer.sendMessage')}
               >
-                {isSending ? (
-                  <Loader2 className="h-[18px] w-[18px] animate-spin" />
-                ) : (
-                  <Send className="h-[18px] w-[18px] transition-transform group-hover/send:translate-x-0.5 group-hover/send:-translate-y-0.5" />
-                )}
+                {isSending ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Send className="h-[18px] w-[18px] icon-mirror" />}
               </button>
             ) : (
               <button
                 onClick={isRecording ? stopRecording : startRecording}
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
-                  isRecording
-                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/40'
-                    : 'bg-gradient-to-br from-[#25D366] to-[#1FAA5C] text-white shadow-md shadow-[#25D366]/30 hover:shadow-lg hover:shadow-[#25D366]/40'
+                className={`press flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  isRecording ? 'bg-red-500 text-white' : 'text-ink-3 hover:bg-raised hover:text-ink'
                 }`}
                 type="button"
-                aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+                aria-label={isRecording ? t('composer.stopRecording') : t('composer.recordVoice')}
               >
-                {isRecording ? <Square className="h-[18px] w-[18px]" fill="currentColor" /> : <Mic className="h-[18px] w-[18px]" />}
+                {isRecording ? <Square className="h-[16px] w-[16px]" fill="currentColor" /> : <Mic className="h-[22px] w-[22px]" />}
               </button>
             )}
           </div>
-        </div>
+        </footer>
       </div>
 
-      {/* ===== RIGHT PANEL ===== */}
-      {showRightPanel && (
-        <>
-          {/* Overlay backdrop (shown until the panel docks inline at 2xl) */}
-          <div
-            className="2xl:hidden absolute inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowRightPanel(false)}
-          />
-          <div className="right-panel-mobile flex flex-col border-l border-black/5 dark:border-white/5 bg-white dark:bg-[#111B21] overflow-hidden">
-            {/* Interactive sidebar takes over the panel when active */}
-            {showInteractiveSidebar ? (
-              <div className="flex h-full flex-col overflow-hidden">
-                <InteractiveSidebar
-                  onSend={(msg) => { sendSidebarMessage(msg); }}
-                  onClose={() => setShowInteractiveSidebar(false)}
-                  contactName={conversation?.contact?.name ?? undefined}
-                />
-              </div>
-            ) : (
-            <>
-            {/* Panel header with close (shown whenever the panel overlays) */}
-            <div className="2xl:hidden flex items-center justify-between border-b border-gray-200 dark:border-white/5 px-4 py-3 gap-2">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{t('details.conversationDetails')}</p>
-              <button
-                type="button"
-                onClick={() => setShowRightPanel(false)}
-                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 dark:text-[#AEBAC1] transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Tab bar */}
-            <div className="relative flex border-b border-gray-200 dark:border-white/5">
-              {([
-                { id: 'details' as const, labelKey: 'details.tabDetails', icon: MessageSquare, color: '#25D366' },
-                { id: 'notes' as const, labelKey: 'details.tabNotes', icon: StickyNote, color: '#F59E0B' },
-                { id: 'history' as const, labelKey: 'details.tabHistory', icon: GitBranch, color: '#3B82F6' },
-              ]).map((tab) => {
-                const Icon = tab.icon;
-                const isActive = rightTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setRightTab(tab.id)}
-                    className="relative flex flex-1 flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold uppercase tracking-wider transition-colors"
-                    style={{ color: isActive ? tab.color : undefined }}
-                  >
-                    <Icon className={`h-4 w-4 transition-colors ${isActive ? '' : 'text-gray-400 dark:text-[#8696A0]'}`} />
-                    <span className={isActive ? '' : 'text-gray-500 dark:text-[#8696A0]'}>{t(tab.labelKey)}</span>
-                    {isActive && (
-                      <div
-                        className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-t-full"
-                        style={{ background: tab.color }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {rightTab === 'details' && (
-              <div className="chat-scroll flex-1 overflow-y-auto px-4 py-5 space-y-5">
-                {/* Contact card */}
-                {conversation.contact && (
-                  <div className="pop-in relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-[#25D366]/5 via-white to-white dark:from-[#25D366]/10 dark:via-[#1F2C33] dark:to-[#1F2C33] p-4">
-                    <div className="absolute -top-12 -right-12 h-32 w-32 rounded-full bg-[#25D366]/10 blur-2xl pointer-events-none" />
-                    <div className="relative flex items-center gap-3">
-                      <div className="avatar-ring rounded-full">
-                        <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={48} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-gray-900 dark:text-white"><bdi>{contactName}</bdi></p>
-                        <p dir="ltr" className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{contactPhone}</p>
-                      </div>
-                    </div>
-                    {contactId && (
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/contacts/${contactId}`)}
-                        className="relative mt-3 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 py-2 text-xs font-semibold text-gray-700 dark:text-[#E9EDEF] transition-all hover:border-[#25D366]/40 hover:bg-[#25D366]/5 hover:text-[#1FAA5C]"
-                      >
-                        {t('details.viewFullProfile')}
-                      </button>
-                    )}
+      {/* ===== DETAILS PANEL ===== */}
+      <AnimatePresence initial={false}>
+        {showRightPanel && (
+          <>
+            {/* Overlay below the width where the panel can dock beside the chat */}
+            <motion.div
+              key="details-backdrop"
+              className="absolute inset-0 z-40 bg-[rgb(8_12_10/0.3)] min-[1440px]:hidden"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowRightPanel(false)}
+              aria-hidden="true"
+            />
+            <motion.aside
+              key="details-panel"
+              initial={{ x: isRTL ? '-100%' : '100%', opacity: 0.6 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: isRTL ? '-100%' : '100%', opacity: 0.6 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 42 }}
+              className="absolute inset-y-0 end-0 z-50 flex w-[min(92vw,360px)] flex-col border-s border-line bg-surface shadow-pop min-[1440px]:relative min-[1440px]:z-0 min-[1440px]:w-[340px] min-[1440px]:shadow-none"
+            >
+              {showInteractiveSidebar ? (
+                <div className="flex h-full flex-col overflow-hidden">
+                  <InteractiveSidebar
+                    onSend={(msg) => { sendSidebarMessage(msg); }}
+                    onClose={() => setShowInteractiveSidebar(false)}
+                    contactName={conversation?.contact?.name ?? undefined}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="flex h-[60px] shrink-0 items-center justify-between gap-2 border-b border-line ps-4 pe-2">
+                    <p className="truncate text-[13px] font-semibold text-ink">{t('details.conversationDetails')}</p>
+                    <button type="button" onClick={() => setShowRightPanel(false)} className="btn btn-ghost btn-icon btn-sm" aria-label={t('common:actions.close', 'Close')}>
+                      <X aria-hidden="true" />
+                    </button>
                   </div>
-                )}
 
-                {/* AI Sales Intelligence */}
-                {contactId && (
-                  <QualificationPanel contactId={contactId} />
-                )}
-
-                {/* Tags */}
-                {contactId && (
-                  <div>
-                    <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                      <Tag className="h-3 w-3" />
-                      {t('details.tags')}
-                    </label>
-                    <ContactTagSelector contactId={contactId} />
-                  </div>
-                )}
-
-                {/* Status */}
-                <div>
-                  <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                    <span className={`h-1.5 w-1.5 rounded-full ${statusLabel === 'open' ? 'bg-[#25D366]' : statusLabel === 'pending' ? 'bg-amber-400' : 'bg-slate-400'}`} />
-                    {t('details.status')}
-                  </label>
-                  <select
-                    value={conversation.status}
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 pe-9 text-sm font-medium text-gray-900 dark:text-white shadow-sm transition-all focus:border-[#25D366] focus:outline-none focus:ring-2 focus:ring-[#25D366]/20"
-                    style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238696A0' d='M3 5l3 3 3-3z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: isRTL ? 'left 12px center' : 'right 12px center' }}
-                  >
-                    <option value="OPEN">{t('details.statusOptions.OPEN')}</option>
-                    <option value="PENDING">{t('details.statusOptions.PENDING')}</option>
-                    <option value="ON_HOLD">{t('details.statusOptions.ON_HOLD')}</option>
-                    <option value="RESOLVED">{t('details.statusOptions.RESOLVED')}</option>
-                    <option value="ARCHIVED">{t('details.statusOptions.ARCHIVED')}</option>
-                    <option value="SPAM">{t('details.statusOptions.SPAM')}</option>
-                  </select>
-                </div>
-
-                {/* Pipeline */}
-                <div>
-                  <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                    <GitBranch className="h-3 w-3" />
-                    {t('details.pipelineStage')}
-                  </label>
-                  <select
-                    value={conversation.pipeline || ''}
-                    onChange={(e) => handlePipelineChange(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 pe-9 text-sm font-medium text-gray-900 dark:text-white shadow-sm transition-all focus:border-[#25D366] focus:outline-none focus:ring-2 focus:ring-[#25D366]/20"
-                    style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238696A0' d='M3 5l3 3 3-3z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: isRTL ? 'left 12px center' : 'right 12px center' }}
-                  >
-                    {PIPELINE_STAGES.map((stage) => (
-                      <option key={stage} value={stage}>
-                        {stage === '' ? t('details.pipeline.none') : t(`details.pipeline.${stage}`)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Assign Agent */}
-                <div>
-                  <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                    <User className="h-3 w-3" />
-                    {t('details.assignedAgent')}
-                    {isAssigning && <Loader2 className="h-3 w-3 animate-spin text-[#25D366]" />}
-                  </label>
-                  <select
-                    value={conversation.assignedTo || ''}
-                    onChange={(e) => handleAssignAgent(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 pe-9 text-sm font-medium text-gray-900 dark:text-white shadow-sm transition-all focus:border-[#25D366] focus:outline-none focus:ring-2 focus:ring-[#25D366]/20"
-                    style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238696A0' d='M3 5l3 3 3-3z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: isRTL ? 'left 12px center' : 'right 12px center' }}
-                  >
-                    <option value="">{t('details.unassigned')}</option>
-                    {agents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.name || agent.email}
-                      </option>
-                    ))}
-                  </select>
-                  {conversation.assignedUser && (
-                    <div className="mt-2 flex items-center gap-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1.5">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-[10px] font-bold text-white shadow-sm">
-                        {(conversation.assignedUser.name || conversation.assignedUser.email).charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300 truncate">
-                        {conversation.assignedUser.name || conversation.assignedUser.email}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Assign Team */}
-                <div>
-                  <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                    <Users className="h-3 w-3" />
-                    {t('details.assignedTeam')}
-                  </label>
-                  <select
-                    value={conversation.assignedTeamId || ''}
-                    onChange={(e) => handleAssignTeam(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5 pe-9 text-sm font-medium text-gray-900 dark:text-white shadow-sm transition-all focus:border-[#25D366] focus:outline-none focus:ring-2 focus:ring-[#25D366]/20"
-                    style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238696A0' d='M3 5l3 3 3-3z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: isRTL ? 'left 12px center' : 'right 12px center' }}
-                  >
-                    <option value="">{t('details.noTeam')}</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                  {conversation.assignedTeam && (
-                    <div className="mt-2 flex items-center gap-2 rounded-lg bg-violet-50 dark:bg-violet-500/10 px-2.5 py-1.5">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-600 text-[10px] font-bold text-white shadow-sm">
-                        {conversation.assignedTeam.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-xs font-medium text-violet-700 dark:text-violet-300 truncate">
-                        {conversation.assignedTeam.name}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* AI Bot */}
-                <div>
-                  <label className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-[#8696A0]">
-                    <Bot className="h-3 w-3" />
-                    {t('details.aiBot')}
-                    {isBotToggling && <Loader2 className="h-3 w-3 animate-spin text-[#25D366]" />}
-                  </label>
-                  <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2.5">
-                    {(() => {
-                      // Tri-state: true = force ON, false = force OFF, null = Auto (follow global rules).
-                      const override: boolean | null =
-                        conversation.botOverride ?? (conversation.botEnabled ? true : null);
-                      // A human-handoff pause only applies in Auto mode. An explicit
-                      // ON/OFF override is sticky and ignores the pause entirely.
-                      const isPaused = override === null && !!conversation.botPausedUntil
-                        && new Date(conversation.botPausedUntil) > new Date();
-                      const modes: Array<{ value: boolean | null; label: string }> = [
-                        { value: null,  label: t('details.aiBotModeAuto') },
-                        { value: true,  label: t('details.aiBotModeOn') },
-                        { value: false, label: t('details.aiBotModeOff') },
-                      ];
+                  {/* Tabs — the underline glides between them */}
+                  <div className="flex shrink-0 gap-1 border-b border-line px-3" role="tablist">
+                    {([
+                      { id: 'details' as const, labelKey: 'details.tabDetails' },
+                      { id: 'notes' as const, labelKey: 'details.tabNotes' },
+                      { id: 'history' as const, labelKey: 'details.tabHistory' },
+                    ]).map((tab) => {
+                      const active = rightTab === tab.id;
                       return (
-                        <>
-                          <div className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 dark:bg-[#111B21] p-1">
-                            {modes.map((m) => {
-                              const active = override === m.value;
-                              return (
-                                <button
-                                  key={String(m.value)}
-                                  type="button"
-                                  disabled={isBotToggling}
-                                  onClick={() => setBotOverride(m.value)}
-                                  className={`rounded-md py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                                    active
-                                      ? 'bg-[#25D366] text-black'
-                                      : 'text-gray-500 dark:text-[#8696A0] hover:text-gray-800 dark:hover:text-white'
-                                  }`}
-                                >
-                                  {m.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <p className="mt-1.5 text-[11px] text-gray-400 dark:text-[#8696A0]">
-                            {override === null ? t('details.aiBotAutoHint')
-                              : override ? t('details.aiBotOnHint')
-                              : t('details.aiBotOffHint')}
-                          </p>
-                          {isPaused && (
-                            <>
-                              <p className="mt-1 text-[11px] text-amber-500">
-                                {t('details.aiBotPaused', { time: new Date(conversation.botPausedUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={handleBotResume}
-                                disabled={isBotToggling}
-                                className="mt-2 w-full rounded-lg border border-[#25D366]/30 py-1 text-xs font-semibold text-[#25D366] hover:bg-[#25D366]/5 transition-colors disabled:opacity-50"
-                              >
-                                {t('details.aiBotResumeNow')}
-                              </button>
-                            </>
-                          )}
-                        </>
+                        <button
+                          key={tab.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setRightTab(tab.id)}
+                          className={`relative px-2 py-2.5 text-xs font-medium transition-colors ${active ? 'text-ink' : 'text-ink-3 hover:text-ink'}`}
+                        >
+                          {t(tab.labelKey)}
+                          {active && <motion.span layoutId="details-tab" className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-brand" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
+                        </button>
                       );
-                    })()}
-                    {/* Test panel */}
-                    <BotTestPanel conversationId={conversationId!} />
+                    })}
                   </div>
-                </div>
-              </div>
-            )}
 
-            {rightTab === 'notes' && conversationId && (
-              <div className="flex-1 overflow-hidden">
-                <InternalNotes conversationId={conversationId} />
-              </div>
-            )}
+                  {rightTab === 'details' && (
+                    <div className="flex-1 overflow-y-auto">
+                      {/* Contact */}
+                      {conversation.contact && (
+                        <section className="border-b border-line p-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={48} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[15px] font-semibold text-ink"><bdi>{contactName}</bdi></p>
+                              <p dir="ltr" className="truncate text-start text-xs tabular-nums text-ink-3">{contactPhone}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-1.5">
+                            {contactId ? (
+                              <button type="button" onClick={() => router.push(`/contacts/${contactId}`)} className="btn btn-secondary btn-sm px-2">
+                                <UserRound aria-hidden="true" />
+                                <span className="truncate">{t('panel.contact')}</span>
+                              </button>
+                            ) : (
+                              <button type="button" onClick={() => setShowSaveContactModal(true)} className="btn btn-secondary btn-sm px-2">
+                                <UserPlus aria-hidden="true" />
+                                <span className="truncate">{t('details.saveContactBtn')}</span>
+                              </button>
+                            )}
+                            <button type="button" disabled={!contactId} onClick={() => router.push(`/tasks?contactId=${contactId}`)} className="btn btn-secondary btn-sm px-2">
+                              <CheckSquare aria-hidden="true" />
+                              <span className="truncate">{t('details.task')}</span>
+                            </button>
+                            <button type="button" disabled={!contactId} onClick={() => router.push(`/deals?contactId=${contactId}`)} className="btn btn-secondary btn-sm px-2">
+                              <BriefcaseBusiness aria-hidden="true" />
+                              <span className="truncate">{t('details.deal')}</span>
+                            </button>
+                          </div>
+                        </section>
+                      )}
 
-            {rightTab === 'history' && conversationId && (
-              <AssignmentHistory conversationId={conversationId} />
-            )}
+                      {/* Conversation fields */}
+                      <section className="space-y-3 border-b border-line p-4">
+                        <p className="eyebrow">{t('panel.conversation')}</p>
+                        <label className="grid grid-cols-[96px_1fr] items-center gap-3">
+                          <span className="text-xs text-ink-3">{t('details.status')}</span>
+                          <select value={conversation.status} onChange={(e) => handleStatusChange(e.target.value)} className={selectCls} style={selectStyle}>
+                            {['OPEN', 'PENDING', 'ON_HOLD', 'RESOLVED', 'ARCHIVED', 'SPAM'].map((s) => (
+                              <option key={s} value={s}>{t(`details.statusOptions.${s}`)}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="grid grid-cols-[96px_1fr] items-center gap-3">
+                          <span className="flex items-center gap-1.5 text-xs text-ink-3">
+                            {t('details.assignedAgent')}
+                            {isAssigning && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                          </span>
+                          <select value={conversation.assignedTo || ''} onChange={(e) => handleAssignAgent(e.target.value)} className={selectCls} style={selectStyle}>
+                            <option value="">{t('details.unassigned')}</option>
+                            {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name || agent.email}</option>)}
+                          </select>
+                        </label>
+                        <label className="grid grid-cols-[96px_1fr] items-center gap-3">
+                          <span className="text-xs text-ink-3">{t('details.assignedTeam')}</span>
+                          <select value={conversation.assignedTeamId || ''} onChange={(e) => handleAssignTeam(e.target.value)} className={selectCls} style={selectStyle}>
+                            <option value="">{t('details.noTeam')}</option>
+                            {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="grid grid-cols-[96px_1fr] items-center gap-3">
+                          <span className="text-xs text-ink-3">{t('details.pipelineStage')}</span>
+                          <select value={conversation.pipeline || ''} onChange={(e) => handlePipelineChange(e.target.value)} className={selectCls} style={selectStyle}>
+                            {PIPELINE_STAGES.map((stage) => (
+                              <option key={stage} value={stage}>{stage === '' ? t('details.pipeline.none') : t(`details.pipeline.${stage}`)}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </section>
+
+                      {/* AI agent for this chat */}
+                      <section className="space-y-2.5 border-b border-line p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="eyebrow">{t('panel.ai')}</p>
+                          {isBotToggling && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-4" aria-hidden="true" />}
+                        </div>
+                        <div className="seg w-full">
+                          {([
+                            { value: null, label: t('details.aiBotModeAuto') },
+                            { value: true, label: t('details.aiBotModeOn') },
+                            { value: false, label: t('details.aiBotModeOff') },
+                          ] as Array<{ value: boolean | null; label: string }>).map((m) => (
+                            <button
+                              key={String(m.value)}
+                              type="button"
+                              disabled={isBotToggling}
+                              data-active={botOverride === m.value}
+                              onClick={() => setBotOverride(m.value)}
+                              className="seg-item flex-1 disabled:opacity-60"
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-2xs leading-4 text-ink-3">
+                          {botOverride === null ? t('details.aiBotAutoHint') : botOverride ? t('details.aiBotOnHint') : t('details.aiBotOffHint')}
+                        </p>
+                        {botPaused && (
+                          <div className="flex items-center justify-between gap-2 rounded-lg bg-amber-500/10 px-2.5 py-2">
+                            <p className="text-2xs font-medium text-amber-800 dark:text-amber-300">
+                              {t('details.aiBotPaused', { time: new Date(conversation.botPausedUntil!).toLocaleTimeString(chatLocale, { hour: 'numeric', minute: '2-digit' }) })}
+                            </p>
+                            <button type="button" onClick={handleBotResume} disabled={isBotToggling} className="btn btn-secondary btn-sm h-7 shrink-0">
+                              {t('details.aiBotResumeNow')}
+                            </button>
+                          </div>
+                        )}
+                        <BotTestPanel conversationId={conversationId!} />
+                      </section>
+
+                      {contactId && (
+                        <section className="space-y-2.5 border-b border-line p-4">
+                          <p className="eyebrow">{t('details.tags')}</p>
+                          <ContactTagSelector contactId={contactId} />
+                        </section>
+                      )}
+
+                      {contactId && (
+                        <section className="p-4">
+                          <QualificationPanel contactId={contactId} />
+                        </section>
+                      )}
+                    </div>
+                  )}
+
+                  {rightTab === 'notes' && conversationId && (
+                    <div className="flex-1 overflow-hidden">
+                      <InternalNotes conversationId={conversationId} />
+                    </div>
+                  )}
+
+                  {rightTab === 'history' && conversationId && (
+                    <AssignmentHistory conversationId={conversationId} />
+                  )}
+                </>
+              )}
+            </motion.aside>
           </>
-          )}
-          </div>
-        </>
-      )}
+        )}
+      </AnimatePresence>
 
       {forwardMessage !== null && (
         <ForwardModal
@@ -2218,7 +1954,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
         <InteractiveComposer
           conversationId={conversationId}
           phone={recipientPhone || conversation?.contact?.phone || ''}
-          provider="baileys"
+          provider="meta"
           onClose={() => setShowInteractiveComposer(false)}
           onSent={() => {
             fetchConversation();

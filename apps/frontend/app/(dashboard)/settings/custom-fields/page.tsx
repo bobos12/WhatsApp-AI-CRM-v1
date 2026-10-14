@@ -107,24 +107,20 @@ export default function CustomFieldsSettingsPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/settings"
-          className="flex items-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-white transition hover:bg-gray-50 dark:hover:bg-white/10"
+          className="btn btn-secondary flex"
         >
           <BackIcon className="h-4 w-4" />
           {t('back', { defaultValue: 'Back' })}
         </Link>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6">
+      <section className="relative">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              {t('customFields.badge', { defaultValue: 'Custom fields' })}
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">
               {t('customFields.title', { defaultValue: 'Contact fields' })}
             </h1>
-            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-[#8696A0]">
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
               {t('customFields.subtitle', {
                 defaultValue:
                   'Define the information your business tracks. Custom fields appear on contact profiles, in the import mapper, in filters, and as personalization tokens in broadcasts.',
@@ -134,7 +130,7 @@ export default function CustomFieldsSettingsPage() {
           <button
             type="button"
             onClick={() => setEditing(null)}
-            className="inline-flex shrink-0 items-center rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
+            className="btn btn-primary inline-flex shrink-0"
           >
             <Plus className="me-2 h-4 w-4" />
             {t('customFields.add', { defaultValue: 'New field' })}
@@ -146,13 +142,13 @@ export default function CustomFieldsSettingsPage() {
         <div className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
 
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21]">
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-3">
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3">
+          <p className="text-xs text-ink-3">
             {t('customFields.count', { count: ordered.length, defaultValue: '{{count}} fields' })}
           </p>
           {savingOrder && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-[#8696A0]">
+            <span className="inline-flex items-center gap-1.5 text-xs text-ink-3">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t('customFields.savingOrder', { defaultValue: 'Saving order…' })}
             </span>
@@ -160,19 +156,19 @@ export default function CustomFieldsSettingsPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-14 text-sm text-gray-500 dark:text-[#8696A0]">
+          <div className="flex items-center justify-center gap-2 py-14 text-sm text-ink-3">
             <Loader2 className="h-4 w-4 animate-spin" />
             {t('customFields.loading', { defaultValue: 'Loading fields…' })}
           </div>
         ) : ordered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
-              <SlidersHorizontal className="h-6 w-6 text-gray-400 dark:text-[#8696A0]" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-raised">
+              <SlidersHorizontal className="h-6 w-6 text-ink-4" />
             </div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
+            <p className="text-sm font-medium text-ink">
               {t('customFields.emptyTitle', { defaultValue: 'No custom fields yet' })}
             </p>
-            <p className="max-w-sm text-xs text-gray-500 dark:text-[#8696A0]">
+            <p className="max-w-sm text-xs text-ink-3">
               {t('customFields.emptyBody', {
                 defaultValue: 'Add the fields your business actually uses — city, plan, renewal date, credit limit.',
               })}
@@ -193,9 +189,9 @@ export default function CustomFieldsSettingsPage() {
                 }}
                 onDragEnd={() => setDragIndex(null)}
                 className={cn(
-                  'flex items-center gap-3 border-b border-gray-100 dark:border-white/5 px-5 py-3 transition last:border-b-0',
+                  'flex items-center gap-3 border-b border-line px-5 py-3 transition last:border-b-0',
                   dragIndex === index && 'opacity-50',
-                  !definition.isActive && 'bg-gray-50 dark:bg-white/[0.02]',
+                  !definition.isActive && 'bg-raised',
                 )}
               >
                 <DragHandle />
@@ -205,12 +201,12 @@ export default function CustomFieldsSettingsPage() {
                     <p
                       className={cn(
                         'truncate text-sm font-medium',
-                        definition.isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-[#8696A0]',
+                        definition.isActive ? 'text-ink' : 'text-ink-4',
                       )}
                     >
                       {definition.label}
                     </p>
-                    <span className="rounded-full bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-[#8696A0]">
+                    <span className="rounded-full bg-raised px-2 py-0.5 text-[10px] font-medium text-ink-3">
                       {FIELD_TYPE_LABELS[definition.type]}
                     </span>
                     {definition.required && (
@@ -219,12 +215,12 @@ export default function CustomFieldsSettingsPage() {
                       </span>
                     )}
                     {!definition.isActive && (
-                      <span className="rounded-full bg-gray-200 dark:bg-white/10 px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:text-[#8696A0]">
+                      <span className="rounded-full bg-overlay px-2 py-0.5 text-[10px] font-medium text-ink-3">
                         {t('customFields.hidden', { defaultValue: 'Hidden' })}
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate font-mono text-[11px] text-gray-400 dark:text-[#8696A0]/70" dir="ltr">
+                  <p className="mt-0.5 truncate font-mono text-[11px] text-ink-4/70" dir="ltr">
                     {`{{${definition.key}}}`}
                     {definition.options?.length ? ` · ${definition.options.length} options` : ''}
                   </p>
@@ -237,7 +233,7 @@ export default function CustomFieldsSettingsPage() {
                     onClick={() => move(index, index - 1)}
                     disabled={index === 0}
                     aria-label={t('customFields.moveUp', { defaultValue: 'Move up' })}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-white disabled:opacity-30"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-raised hover:text-ink disabled:opacity-30"
                   >
                     ↑
                   </button>
@@ -246,7 +242,7 @@ export default function CustomFieldsSettingsPage() {
                     onClick={() => move(index, index + 1)}
                     disabled={index === ordered.length - 1}
                     aria-label={t('customFields.moveDown', { defaultValue: 'Move down' })}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-white disabled:opacity-30"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-raised hover:text-ink disabled:opacity-30"
                   >
                     ↓
                   </button>
@@ -256,7 +252,7 @@ export default function CustomFieldsSettingsPage() {
                   type="button"
                   onClick={() => toggleActive(definition)}
                   aria-label={definition.isActive ? 'Hide field' : 'Show field'}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-white"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-raised hover:text-ink"
                 >
                   {definition.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
@@ -264,7 +260,7 @@ export default function CustomFieldsSettingsPage() {
                   type="button"
                   onClick={() => setEditing(definition)}
                   aria-label="Edit field"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-white"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-raised hover:text-ink"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>

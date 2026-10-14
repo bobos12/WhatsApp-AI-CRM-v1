@@ -4,314 +4,118 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'motion/react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
-import {
-  X, BarChart3, MessageSquare, Users, Send, Settings,
-  Tags, MessageSquareReply, BriefcaseBusiness, CheckSquare,
-  ShieldCheck, UserCog, UsersRound, FileText, Bot, Target,
-  LogOut, Sun, Moon, Globe, RefreshCw, Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLiveCounts } from '@/hooks/useLiveCounts';
 import { useLeadAlerts } from '@/hooks/useLeadAlerts';
-import { useTheme } from '@/components/providers/ThemeProvider';
-import { useLanguage } from '@/components/providers/I18nProvider';
-import { useSyncStatus } from '@/hooks/useSyncStatus';
-import { isManager, toSimpleRole, SIMPLE_ROLE_LABEL, SIMPLE_ROLE_BADGE } from '@/lib/roles';
+import { useOperatorAccess } from '@/hooks/useOperatorAccess';
+import { isManager } from '@/lib/roles';
+import AccountMenu from './AccountMenu';
+import { visibleGroups, isActive, SETTINGS_ITEM, type LiveKey } from './nav-config';
 
-type NavItem = {
-  key: string;
-  href: string;
-  icon: LucideIcon;
-  liveKey?: string;
-};
-
-const MAIN_NAV: readonly NavItem[] = [
-  { key: 'dashboard',    href: '/dashboard',    icon: BarChart3 },
-  { key: 'conversations',href: '/conversations', icon: MessageSquare, liveKey: 'openConversations' },
-  { key: 'contacts',     href: '/contacts',      icon: Users },
-  { key: 'broadcasts',   href: '/broadcasts',    icon: Send },
-  { key: 'templates',    href: '/templates',     icon: FileText },
-  { key: 'deals',        href: '/deals',         icon: BriefcaseBusiness },
-  { key: 'tasks',        href: '/tasks',          icon: CheckSquare },
-  { key: 'tags',         href: '/tags',           icon: Tags },
-  { key: 'savedReplies', href: '/saved-replies',  icon: MessageSquareReply },
-  { key: 'leads',        href: '/leads',          icon: Target, liveKey: 'leadsNeedsAttention' },
-  { key: 'settings',     href: '/settings',       icon: Settings },
-];
-
-const ADMIN_NAV = [
-  { key: 'users',      href: '/admin/users',       icon: UserCog },
-  { key: 'teams',      href: '/admin/teams',        icon: UsersRound },
-  { key: 'customerAi', href: '/admin/customer-ai', icon: Bot },
-  { key: 'chatbot',    href: '/admin/chatbot',      icon: Sparkles },
-] as const;
+// The four bottom-bar tabs aren't repeated here; this sheet is "everything else".
+const ON_TAB_BAR = new Set(['dashboard', 'conversations', 'contacts', 'broadcasts']);
 
 export default function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const pathname  = usePathname();
+  const pathname = usePathname();
   const dragControls = useDragControls();
   const reduceMotion = useReducedMotion();
   const { data: session } = useSession();
-  const { t }       = useTranslation('sidebar');
-  const { t: tCommon } = useTranslation('common');
-  const { t: tAuth }   = useTranslation('auth');
-  const { theme, toggle } = useTheme();
-  const { language, setLanguage } = useLanguage();
-  const { syncing, connection, sync } = useSyncStatus();
+  const { t } = useTranslation('sidebar');
+  const { isOperator } = useOperatorAccess();
   const { openConversations } = useLiveCounts();
-  const { needsAttention }    = useLeadAlerts();
+  const { needsAttention } = useLeadAlerts();
 
-  const user     = session?.user as any;
-  const name     = user?.name  || user?.email || '?';
-  const email    = user?.email || '';
-  const role     = user?.role  || '';
-  const initials = name.charAt(0).toUpperCase();
-  const isAdmin  = isManager(role);
-  const simpleRole = toSimpleRole(role);
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const counts: Record<LiveKey, number | null> = { openConversations, leadsNeedsAttention: needsAttention };
+  const groups = visibleGroups({ manager: isManager(role), operator: isOperator })
+    .map((g) => ({ ...g, items: g.items.filter((i) => !ON_TAB_BAR.has(i.key)) }))
+    .filter((g) => g.items.length > 0);
+  groups.push({ key: 'workspace', items: [SETTINGS_ITEM] } as (typeof groups)[number]);
 
-  const liveCounts: Record<string, number> = {
-    openConversations: openConversations ?? 0,
-    leadsNeedsAttention: needsAttention ?? 0,
-  };
-
-  // Lock body scroll while open
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  // Auto-close when route changes
+  // Close when the route changes (a link was followed).
   useEffect(() => { onClose(); }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             key="drawer-backdrop"
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
+            className="fixed inset-0 z-40 bg-[rgb(8_12_10/0.45)]"
             aria-hidden
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            transition={{ duration: 0.2 }}
           />
 
-          {/* Sheet — springs up like a native bottom sheet; swipe down on the
-              handle/header to dismiss (drag starts only from the grip, so the
-              inner nav list still scrolls freely). */}
+          {/* Bottom sheet — swipe down on the grip to dismiss; the list itself
+              still scrolls because the drag only starts from the grip. */}
           <motion.div
             key="drawer-sheet"
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col rounded-t-3xl bg-white dark:bg-[#111B21] shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.45)]"
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] flex-col rounded-t-2xl bg-surface shadow-pop"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 40 }}
+            transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 42 }}
             drag={reduceMotion ? false : 'y'}
             dragControls={dragControls}
             dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.55 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 110 || info.velocity.y > 600) onClose();
-            }}
+            onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}
           >
-
-        {/* Drag handle — grip zone that drives the swipe-to-dismiss */}
-        <div
-          className="flex cursor-grab touch-none justify-center pt-3 pb-1 shrink-0 active:cursor-grabbing"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <div className="h-1 w-10 rounded-full bg-gray-200 dark:bg-white/15" />
-        </div>
-
-        {/* Sheet header — also part of the grip zone */}
-        <div
-          className="flex touch-none items-center justify-between px-5 py-3 shrink-0"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/logo-tight.png"
-              alt={t('appName')}
-              className="h-8 w-8 shrink-0 rounded-xl shadow-[0_4px_12px_-4px_rgba(13,77,46,0.5)]"
-            />
-            <span className="text-[15px] font-bold text-gray-900 dark:text-white">{t('appName')}</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close menu"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-4 pb-3">
-
-          {/* Main nav grid – 4 columns */}
-          <div className="grid grid-cols-4 gap-2">
-            {MAIN_NAV.map(({ key, href, icon: Icon, liveKey }) => {
-              const active = !!pathname?.startsWith(href);
-              const count  = liveKey ? liveCounts[liveKey] : 0;
-              return (
-                <Link
-                  key={key}
-                  href={href}
-                  className={cn(
-                    'relative flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all active:scale-95 select-none',
-                    active
-                      ? 'bg-[#16A34A]/10 dark:bg-[#25D366]/12'
-                      : 'bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8',
-                  )}
-                >
-                  {count > 0 && (
-                    <span className="absolute end-2 top-2 flex h-4 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
-                      {count > 99 ? '99+' : count}
-                    </span>
-                  )}
-                  <span className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-xl',
-                    active ? 'bg-[#16A34A]/15 dark:bg-[#25D366]/20' : '',
-                  )}>
-                    <Icon className={cn(
-                      'h-[18px] w-[18px]',
-                      active ? 'text-[#16A34A] dark:text-[#25D366] stroke-[2.5]' : 'text-gray-500 dark:text-[#8696A0]',
-                    )} />
-                  </span>
-                  <span className={cn(
-                    'text-center text-[10px] font-semibold leading-tight',
-                    active ? 'text-[#16A34A] dark:text-[#25D366]' : 'text-gray-600 dark:text-[#8696A0]',
-                  )}>
-                    {t(`nav.${key}`)}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Admin section */}
-          {isAdmin && (
-            <>
-              <div className="mt-4 mb-2 flex items-center gap-2 px-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  {t('admin')}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {ADMIN_NAV.map(({ key, href, icon: Icon }) => {
-                  const active = !!pathname?.startsWith(href);
-                  return (
-                    <Link
-                      key={key}
-                      href={href}
-                      className={cn(
-                        'flex flex-col items-center gap-1.5 rounded-2xl p-3 transition-all active:scale-95 select-none',
-                        active
-                          ? 'bg-amber-50 dark:bg-amber-400/10'
-                          : 'bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8',
-                      )}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl">
-                        <Icon className={cn('h-[18px] w-[18px]', active ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-[#8696A0]')} />
-                      </span>
-                      <span className={cn('text-center text-[10px] font-semibold leading-tight', active ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-[#8696A0]')}>
-                        {t(`nav.${key}`)}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Quick-action strip */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={toggle}
-              className="flex flex-col items-center gap-1.5 rounded-2xl bg-gray-50 dark:bg-white/5 p-3 transition-all active:scale-95"
-            >
-              {theme === 'dark'
-                ? <Sun className="h-5 w-5 text-gray-500 dark:text-[#8696A0]" />
-                : <Moon className="h-5 w-5 text-gray-500 dark:text-[#8696A0]" />}
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-[#8696A0]">
-                {theme === 'dark' ? tCommon('theme.light', { defaultValue: 'Light' }) : tCommon('theme.dark', { defaultValue: 'Dark' })}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-              className="flex flex-col items-center gap-1.5 rounded-2xl bg-gray-50 dark:bg-white/5 p-3 transition-all active:scale-95"
-            >
-              <Globe className="h-5 w-5 text-gray-500 dark:text-[#8696A0]" />
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-[#8696A0]">
-                {language === 'en' ? 'العربية' : 'English'}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={sync}
-              disabled={syncing}
-              className="flex flex-col items-center gap-1.5 rounded-2xl bg-gray-50 dark:bg-white/5 p-3 transition-all active:scale-95 disabled:opacity-50"
-            >
-              <span className="relative">
-                <RefreshCw className={cn('h-5 w-5 text-gray-500 dark:text-[#8696A0]', syncing && 'animate-spin')} />
-                <span className={cn(
-                  'absolute -end-1 -top-1 h-2 w-2 rounded-full border-2 border-white dark:border-[#111B21]',
-                  connection === 'connected' ? 'bg-[#25D366]' : connection === 'connecting' ? 'bg-amber-400' : 'bg-red-500',
-                )} />
-              </span>
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-[#8696A0]">
-                {tCommon('header.sync', { defaultValue: 'Sync' })}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* User footer */}
-        <div className="shrink-0 border-t border-gray-100 dark:border-white/8 px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1f9255] to-[#0c3a27] text-sm font-bold text-white">
-                {initials}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{name}</p>
-                {email && (
-                  <p className="truncate text-[11px] text-gray-400 dark:text-[#8696A0]">{email}</p>
-                )}
-              </div>
+            <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5" onPointerDown={(e) => dragControls.start(e)}>
+              <div className="h-1 w-9 rounded-full bg-line-strong" />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {role && (
-                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide', SIMPLE_ROLE_BADGE[simpleRole])}>
-                  {SIMPLE_ROLE_LABEL[simpleRole]}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                aria-label={tAuth('logout.button', { defaultValue: 'Logout' })}
-                title={tAuth('logout.button', { defaultValue: 'Logout' })}
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* iOS safe-area spacer */}
-        <div className="shrink-0 pb-safe" />
+            <div className="flex-1 overflow-y-auto px-3 pb-3">
+              {groups.map((group, gi) => (
+                <div key={`${group.key}-${gi}`} className="mt-3 first:mt-1">
+                  {group.items[0]?.key !== 'settings' && gi > 0 && (
+                    <p className="eyebrow px-2 pb-1.5">{t(`groups.${group.key}`)}</p>
+                  )}
+                  <ul className="overflow-hidden rounded-xl border border-line">
+                    {group.items.map((item) => {
+                      const active = isActive(pathname, item);
+                      const count = item.liveKey ? counts[item.liveKey] : null;
+                      return (
+                        <li key={item.key} className="border-b border-line last:border-0">
+                          <Link
+                            href={item.href}
+                            className={cn('flex h-12 items-center gap-3 px-3.5 transition-colors active:bg-raised', active && 'bg-raised')}
+                          >
+                            <item.icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-brand' : 'text-ink-3')} aria-hidden="true" />
+                            <span className={cn('flex-1 text-sm', active ? 'font-semibold text-ink' : 'font-medium text-ink')}>
+                              {t(`nav.${item.key}`)}
+                            </span>
+                            {typeof count === 'number' && count > 0 && (
+                              <span className="chip chip-brand tabular-nums">{count > 99 ? '99+' : count}</span>
+                            )}
+                            <ChevronRight className="h-4 w-4 shrink-0 text-ink-4 icon-mirror" aria-hidden="true" />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="shrink-0 border-t border-line px-3 py-2.5 pb-safe">
+              <AccountMenu variant="bar" />
+            </div>
           </motion.div>
         </>
       )}

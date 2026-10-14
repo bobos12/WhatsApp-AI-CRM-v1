@@ -54,30 +54,31 @@ export const SIGNAL_KEYS: Array<keyof LeadSignals> = [
 ];
 
 // ── Visual config ─────────────────────────────────────────────────────────────
+// Chips must read in both themes: a 600-weight text colour in light, 300 in dark.
 export const STATUS_CFG: Record<LeadStatus, { dot: string; badge: string }> = {
-  HOT:            { dot: 'bg-red-500',     badge: 'bg-red-500/10 text-red-400 border-red-500/20' },
-  QUALIFIED:      { dot: 'bg-emerald-500', badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  WARM:           { dot: 'bg-amber-500',   badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  COLD:           { dot: 'bg-sky-500',     badge: 'bg-sky-500/10 text-sky-400 border-sky-500/20' },
-  NEW_LEAD:       { dot: 'bg-violet-500',  badge: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
-  CUSTOMER:       { dot: 'bg-[#25D366]',   badge: 'bg-[#25D366]/10 text-[#25D366] border-[#25D366]/20' },
-  LOST:           { dot: 'bg-gray-500',    badge: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
-  NOT_INTERESTED: { dot: 'bg-gray-500',    badge: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
-  SPAM:           { dot: 'bg-rose-700',    badge: 'bg-rose-700/10 text-rose-400 border-rose-700/20' },
+  HOT:            { dot: 'bg-red-500',     badge: 'bg-red-500/10 text-red-700 dark:text-red-300' },
+  QUALIFIED:      { dot: 'bg-brand',       badge: 'bg-brand/10 text-brand' },
+  WARM:           { dot: 'bg-amber-500',   badge: 'bg-amber-500/12 text-amber-800 dark:text-amber-300' },
+  COLD:           { dot: 'bg-sky-500',     badge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  NEW_LEAD:       { dot: 'bg-violet-500',  badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-300' },
+  CUSTOMER:       { dot: 'bg-brand',       badge: 'bg-brand/10 text-brand' },
+  LOST:           { dot: 'bg-ink-4',       badge: 'bg-raised text-ink-3 ring-1 ring-inset ring-line' },
+  NOT_INTERESTED: { dot: 'bg-ink-4',       badge: 'bg-raised text-ink-3 ring-1 ring-inset ring-line' },
+  SPAM:           { dot: 'bg-rose-700',    badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300' },
 };
 
 export const PRIORITY_CFG: Record<Priority, string> = {
-  URGENT: 'bg-red-500/15 text-red-400 border-red-500/25',
-  HIGH:   'bg-orange-500/15 text-orange-400 border-orange-500/25',
-  NORMAL: 'bg-white/5 text-[#8696A0] border-white/10',
-  LOW:    'bg-white/5 text-[#8696A0]/70 border-white/10',
+  URGENT: 'bg-red-600 text-white',
+  HIGH:   'bg-orange-500/12 text-orange-700 dark:text-orange-300',
+  NORMAL: 'bg-raised text-ink-3 ring-1 ring-inset ring-line',
+  LOW:    'bg-raised text-ink-4 ring-1 ring-inset ring-line',
 };
 
 export function scoreColor(score: number): string {
-  if (score >= 75) return 'text-red-400';
-  if (score >= 50) return 'text-amber-400';
-  if (score >= 25) return 'text-sky-400';
-  return 'text-[#8696A0]';
+  if (score >= 75) return 'text-red-600 dark:text-red-400';
+  if (score >= 50) return 'text-amber-700 dark:text-amber-400';
+  if (score >= 25) return 'text-sky-700 dark:text-sky-400';
+  return 'text-ink-3';
 }
 
 /** Pick the AI free-text field matching the current UI language. */
@@ -92,7 +93,7 @@ export function StatusBadge({ status, className }: { status: LeadStatus; classNa
   const { t } = useTranslation('leads');
   const cfg = STATUS_CFG[status];
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold', cfg.badge, className)}>
+    <span className={cn('chip gap-1.5', cfg.badge, className)}>
       <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
       {t(`status.${status}`)}
     </span>
@@ -102,7 +103,7 @@ export function StatusBadge({ status, className }: { status: LeadStatus; classNa
 export function PriorityBadge({ priority }: { priority: Priority }) {
   const { t } = useTranslation('leads');
   return (
-    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide', PRIORITY_CFG[priority])}>
+    <span className={cn('chip', PRIORITY_CFG[priority])}>
       {t(`priority.${priority}`)}
     </span>
   );
@@ -114,13 +115,13 @@ export function FlagChips({ lead }: { lead: Lead }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {lead.needsAttention && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-400">
+        <span className="chip chip-danger">
           <AlertTriangle className="h-3 w-3" />
           {t('flags.needsAttention')}
         </span>
       )}
       {lead.buyingIntent && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-[#25D366]/25 bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-semibold text-[#25D366]">
+        <span className="chip chip-brand">
           <ShoppingCart className="h-3 w-3" />
           {t('flags.buyingIntent')}
         </span>
@@ -133,12 +134,12 @@ export function SignalChips({ signals }: { signals: LeadSignals | null }) {
   const { t } = useTranslation('leads');
   const active = signals ? SIGNAL_KEYS.filter((k) => signals[k]) : [];
   if (active.length === 0) {
-    return <p className="text-xs text-[#8696A0]/60">{t('noSignals')}</p>;
+    return <p className="text-xs text-ink-3">{t('noSignals')}</p>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
       {active.map((k) => (
-        <span key={k} className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-[#cfd9de]">
+        <span key={k} className="chip chip-neutral">
           {t(`signalLabels.${k}`)}
         </span>
       ))}
@@ -154,7 +155,7 @@ export function LeadAvatar({ lead, className = '' }: { lead: Lead; className?: s
   const identity = lead.contact?.name ?? lead.contact?.phone ?? '';
   const isPhone = !lead.contact?.name && identity.startsWith('+');
   return (
-    <div className={cn('flex shrink-0 items-center justify-center rounded-full bg-[#25D366]/15 font-bold text-[#25D366]', className)}>
+    <div className={cn('flex shrink-0 items-center justify-center rounded-full bg-brand/12 font-semibold text-brand', className)}>
       {isPhone
         ? <UserRound aria-hidden="true" className="h-1/2 w-1/2" />
         : (identity.charAt(0) || '?').toUpperCase()}

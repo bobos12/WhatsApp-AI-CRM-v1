@@ -284,8 +284,8 @@ router.post('/:id/bot/simulate', async (req, res) => {
 
     // Try to send via WhatsApp (real delivery); fall back to DB-only if WA is offline
     try {
-      const { sendMessage } = await import('../../whatsapp/sender');
-      await sendMessage(phone, reply, undefined, undefined, undefined, conv.id, { byBot: true });
+      const { providerManager } = await import('../../providers/manager');
+      await providerManager.sendMessage({ phone, text: reply, conversationId: conv.id });
     } catch {
       // WhatsApp not connected — persist locally so the reply still shows in chat
       const botMsg = await prisma.message.create({
@@ -560,12 +560,12 @@ router.post('/:id/interactive', checkPermission('create', 'messages'), async (re
     });
     if (!conv?.contact?.phone) return res.status(404).json({ error: 'Conversation or contact not found' });
 
-    const { sendInteractiveViaBaileys } = await import('../../whatsapp/sender');
-    const { id: messageId } = await sendInteractiveViaBaileys(
+    // Native Cloud API interactive: real tappable buttons and list sheets,
+    // rather than the numbered-text menu the WhatsApp Web protocol forced.
+    const { messageId } = await interactiveMessageService.send(
       conv.contact.phone,
       content,
-      req.params.id,
-      clientId ?? undefined,
+      { conversationId: req.params.id, clientId: clientId ?? undefined },
     );
 
     // Auto-assign to the sending agent if the conversation has no assigned agent

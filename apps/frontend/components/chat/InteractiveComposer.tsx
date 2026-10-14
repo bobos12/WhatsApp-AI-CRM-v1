@@ -14,7 +14,7 @@ import { MessageRenderer } from '../messages/MessageRenderer';
 import { Modal } from '../ui/modal';
 
 type Tab = 'buttons' | 'list' | 'cta';
-type Provider = 'baileys';
+type Provider = 'meta';
 
 const TAB_LABELS: Record<Tab, string> = {
   buttons: 'Quick Reply',
@@ -31,8 +31,8 @@ function genId() {
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex items-center gap-1.5 mb-1">
-      <span className="text-[10px] uppercase tracking-widest font-semibold text-gray-500 dark:text-[#8696A0]">{children}</span>
-      {hint && <span className="text-[10px] text-gray-400 dark:text-[#8696A0]">({hint})</span>}
+      <span className="text-[10px] uppercase tracking-widest font-semibold text-ink-3">{children}</span>
+      {hint && <span className="text-[10px] text-ink-4">({hint})</span>}
     </div>
   );
 }
@@ -48,7 +48,7 @@ function Input({ value, onChange, placeholder, maxLength, disabled }: {
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
-        className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#25D366] disabled:opacity-50"
+        className="field w-full disabled:opacity-50"
       />
       {maxLength && (
         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 dark:text-white/20 pointer-events-none">
@@ -70,7 +70,7 @@ function Textarea({ value, onChange, placeholder, maxLength, rows = 3 }: {
         placeholder={placeholder}
         maxLength={maxLength}
         rows={rows}
-        className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#25D366]"
+        className="field w-full resize-none"
       />
       {maxLength && (
         <span className="absolute right-2 bottom-2 text-[10px] text-gray-300 dark:text-white/20 pointer-events-none">
@@ -176,8 +176,8 @@ function MediaUploader({
           onClick={() => setInputMode('upload')}
           className={`text-xs px-3 py-1 rounded-lg border transition-colors ${
             inputMode === 'upload'
-              ? 'border-[#25D366] text-[#25D366] bg-[#25D366]/5'
-              : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8696A0] hover:border-[#25D366]/40'
+              ? 'border-brand text-brand bg-brand/5'
+              : 'border-line text-ink-3 hover:border-brand/40'
           }`}
         >
           From device
@@ -187,8 +187,8 @@ function MediaUploader({
           onClick={() => setInputMode('url')}
           className={`text-xs px-3 py-1 rounded-lg border transition-colors ${
             inputMode === 'url'
-              ? 'border-[#25D366] text-[#25D366] bg-[#25D366]/5'
-              : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8696A0] hover:border-[#25D366]/40'
+              ? 'border-brand text-brand bg-brand/5'
+              : 'border-line text-ink-3 hover:border-brand/40'
           }`}
         >
           From URL
@@ -201,8 +201,8 @@ function MediaUploader({
           <label
             className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 cursor-pointer transition-colors ${
               uploading
-                ? 'border-gray-200 dark:border-white/10 opacity-60 cursor-not-allowed'
-                : 'border-gray-200 dark:border-white/10 hover:border-[#25D366]/60 hover:bg-[#25D366]/3'
+                ? 'border-line opacity-60 cursor-not-allowed'
+                : 'border-line hover:border-brand/60 hover:bg-brand/3'
             }`}
           >
             <input
@@ -217,18 +217,18 @@ function MediaUploader({
               }}
             />
             {uploading ? (
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#25D366] border-t-transparent" />
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent" />
             ) : mediaName ? (
               <>
-                <CheckCircle2 className="h-5 w-5 text-[#25D366]" />
-                <span className="text-xs text-center text-gray-700 dark:text-white truncate max-w-full px-2">{mediaName}</span>
-                <span className="text-[10px] text-gray-400 dark:text-[#8696A0]">Click to replace</span>
+                <CheckCircle2 className="h-5 w-5 text-brand" />
+                <span className="text-xs text-center text-ink-2 truncate max-w-full px-2">{mediaName}</span>
+                <span className="text-[10px] text-ink-4">Click to replace</span>
               </>
             ) : (
               <>
-                <Plus className="h-5 w-5 text-gray-400 dark:text-[#8696A0]" />
-                <span className="text-xs text-gray-500 dark:text-[#8696A0]">Click to upload {kind}</span>
-                <span className="text-[10px] text-gray-400 dark:text-[#8696A0]">{MEDIA_HINTS[kind]}</span>
+                <Plus className="h-5 w-5 text-ink-4" />
+                <span className="text-xs text-ink-3">Click to upload {kind}</span>
+                <span className="text-[10px] text-ink-4">{MEDIA_HINTS[kind]}</span>
               </>
             )}
           </label>
@@ -244,9 +244,9 @@ function MediaUploader({
             value={mediaUrl}
             onChange={e => onChange(makeMediaHeader(kind, e.target.value))}
             placeholder={`https://example.com/${kind === 'image' ? 'banner.jpg' : kind === 'video' ? 'promo.mp4' : 'invoice.pdf'}`}
-            className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#25D366]"
+            className="field w-full"
           />
-          <p className="text-[10px] text-gray-400 dark:text-[#8696A0]">Must be a publicly accessible URL.</p>
+          <p className="text-[10px] text-ink-4">Must be a publicly accessible URL.</p>
         </div>
       )}
     </div>
@@ -291,7 +291,7 @@ function HeaderEditor({
       <Label hint="optional">Header</Label>
 
       {/* Kind picker */}
-      <div className="flex gap-1 rounded-xl border border-gray-200 dark:border-white/10 p-1">
+      <div className="flex gap-1 rounded-xl border border-line p-1">
         {KINDS.map(({ value, label }) => (
           <button
             key={value}
@@ -299,8 +299,8 @@ function HeaderEditor({
             onClick={() => handleKindChange(value)}
             className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
               kind === value
-                ? 'bg-[#25D366] text-white'
-                : 'text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5'
+                ? 'bg-brand text-brand-fg'
+                : 'text-ink-3 hover:bg-raised'
             }`}
           >
             {label}
@@ -377,7 +377,7 @@ function PreviewPane({ content }: { content: InteractiveContent }) {
     id: 'preview',
     clientId: 'preview',
     externalId: null,
-    provider: 'baileys' as const,
+    provider: 'meta' as const,
     sessionId: '',
     conversationId: '',
     contactPhone: '',
@@ -399,8 +399,8 @@ function PreviewPane({ content }: { content: InteractiveContent }) {
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-[#f0f2f5] dark:bg-[#0B141A] p-4">
-      <p className="mb-3 text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-[#8696A0]">
+    <div className="rounded-xl border border-line bg-canvas dark:bg-canvas p-4">
+      <p className="mb-3 text-[10px] uppercase tracking-widest font-semibold text-ink-4">
         WhatsApp Preview
       </p>
       <MessageRenderer message={fakeDto as any} variant="preview" />
@@ -454,7 +454,7 @@ function ButtonsTab({
             <button
               type="button"
               onClick={() => update({ buttons: [...content.buttons, { id: genId(), title: '' }] })}
-              className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#1FAA5C] transition-colors"
+              className="flex items-center gap-1 text-xs text-brand hover:text-brand-strong transition-colors"
             >
               <Plus className="h-3 w-3" /> Add button
             </button>
@@ -463,7 +463,7 @@ function ButtonsTab({
         <div className="space-y-2">
           {content.buttons.map((btn, i) => (
             <div key={btn.id} className="flex items-center gap-2">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#25D366]/10 text-[10px] font-bold text-[#25D366]">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
                 {i + 1}
               </div>
               <Input
@@ -486,7 +486,7 @@ function ButtonsTab({
             </div>
           ))}
           {content.buttons.length === 0 && (
-            <p className="text-xs text-gray-400 dark:text-[#8696A0] italic">No buttons yet — click &ldquo;Add button&rdquo; above.</p>
+            <p className="text-xs text-ink-4 italic">No buttons yet — click &ldquo;Add button&rdquo; above.</p>
           )}
         </div>
       </div>
@@ -583,24 +583,24 @@ function ListTab({
           <Label>Sections (max 10)</Label>
           {content.sections.length < 10 && (
             <button type="button" onClick={addSection}
-              className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#1FAA5C] transition-colors">
+              className="flex items-center gap-1 text-xs text-brand hover:text-brand-strong transition-colors">
               <Plus className="h-3 w-3" /> Add section
             </button>
           )}
         </div>
 
         {content.sections.length === 0 && (
-          <p className="text-xs text-gray-400 dark:text-[#8696A0] italic">No sections — add at least one.</p>
+          <p className="text-xs text-ink-4 italic">No sections — add at least one.</p>
         )}
 
         <div className="space-y-2">
           {content.sections.map((sec, si) => (
-            <div key={si} className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-white/5">
+            <div key={si} className="rounded-xl border border-line overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-raised">
                 <button type="button" onClick={() => setOpenSection(openSection === si ? null : si)}
                   className="flex-1 flex items-center gap-2 text-left">
                   {openSection === si ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
-                  <span className="text-sm font-medium text-gray-700 dark:text-white truncate">{sec.title || `Section ${si + 1}`}</span>
+                  <span className="text-sm font-medium text-ink-2 truncate">{sec.title || `Section ${si + 1}`}</span>
                   <span className="text-xs text-gray-400">({sec.rows.length} rows)</span>
                 </button>
                 <button type="button" onClick={() => removeSection(si)}
@@ -610,7 +610,7 @@ function ListTab({
               </div>
 
               {openSection === si && (
-                <div className="p-3 space-y-3 border-t border-gray-200 dark:border-white/10">
+                <div className="p-3 space-y-3 border-t border-line">
                   <div>
                     <Label>Section title</Label>
                     <Input
@@ -625,7 +625,7 @@ function ListTab({
 
                   <div className="space-y-2">
                     {sec.rows.map((row, ri) => (
-                      <div key={row.id} className="rounded-lg border border-gray-200 dark:border-white/10 p-2.5 space-y-2">
+                      <div key={row.id} className="rounded-lg border border-line p-2.5 space-y-2">
                         <div className="flex items-center gap-2">
                           <Input
                             value={row.title}
@@ -648,7 +648,7 @@ function ListTab({
                     ))}
                     {sec.rows.length < 10 && (
                       <button type="button" onClick={() => addRow(si)}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-200 dark:border-white/10 py-2 text-xs text-gray-400 hover:text-[#25D366] hover:border-[#25D366]/40 transition-colors">
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line py-2 text-xs text-gray-400 hover:text-brand hover:border-brand/40 transition-colors">
                         <Plus className="h-3 w-3" /> Add row
                       </button>
                     )}
@@ -702,10 +702,10 @@ function CtaTab({
         />
       </div>
 
-      <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3 space-y-3">
+      <div className="rounded-xl border border-line p-3 space-y-3">
         <Label>CTA Button</Label>
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#8696A0]">Button label (max 20)</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-4">Button label (max 20)</span>
           <Input
             value={content.cta.displayText}
             onChange={v => update({ cta: { ...content.cta, displayText: v } })}
@@ -714,7 +714,7 @@ function CtaTab({
           />
         </div>
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#8696A0]">URL</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-4">URL</span>
           <Input
             value={content.cta.url}
             onChange={v => update({ cta: { ...content.cta, url: v } })}
@@ -760,7 +760,7 @@ interface InteractiveComposerProps {
 export default function InteractiveComposer({
   conversationId,
   phone,
-  provider = 'baileys',
+  provider = 'meta',
   onClose,
   onSent,
 }: InteractiveComposerProps) {
@@ -822,24 +822,24 @@ export default function InteractiveComposer({
       onClose={onClose}
       aria-label="Interactive Message"
       overlayClassName="bg-black/50"
-      className="w-full max-w-3xl max-h-[90vh] rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-2xl flex flex-col overflow-hidden"
+      className="w-full max-w-3xl max-h-[90vh] rounded-xl border border-line bg-surface shadow-2xl flex flex-col overflow-hidden"
     >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Interactive Message</h2>
-            <p className="text-xs text-gray-500 dark:text-[#8696A0] mt-0.5">
+            <h2 className="text-base font-semibold text-ink">Interactive Message</h2>
+            <p className="text-xs text-ink-3 mt-0.5">
               Requires active 24-hour session window — customer must have messaged first
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-raised transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-white/10 px-5">
+        <div className="flex border-b border-line px-5">
           {(Object.keys(TAB_LABELS) as Tab[]).map(t => (
             <button
               key={t}
@@ -847,8 +847,8 @@ export default function InteractiveComposer({
               onClick={() => setTab(t)}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === t
-                  ? 'border-[#25D366] text-[#25D366]'
-                  : 'border-transparent text-gray-500 dark:text-[#8696A0] hover:text-gray-700 dark:hover:text-white'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent text-ink-3 hover:text-ink'
               }`}
             >
               {TAB_LABELS[t]}
@@ -875,19 +875,19 @@ export default function InteractiveComposer({
 
           {/* Preview */}
           {showPreview && (
-            <div className="w-72 shrink-0 border-l border-gray-200 dark:border-white/10 overflow-y-auto p-4 bg-gray-50 dark:bg-[#0B141A] space-y-3">
-              <span className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-[#8696A0]">Live Preview</span>
+            <div className="w-72 shrink-0 border-l border-line overflow-y-auto p-4 bg-gray-50 dark:bg-canvas space-y-3">
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-ink-4">Live Preview</span>
               <PreviewPane content={currentContent} />
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-gray-200 dark:border-white/10 px-5 py-3 bg-gray-50 dark:bg-[#0B141A]">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3 bg-gray-50 dark:bg-canvas">
           <button
             type="button"
             onClick={() => setShowPreview(v => !v)}
-            className="text-xs text-gray-500 dark:text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
+            className="text-xs text-ink-3 hover:text-ink transition-colors"
           >
             {showPreview ? 'Hide preview' : 'Show preview'}
           </button>
@@ -897,20 +897,20 @@ export default function InteractiveComposer({
               <p className="text-xs text-red-500">{sendError}</p>
             )}
             {sent && (
-              <div className="flex items-center gap-1.5 text-xs text-[#25D366]">
+              <div className="flex items-center gap-1.5 text-xs text-brand">
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Sent!</span>
               </div>
             )}
             <button type="button" onClick={onClose}
-              className="rounded-xl border border-gray-200 dark:border-white/10 px-4 py-2 text-sm text-gray-600 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+              className="rounded-xl border border-line px-4 py-2 text-sm text-ink-3 hover:bg-raised transition-colors">
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSend}
               disabled={!canSend}
-              className="flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1FAA5C] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary flex disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isSending
                 ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Sending…</>

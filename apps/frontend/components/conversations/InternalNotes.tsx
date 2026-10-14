@@ -98,15 +98,15 @@ export default function InternalNotes({ conversationId }: InternalNotesProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-gray-200 dark:border-white/5 px-4 py-3">
+      <div className="border-b border-line px-4 py-3">
         <div className="flex items-center gap-2">
           <StickyNote className="h-4 w-4 text-amber-500" />
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('details.notes')}</h3>
+          <h3 className="text-sm font-semibold text-ink">{t('details.notes')}</h3>
           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
             {t('details.notesPrivate')}
           </span>
         </div>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">
+        <p className="mt-0.5 text-xs text-ink-3">
           {t('details.notesSubtitle')}
         </p>
       </div>
@@ -120,8 +120,8 @@ export default function InternalNotes({ conversationId }: InternalNotesProps) {
         {!loading && notes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <StickyNote className="mb-3 h-8 w-8 text-gray-300 dark:text-white/20" />
-            <p className="text-sm font-medium text-gray-500 dark:text-[#8696A0]">{t('details.notesEmpty')}</p>
-            <p className="mt-1 text-xs text-gray-400 dark:text-[#8696A0]/70">
+            <p className="text-sm font-medium text-ink-3">{t('details.notesEmpty')}</p>
+            <p className="mt-1 text-xs text-ink-4/70">
               {t('details.notesEmptyHint')}
             </p>
           </div>
@@ -161,13 +161,13 @@ export default function InternalNotes({ conversationId }: InternalNotesProps) {
                   </button>
                 )}
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800 dark:text-white/80">{note.body}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-ink/80">{note.body}</p>
             </div>
           );
         })}
       </div>
 
-      <div className="border-t border-gray-200 dark:border-white/5 p-3">
+      <div className="border-t border-line p-3">
         <div className="flex items-end gap-2">
           <textarea
             value={body}
@@ -175,7 +175,7 @@ export default function InternalNotes({ conversationId }: InternalNotesProps) {
             onKeyDown={handleKeyDown}
             placeholder={t('details.notesPlaceholder')}
             rows={2}
-            className="flex-1 resize-none rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-white dark:placeholder:text-[#8696A0]"
+            className="field flex-1 resize-none"
           />
           <button
             type="button"

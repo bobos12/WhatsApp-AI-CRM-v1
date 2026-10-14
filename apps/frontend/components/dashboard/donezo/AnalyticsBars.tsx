@@ -7,7 +7,7 @@ interface DayDatum { date: string; incoming: number; outgoing: number }
 
 // Solid fills for the three busiest days (dark → light), matching the reference
 const SOLID = [
-  'bg-gradient-to-t from-[#0c3a27] to-[#1f9255] dark:from-[#0b5e3a] dark:to-[#25D366]', // #1 darkest
+  'bg-gradient-to-t from-[#0c3a27] to-[#1f9255] dark:from-[#0b5e3a] dark:to-brand', // #1 darkest
   'bg-[#2E9E5B] dark:bg-[#1fa85a]',                                                      // #2 medium
   'bg-[#8ad3ab] dark:bg-[#3fae6a]',                                                      // #3 light
 ];
@@ -36,11 +36,11 @@ export default function AnalyticsBars({ data }: { data: DayDatum[] }) {
   const peakIdx = weekTotal > 0 ? days.reduce((best, d, i) => (d.total > days[best].total ? i : best), 0) : -1;
 
   return (
-    <section className="flex h-full flex-col rounded-[20px] border border-gray-200/80 bg-white p-5 dark:border-white/8 dark:bg-[#111B21]">
+    <section className="flex h-full flex-col rounded-xl border border-gray-200/80 bg-white p-5 dark:border-white/8 dark:bg-surface">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">{t('analytics.title')}</h2>
+        <h2 className="text-[15px] font-bold text-ink">{t('analytics.title')}</h2>
         {weekTotal > 0 && (
-          <span className="text-[11px] font-medium text-gray-400 dark:text-[#8696A0]">
+          <span className="text-[11px] font-medium text-ink-4">
             {weekTotal.toLocaleString(locale)} {t('analytics.title').toLowerCase()}
           </span>
         )}
@@ -54,9 +54,9 @@ export default function AnalyticsBars({ data }: { data: DayDatum[] }) {
             return (
               <div key={d.date} className="flex flex-1 flex-col items-center gap-2.5">
                 <div className="relative flex w-full flex-1 items-end justify-center">
-                  <div className="dz-bar w-full max-w-[26px] rounded-full dz-hatch border border-[#16A34A]/15 bg-transparent dark:border-[#25D366]/15" style={{ height: '14%' }} />
+                  <div className="dz-bar w-full max-w-[26px] rounded-full dz-hatch border border-brand/15 bg-transparent dark:border-brand/15" style={{ height: '14%' }} />
                 </div>
-                <span className="text-[11px] font-medium text-gray-400 dark:text-[#8696A0]">{weekday}</span>
+                <span className="text-[11px] font-medium text-ink-4">{weekday}</span>
               </div>
             );
           })}
@@ -75,29 +75,29 @@ export default function AnalyticsBars({ data }: { data: DayDatum[] }) {
               <div key={d.date} className="flex flex-1 flex-col items-center gap-2.5">
                 <div className="relative flex w-full flex-1 items-end justify-center">
                   {isPeak && (
-                    <span className="absolute top-0 z-10 -translate-y-1 whitespace-nowrap rounded-lg bg-[#15703f] px-2 py-1 text-[10px] font-bold tabular-nums text-white shadow-md dark:bg-[#25D366] dark:text-[#0B141A]">
+                    <span className="absolute top-0 z-10 -translate-y-1 whitespace-nowrap rounded-lg bg-brand-strong px-2 py-1 text-[10px] font-bold tabular-nums text-white shadow-md dark:bg-brand dark:text-brand-fg">
                       {d.total.toLocaleString(locale)}
-                      <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-[#15703f] dark:bg-[#25D366]" aria-hidden="true" />
+                      <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-brand-strong dark:bg-brand" aria-hidden="true" />
                     </span>
                   )}
                   <div
                     className={`dz-bar w-full max-w-[26px] rounded-full ${
                       isSolid
                         ? SOLID[rank]
-                        : 'dz-hatch border border-[#16A34A]/20 bg-transparent dark:border-[#25D366]/20'
+                        : 'dz-hatch border border-brand/20 bg-transparent dark:border-brand/20'
                     }`}
                     style={{ height }}
                     title={d.total.toLocaleString(locale)}
                   />
                 </div>
-                <span className="text-[11px] font-medium text-gray-400 dark:text-[#8696A0]">{weekday}</span>
+                <span className="text-[11px] font-medium text-ink-4">{weekday}</span>
               </div>
             );
           })}
         </div>
       )}
 
-      <p className="mt-3 text-[11px] text-gray-400 dark:text-[#8696A0]">{t('analytics.subtitle')}</p>
+      <p className="mt-3 text-[11px] text-ink-4">{t('analytics.subtitle')}</p>
     </section>
   );
 }

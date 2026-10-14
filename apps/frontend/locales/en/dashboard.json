@@ -21,7 +21,17 @@
     "todayMessages": "Messages Today",
     "todayMessagesCaption": "Sent & received today",
     "hotLeads": "Hot Leads",
-    "hotLeadsCaption": "Lead management customers"
+    "hotLeadsCaption": "Lead management customers",
+    "newToday": "+{{count}} added today",
+    "noneToday": "None added today",
+    "unread": "{{count}} still unread",
+    "allRead": "Nothing unread",
+    "vsYesterday": "{{sign}}{{percent}}% vs all of yesterday",
+    "vsYesterdayNoBase": "{{count}} today, none yesterday",
+    "sameAsYesterday": "Same as all of yesterday",
+    "noMessagesToday": "No messages yet today",
+    "hotToday": "+{{count}} turned hot today",
+    "noHotToday": "No new hot leads today"
   },
   "analytics": {
     "title": "Message Analytics",
@@ -152,5 +162,91 @@
     "moreOptions": "More connection options"
   },
   "pipelineEmpty": "No deals yet",
-  "pipelineEmptyCta": "Open the deals board"
+  "pipelineEmptyCta": "Open the deals board",
+  "today": {
+    "morning": "Good morning, {{name}}",
+    "afternoon": "Good afternoon, {{name}}",
+    "evening": "Good evening, {{name}}",
+    "sendingFrom": "Sending from",
+    "fullCapacity": "Full capacity",
+    "warmup": "Warm-up day {{day}}",
+    "openInbox": "Open inbox",
+    "pulse": {
+      "open": "Open chats",
+      "waiting": "{{count}} waiting on a reply",
+      "allAnswered": "Every chat answered",
+      "messages": "Messages today",
+      "contacts": "Contacts",
+      "newToday": "+{{count}} new today",
+      "noneToday": "No new contacts today",
+      "hot": "Hot leads",
+      "hotToday": "+{{count}} turned hot today",
+      "noHotToday": "None new today",
+      "last7": "Last 7 days"
+    },
+    "queue": {
+      "title": "Waiting on you",
+      "sub": "Open chats, longest wait first",
+      "emptyTitle": "No one is waiting",
+      "emptySub": "Every open chat has a reply. New messages will appear here.",
+      "reply": "Reply",
+      "unassigned": "Unassigned",
+      "waitingFor": "waiting {{time}}",
+      "viewAll": "Open inbox",
+      "more": "+{{count}} more in the inbox"
+    },
+    "leads": {
+      "title": "Hot leads",
+      "sub": "Most likely to buy",
+      "empty": "No hot leads right now",
+      "emptySub": "Leads appear here when the AI spots buying intent.",
+      "viewAll": "All leads"
+    },
+    "activity": {
+      "title": "Message activity",
+      "sub": "Sent and received, last 7 days",
+      "sent": "Sent",
+      "received": "Received",
+      "total": "Total",
+      "empty": "No messages in the last 7 days"
+    },
+    "pipeline": {
+      "title": "Pipeline",
+      "sub": "Deals by stage",
+      "openValue": "Open value",
+      "winRate": "Win rate",
+      "deals": "{{count}} deals",
+      "empty": "No deals yet",
+      "emptySub": "Deals you create from chats will show here.",
+      "cta": "Open deals"
+    },
+    "team": {
+      "title": "Team",
+      "sub": "Workload and speed this period",
+      "agent": "Agent",
+      "open": "Open",
+      "resolved": "Resolved",
+      "resolution": "Resolution",
+      "firstResponse": "First reply",
+      "min": "{{n}} min",
+      "empty": "No agent activity yet",
+      "manage": "Manage team"
+    },
+    "brief": {
+      "waiting_one": "<b>{{count}} customer</b> is waiting for a reply",
+      "waiting_other": "<b>{{count}} customers</b> are waiting for a reply",
+      "none": "Nobody is waiting for a reply",
+      "longest": " — the longest for <w>{{time}}</w>",
+      "hot_one": "<b>{{count}} lead</b> turned hot today",
+      "hot_other": "<b>{{count}} leads</b> turned hot today",
+      "noHot": "no new hot leads yet today",
+      "volume": "<b>{{count}}</b> messages so far today",
+      "and": "and",
+      "sections": {
+        "act": "Act now",
+        "understand": "This week",
+        "team": "Your team"
+      }
+    }
+  }
 }

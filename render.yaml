@@ -1,0 +1,68 @@
+# Render Blueprint — backend API + Redis on the free tier.
+# Frontend runs on Vercel, Postgres on Neon, media on Supabase Storage (S3 API).
+# Render → New → Blueprint → pick this repo. Values marked `sync: false` are
+# prompted for on first deploy.
+services:
+  - type: web
+    name: crm-backend
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./apps/backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: crm-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: META_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: META_GRAPH_VERSION
+        value: v21.0
+      - key: OWNER_EMAIL
+        sync: false
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: OWNER_NAME
+        sync: false
+      - key: DEV_SUPERUSER_EMAIL
+        sync: false
+      - key: DEV_SUPERUSER_PASSWORD
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_URL
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+  - type: keyvalue
+    name: crm-redis
+    plan: free
+    region: frankfurt
+    # Bull queues must never have jobs evicted.
+    maxmemoryPolicy: noeviction
+    ipAllowList: []

@@ -1,7 +1,6 @@
 import type { Contact } from '@prisma/client';
 import { prisma, type GuardedPrisma } from '../lib/prisma';
 import { normalizePhone, phoneFingerprint } from '../lib/phone';
-import { getWhatsAppProfilePictureUrl } from '../whatsapp/client';
 
 // The tenant-guarded client. Every query it runs is scoped to the tenant in the
 // ambient context (lib/tenant-context.ts). This resolver is always called with
@@ -33,6 +32,59 @@ function buildPhoneVariants(phone: string) {
   }
 
   return [...variants];
+}
+
+/**
+ * Collapse duplicate conversations for one contact onto a primary, KEEPING the
+ * history.
+ *
+ * This used to `deleteMany` the duplicates' messages and internal notes. It ran
+ * on the inbound path — every arriving message resolves a conversation — so any
+ * contact that had ever ended up with two conversation rows silently lost one
+ * of them, permanently, the next time they wrote in. There is no soft delete and
+ * no audit trail on Message, so the history was simply gone. Merging is what
+ * "collapse duplicates" was always supposed to mean.
+ *
+ * `Message` carries `@@unique([clientId, conversationId])`. Re-parenting can
+ * therefore collide when two duplicates hold the same caller-issued idempotency
+ * key, which only happens if the same outbound message was recorded twice — so
+ * the loser's `clientId` is dropped rather than the message.
+ */
+async function mergeDuplicateConversations(db: DbClient, primaryId: string, duplicateIds: string[]) {
+  await db.internalNote.updateMany({
+    where: { conversationId: { in: duplicateIds } },
+    data: { conversationId: primaryId },
+  });
+
+  try {
+    await db.message.updateMany({
+      where: { conversationId: { in: duplicateIds } },
+      data: { conversationId: primaryId },
+    });
+  } catch {
+    // Unique collision on (clientId, conversationId): move what we can one at a
+    // time and clear the key on the ones that clash.
+    const stragglers = await db.message.findMany({
+      where: { conversationId: { in: duplicateIds } },
+      select: { id: true },
+    });
+    for (const message of stragglers) {
+      try {
+        await db.message.update({
+          where: { id: message.id },
+          data: { conversationId: primaryId },
+        });
+      } catch {
+        await db.message.update({
+          where: { id: message.id },
+          data: { conversationId: primaryId, clientId: null },
+        });
+      }
+    }
+  }
+
+  // Safe now: the duplicates own no rows that would RESTRICT the delete.
+  await db.conversation.deleteMany({ where: { id: { in: duplicateIds } } });
 }
 
 async function findMatchingContact(db: DbClient, phone: string, teamId?: string | null) {
@@ -84,20 +136,10 @@ export async function getOrCreateConversationByPhone(
   }
 
   const customFields = (contact.customFields as Record<string, unknown> | null | undefined) || {};
-  if (!customFields.avatarUrl) {
-    void getWhatsAppProfilePictureUrl(contact.phone).then(async (avatarUrl) => {
-      if (!avatarUrl) return;
-      await db.contact.update({
-        where: { id: contact.id },
-        data: {
-          customFields: {
-            ...customFields,
-            avatarUrl,
-          },
-        },
-      });
-    });
-  }
+  // Contact avatars are not available on the Cloud API: Meta deliberately
+  // exposes no endpoint for a customer's WhatsApp profile photo. The UI falls
+  // back to initials. (The old Baileys socket could read them, which is
+  // precisely the kind of access an unofficial client should not have had.)
 
   const conversations = await db.conversation.findMany({
     where: {
@@ -110,14 +152,7 @@ export async function getOrCreateConversationByPhone(
   if (conversations.length > 0) {
     const [primary, ...duplicates] = conversations;
     if (duplicates.length > 0) {
-      const duplicateIds = duplicates.map((conversation) => conversation.id);
-      // InternalNote→Conversation has no `onDelete`, so it RESTRICTs. Without
-      // this, collapsing duplicates threw a foreign-key error the moment one of
-      // them carried a note — and this runs on the inbound path, so it would
-      // have rejected the incoming message too.
-      await db.internalNote.deleteMany({ where: { conversationId: { in: duplicateIds } } });
-      await db.message.deleteMany({ where: { conversationId: { in: duplicateIds } } });
-      await db.conversation.deleteMany({ where: { id: { in: duplicateIds } } });
+      await mergeDuplicateConversations(db, primary.id, duplicates.map((c) => c.id));
     }
     return { contact, conversation: primary, isNew: false };
   }

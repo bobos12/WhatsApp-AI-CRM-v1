@@ -243,5 +243,25 @@
   "yes": "نعم",
   "no": "لا",
   "new": "جديد",
-  "required": "مطلوب"
+  "required": "مطلوب",
+  "palette": {
+    "placeholder": "ابحث عن أشخاص أو محادثات أو قوالب — أو انتقل إلى صفحة",
+    "jump": "انتقل إلى",
+    "actions": "إنشاء",
+    "preferences": "التفضيلات",
+    "newBroadcast": "حملة جديدة",
+    "addContact": "إضافة جهة اتصال",
+    "importContacts": "استيراد جهات الاتصال",
+    "newTemplate": "قالب جديد",
+    "toggleTheme": "تبديل الوضع الداكن",
+    "contacts": "جهات الاتصال",
+    "conversations": "المحادثات",
+    "templates": "القوالب",
+    "broadcasts": "الحملات",
+    "empty": "لا توجد نتائج لـ «{{query}}»",
+    "navigate": "تنقّل",
+    "open": "فتح",
+    "toggle": "إظهار/إخفاء",
+    "askAi": "اسأل المساعد الذكي"
+  }
 }

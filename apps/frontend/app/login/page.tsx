@@ -64,12 +64,12 @@ export default function LoginPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#0B141A]" />
+      <div className="min-h-screen bg-white dark:bg-canvas" />
     );
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-gray-50 dark:bg-[#0B141A]">
+    <div className="min-h-screen overflow-hidden bg-gray-50 dark:bg-canvas">
       <AppUpdateBanner />
 
       <div className="relative min-h-screen flex flex-col lg:flex-row">
@@ -77,7 +77,7 @@ export default function LoginPage() {
         <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden">
           {/* Decorative elements */}
           <div className="absolute inset-0 -z-10">
-            <div className="absolute top-20 left-12 h-64 w-64 rounded-3xl bg-gradient-to-br from-[#25D366]/10 to-emerald-400/5 blur-2xl" />
+            <div className="absolute top-20 left-12 h-64 w-64 rounded-3xl bg-gradient-to-br from-brand/10 to-emerald-400/5 blur-2xl" />
             <div className="absolute bottom-32 right-12 h-72 w-72 rounded-full bg-gradient-to-tl from-blue-400/10 to-cyan-400/5 blur-3xl" />
           </div>
 
@@ -85,13 +85,13 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 text-2xl font-bold">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/logo-tight.png" alt="Nexus CRM" className="h-12 w-12 rounded-2xl shadow-lg" />
-            <span className="text-gray-900 dark:text-white">CRM</span>
+            <span className="text-ink">CRM</span>
           </div>
 
           {/* Center content */}
           <div className="max-w-md space-y-8">
             <div className="space-y-4">
-              <h1 className="text-5xl font-bold text-gray-900 dark:text-white leading-tight">
+              <h1 className="text-5xl font-bold text-ink leading-tight">
                 Professional Messaging at Scale
               </h1>
               <p className="text-lg text-gray-600 dark:text-gray-400">
@@ -112,10 +112,10 @@ export default function LoginPage() {
                 >
                   <span className="text-2xl flex-shrink-0">{feature.icon}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white">{feature.title}</p>
+                    <p className="font-semibold text-ink">{feature.title}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">{feature.desc}</p>
                   </div>
-                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-[#25D366] transition-colors flex-shrink-0 mt-0.5" />
+                  <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-brand transition-colors flex-shrink-0 mt-0.5" />
                 </div>
               ))}
             </div>
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
           {/* Bottom security notice */}
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <Lock className="h-4 w-4 text-[#25D366]" />
+            <Lock className="h-4 w-4 text-brand" />
             <span>{t('login.security')}</span>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-200"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-raised text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-200"
               aria-label="Toggle language"
             >
               <Globe className="h-4 w-4" />
@@ -145,7 +145,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-200"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-raised text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-200"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
@@ -161,8 +161,8 @@ export default function LoginPage() {
             {/* Card header */}
             <div className="mb-8 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/logo-tight.png" alt="Nexus CRM" className="mx-auto mb-6 h-16 w-16 rounded-2xl shadow-lg shadow-[#25D366]/30" />
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              <img src="/icons/logo-tight.png" alt="Nexus CRM" className="mx-auto mb-6 h-16 w-16 rounded-2xl shadow-lg shadow-brand/30" />
+              <h2 className="text-3xl font-bold text-ink mb-2">
                 {t('login.title')}
               </h2>
               <p className="text-base text-gray-600 dark:text-gray-400">
@@ -171,7 +171,7 @@ export default function LoginPage() {
             </div>
 
             {/* Login card container */}
-            <div className="rounded-2xl border border-gray-200/60 dark:border-white/10 bg-white/80 dark:bg-[#111B21]/80 backdrop-blur-xl shadow-lg dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-8 space-y-6">
+            <div className="rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/80 dark:bg-surface/80 backdrop-blur-xl shadow-lg dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-8 space-y-6">
               {/* Error alert */}
               {error && (
                 <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-red-200/50 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/10 backdrop-blur px-4 py-3">
@@ -192,7 +192,7 @@ export default function LoginPage() {
                     required
                     autoComplete="email"
                     disabled={loading}
-                    className="w-full px-4 py-3 text-sm rounded-xl border border-gray-300/60 dark:border-white/10 bg-white/50 dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-600 outline-none transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/8 focus:border-[#25D366] focus:ring-4 focus:ring-[#25D366]/20 dark:focus:ring-[#25D366]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="field w-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder={t('login.emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -212,7 +212,7 @@ export default function LoginPage() {
                       required
                       autoComplete="current-password"
                       disabled={loading}
-                      className="w-full px-4 py-3 text-sm rounded-xl border border-gray-300/60 dark:border-white/10 bg-white/50 dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-600 outline-none transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/8 focus:border-[#25D366] focus:ring-4 focus:ring-[#25D366]/20 dark:focus:ring-[#25D366]/30 pr-12 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="field w-full transition-all pr-12 disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder={t('login.passwordPlaceholder')}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -235,7 +235,7 @@ export default function LoginPage() {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={loading}
-                    className="h-4 w-4 rounded border border-gray-300 dark:border-white/20 bg-white dark:bg-white/5 text-[#25D366] transition-all checked:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-4 w-4 rounded border border-line-strong bg-white dark:bg-white/5 text-brand transition-all checked:border-brand focus:border-brand focus:ring-[3px] focus:ring-brand/15 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
                     {t('login.rememberMe')}
@@ -246,7 +246,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full px-4 py-3 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-[#25D366] to-emerald-600 hover:from-[#25D366]/90 hover:to-emerald-600/90 shadow-lg shadow-[#25D366]/30 hover:shadow-[#25D366]/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                  className="w-full px-4 py-3 text-sm font-semibold text-white rounded-xl bg-gradient-to-r from-brand to-emerald-600 hover:from-brand/90 hover:to-emerald-600/90 shadow-lg shadow-brand/30 hover:shadow-brand/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
                 >
                   {loading ? (
                     <>
@@ -264,7 +264,7 @@ export default function LoginPage() {
 
               {/* Security notice - desktop visible */}
               <div className="hidden sm:flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-sm">
-                <Lock className="h-4 w-4 text-[#25D366] flex-shrink-0" />
+                <Lock className="h-4 w-4 text-brand flex-shrink-0" />
                 <span className="text-emerald-800 dark:text-emerald-300">{t('login.security')}</span>
               </div>
             </div>
@@ -272,10 +272,10 @@ export default function LoginPage() {
             {/* Bottom controls (desktop) */}
             <div className="mt-8 hidden lg:flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
               <div className="flex items-center gap-4">
-                <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">
+                <a href="#" className="hover:text-ink transition-colors">
                   {t('login.privacy')}
                 </a>
-                <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">
+                <a href="#" className="hover:text-ink transition-colors">
                   {t('login.terms')}
                 </a>
               </div>
@@ -283,7 +283,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-raised transition-colors"
                   aria-label="Toggle language"
                 >
                   <Globe className="h-4 w-4" />
@@ -292,7 +292,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-raised transition-colors"
                   aria-label="Toggle theme"
                 >
                   {theme === 'dark' ? (

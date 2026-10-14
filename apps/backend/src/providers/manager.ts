@@ -1,71 +1,63 @@
-import type { MessagingProvider, SendMessageInput } from './types';
-import { BaileysProvider } from './baileys.provider';
-import { MetaWhatsAppProvider } from './meta.provider';
-import { logger } from '../lib/logger';
+import type { MessagingProvider, ProviderName, ProviderStatus, SendMessageInput } from './types';
+import { MetaWhatsAppProvider } from './meta/provider';
+import { getChannel } from './channel.service';
+import { getTenantId } from '../lib/tenant-context';
+
+/**
+ * The messaging provider for the current tenant.
+ *
+ * There is exactly one transport: the official WhatsApp Business Cloud API.
+ * The unofficial WhatsApp Web path (Baileys) was removed deliberately — an
+ * unofficial library means a number that can be banned without appeal, a
+ * protocol that breaks whenever WhatsApp changes it, and a product that cannot
+ * honestly be sold as a WhatsApp integration.
+ *
+ * This module is kept as a thin indirection rather than having callers import
+ * the provider directly, because the seam is what made removing a transport a
+ * contained change — and it is the same seam a future BSP (Twilio, 360dialog)
+ * would slot into.
+ */
+
+const meta = new MetaWhatsAppProvider();
+
+/** The provider for the current tenant. */
+export async function resolveProvider(): Promise<MessagingProvider> {
+  return meta;
+}
+
+/** A specific provider by name. Only 'meta' exists. */
+export function providerByName(_name: ProviderName): MessagingProvider {
+  return meta;
+}
 
 class ProviderManager {
-  private primary: MessagingProvider;
-  private fallback: MessagingProvider | null;
-
-  constructor() {
-    const name = (process.env.WHATSAPP_PROVIDER ?? 'baileys').toLowerCase();
-    if (name === 'meta') {
-      this.primary = new MetaWhatsAppProvider();
-      this.fallback = null; // Meta-only: no Baileys socket needed
-    } else {
-      this.primary = new BaileysProvider();
-      this.fallback = null;
-    }
-    logger.info(`provider.active: ${this.primary.name}`);
+  async getProvider(): Promise<MessagingProvider> {
+    return meta;
   }
 
-  getProvider(): MessagingProvider {
-    return this.primary;
+  async activeName(): Promise<ProviderName> {
+    return 'meta';
   }
 
   async connect(): Promise<void> {
-    // Connect fallback silently so it's ready for failover
-    if (this.fallback) {
-      this.fallback.connect().catch((err) => {
-        logger.warn('provider.fallback_connect_failed', {
-          provider: this.fallback!.name,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
-    return this.primary.connect();
+    return meta.connect();
   }
 
   async disconnect(): Promise<void> {
-    if (this.fallback) {
-      await this.fallback.disconnect().catch(() => {});
-    }
-    return this.primary.disconnect();
+    return meta.disconnect();
   }
 
-  getStatus() {
-    return this.primary.getStatus();
+  async getStatus(): Promise<ProviderStatus> {
+    // A platform identity (operator console) has no tenant and therefore no
+    // channel. Reporting "disconnected" keeps every status gate from throwing.
+    if (!getTenantId()) {
+      return { status: 'disconnected', connectedPhone: null, error: null, health: null };
+    }
+    return meta.getStatus();
   }
 
   async sendMessage(input: SendMessageInput): Promise<{ messageId: string }> {
-    try {
-      return await this.primary.sendMessage(input);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error('provider.primary_send_failed', { primary: this.primary.name, error: message });
-      // Why: while debugging Meta setup we want the real Meta error to surface, not a silent
-      // Baileys fallback that sends from the user's personal number. Re-enable with
-      // WHATSAPP_ALLOW_FALLBACK=true once Meta is verified working.
-      if (this.fallback && process.env.WHATSAPP_ALLOW_FALLBACK === 'true') {
-        logger.warn('provider.primary_failed_falling_back', {
-          primary: this.primary.name,
-          fallback: this.fallback.name,
-          error: message,
-        });
-        return this.fallback.sendMessage(input);
-      }
-      throw err;
-    }
+    return meta.sendMessage(input);
   }
 
   async sendReaction(
@@ -74,18 +66,16 @@ class ProviderManager {
     fromMe: boolean,
     emoji: string,
   ): Promise<void> {
-    try {
-      return await this.primary.sendReaction(phone, messageExternalId, fromMe, emoji);
-    } catch (err) {
-      if (this.fallback && process.env.WHATSAPP_ALLOW_FALLBACK === 'true') {
-        return this.fallback.sendReaction(phone, messageExternalId, fromMe, emoji);
-      }
-      throw err;
-    }
+    return meta.sendReaction(phone, messageExternalId, fromMe, emoji);
   }
 
   async getProfilePictureUrl(phone: string): Promise<string | null> {
-    return this.primary.getProfilePictureUrl(phone);
+    return meta.getProfilePictureUrl(phone);
+  }
+
+  /** The current tenant's resolved channel (credentials, health). */
+  async channel() {
+    return getChannel();
   }
 }
 

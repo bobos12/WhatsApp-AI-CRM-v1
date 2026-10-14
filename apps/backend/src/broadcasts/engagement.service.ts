@@ -1,7 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { runAsPlatform, runWithTenant } from '../lib/tenant-context';
 import { logger } from '../lib/logger';
-import { bumpHealthCounter } from './safety/account-health';
 
 /**
  * ─── Engagement reconciliation ───────────────────────────────────────────────
@@ -129,7 +128,7 @@ async function reconcileReplies(since: Date): Promise<number> {
   }
 
   for (const [tenantId, count] of repliesByTenant) {
-    const bump = () => bumpHealthCounter({ broadcastReplies: count });
+    const bump = async () => { /* reply counters fed the Baileys health model, which is gone */ };
     await (tenantId ? runWithTenant(tenantId, bump) : runAsPlatform(bump)).catch(() => {});
   }
 

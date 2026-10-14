@@ -1,25 +1,26 @@
+import crypto from 'node:crypto';
 import { prisma } from '../lib/prisma';
-import { logger } from '../lib/logger';
 import { providerManager } from '../providers/manager';
+import { getChannel } from '../providers/channel.service';
 import { resolveAudienceDetailed, type AudienceFilter } from './audience';
-import { getAccountHealth } from './safety/account-health';
-import { partitionSuppressed } from './safety/suppression';
-import { scoreAudience, orderForDelivery, type ScoredRecipient } from './safety/contact-quality';
-import { analyzeContent, contentFingerprint, resolveVariants } from './safety/content-analyzer';
-import { assessCampaign, type PreflightReport } from './safety/risk-engine';
-import type { PacingProfile } from './safety/pacing';
-import type { QuietHoursWindow } from './safety/quiet-hours';
 
 /**
  * ─── Pre-flight ──────────────────────────────────────────────────────────────
  *
- * One entry point that takes a campaign draft and answers: who would actually
- * receive this, what would it cost the account, and what should change first.
+ * One entry point that answers: who would actually receive this campaign, and is
+ * there anything stopping it from being sent.
  *
- * Run twice in a campaign's life — live in the composer while the user is still
- * editing, and again at claim time, where its output is authoritative and its
- * blockers are enforced. Same code both times, so what the user was shown is
- * what the sender does.
+ * This replaced a much larger ban-prevention engine that existed because the CRM
+ * used to send over an unofficial WhatsApp Web library, where volume alone could
+ * get a number banned without appeal. On the official Cloud API that class of
+ * risk is Meta's to manage: they enforce a messaging limit tier, they publish a
+ * quality rating, and they simply refuse traffic that exceeds either. So the
+ * checks here are the ones Meta actually enforces, rather than heuristics
+ * guessing at what might upset an unofficial protocol.
+ *
+ * Run twice in a campaign's life — live in the composer while the user edits,
+ * and again at claim time, where its blockers are enforced. Same code both
+ * times, so what the user was shown is what the sender does.
  */
 
 export interface PreflightInput {
@@ -30,89 +31,154 @@ export interface PreflightInput {
   teamId?: string;
   mediaUrl?: string | null;
   interactiveContent?: object | null;
-  pacingProfile?: PacingProfile;
-  quietHoursEnabled?: boolean;
-  quietHoursStart?: number;
-  quietHoursEnd?: number;
-  /** Exclude this campaign from duplicate detection (it is the one being edited). */
+  /** The approved template this campaign sends. Required — see `checkTemplate`. */
+  templateId?: string | null;
+  /** Exclude this campaign from its own duplicate check (it is the one being edited). */
   excludeBroadcastId?: string;
-  /** Skip the recent-contact cooldown, e.g. for a genuine transactional notice. */
-  ignoreCooldown?: boolean;
-  /**
-   * Drop everyone who has never messaged us. The "send to the people who have
-   * written to you" remedy, resolved here rather than in the browser: the client
-   * does not know which numbers are cold, and shipping a 40,000-entry list to it
-   * so it can filter its own selection would be absurd.
-   */
-  excludeCold?: boolean;
-  /** Drop anyone who already received this broadcast — the duplicate remedy. */
+  /** Drop anyone who already received a given broadcast. */
   excludeReceivedFrom?: string;
+}
+
+export interface PreflightFinding {
+  key: string;
+  /** `blocker` prevents sending; the rest inform. */
+  kind: 'blocker' | 'warning' | 'tip';
+  label: string;
+  detail: string;
+  /** A one-tap remedy the UI can apply to the campaign form. */
+  fix?: { action: 'choose_template' | 'connect_channel' | 'exclude_already_received'; label: string };
+}
+
+export interface PlannedRecipient {
+  phone: string;
+  contactId: string | null;
+  name: string | null;
+  /** Set when the recipient will NOT be sent to, so the UI can explain the shortfall. */
+  skipReason?: string | null;
+}
+
+export interface PreflightReport {
+  generatedAt: string;
+  /** True when nothing blocks the send. */
+  canSend: boolean;
+  findings: PreflightFinding[];
+  audience: {
+    requested: number;
+    deliverable: number;
+    invalid: number;
+    duplicates: number;
+    alreadyReceived: number;
+  };
+  channel: {
+    connected: boolean;
+    displayPhoneNumber: string | null;
+    qualityRating: string;
+    /** Meta's cap on unique customers you may start conversations with per 24h. */
+    messagingLimit: string | null;
+  };
+  template: { id: string; name: string; status: string | null } | null;
 }
 
 export interface PreflightResult {
   report: PreflightReport;
-  /** Delivery-ordered, deliverable recipients. Consumed by the audience writer. */
-  plan: ScoredRecipient[];
-  /** Everyone excluded, with the reason, so the UI can explain the shortfall. */
-  excluded: ScoredRecipient[];
+  /** Deliverable recipients, in send order. Consumed by the audience writer. */
+  plan: PlannedRecipient[];
+  /** Everyone excluded, with the reason. */
+  excluded: PlannedRecipient[];
   contentHash: string;
-  variants: string[];
-}
-
-/** How far back a same-content campaign counts as a duplicate. */
-const DUPLICATE_WINDOW_DAYS = Number(process.env.BROADCAST_DUPLICATE_WINDOW_DAYS ?? 14);
-
-function quietWindow(input: PreflightInput): QuietHoursWindow {
-  return {
-    enabled: input.quietHoursEnabled !== false,
-    start: clampHour(input.quietHoursStart, 21),
-    end: clampHour(input.quietHoursEnd, 9),
-  };
-}
-
-function clampHour(value: number | undefined, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.min(23, Math.max(0, Math.floor(value)));
 }
 
 /**
- * Find a recently-sent campaign carrying the same content, and how many of this
- * audience already received it.
- *
- * Duplicate detection matters more than it looks: the fastest path to a
- * restriction in this product was Duplicate → Send, twice, because nothing
- * anywhere checked whether those people had just been messaged.
+ * Stable fingerprint of what a campaign sends. Retained because the column
+ * exists and it makes "you already sent this" answerable, but it no longer
+ * drives any automatic refusal.
  */
-async function findDuplicate(
-  contentHash: string,
-  phones: string[],
-  excludeBroadcastId?: string,
-): Promise<{ id: string; name: string; sentAt: Date | null; overlap: number } | null> {
-  if (!phones.length) return null;
+export function contentFingerprint(input: {
+  message?: string | null;
+  mediaUrl?: string | null;
+  templateId?: string | null;
+}): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${input.message ?? ''}|${input.mediaUrl ?? ''}|${input.templateId ?? ''}`)
+    .digest('hex')
+    .slice(0, 32);
+}
 
-  const since = new Date(Date.now() - DUPLICATE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const prior = await prisma.broadcast.findFirst({
-    where: {
-      contentHash,
-      status: { in: ['SENT', 'SENDING', 'PAUSED'] },
-      createdAt: { gte: since },
-      ...(excludeBroadcastId ? { id: { not: excludeBroadcastId } } : {}),
-    },
-    select: { id: true, name: true, sentAt: true },
-    orderBy: { createdAt: 'desc' },
+/**
+ * Meta's messaging limit tiers, as a number of unique customers per rolling 24h.
+ * Used only to warn when an audience obviously exceeds the tier — Meta enforces
+ * the real limit, we just say so before the run rather than after.
+ */
+const TIER_CAPACITY: Record<string, number> = {
+  TIER_50: 50,
+  TIER_250: 250,
+  TIER_1K: 1_000,
+  TIER_10K: 10_000,
+  TIER_100K: 100_000,
+  TIER_UNLIMITED: Number.MAX_SAFE_INTEGER,
+};
+
+/**
+ * The template gate.
+ *
+ * A broadcast audience is, by definition, almost entirely outside the 24-hour
+ * customer service window, so free-form content is refused per recipient with
+ * error 131047 and only an approved template delivers. This is a blocker rather
+ * than a warning because it is not a matter of degree: without a template the
+ * campaign does not deliver poorly, it delivers to nobody.
+ */
+async function checkTemplate(templateId?: string | null): Promise<PreflightFinding | null> {
+  if (!templateId) {
+    return {
+      key: 'template_required',
+      kind: 'blocker',
+      label: 'This campaign needs an approved template',
+      detail:
+        'WhatsApp only delivers to people who have not messaged you in the last 24 hours if the message is a template it has approved. Choose one, or create and submit a template first.',
+      fix: { action: 'choose_template', label: 'Choose a template' },
+    };
+  }
+
+  const template = await prisma.messageTemplate.findUnique({
+    where: { id: templateId },
+    select: { name: true, metaStatus: true, metaRejectedReason: true },
   });
-  if (!prior) return null;
 
-  const overlap = await prisma.broadcastRecipient.count({
-    where: { broadcastId: prior.id, phone: { in: phones }, status: 'sent' },
-  });
+  if (!template) {
+    return {
+      key: 'template_missing',
+      kind: 'blocker',
+      label: 'The selected template no longer exists',
+      detail: 'Choose another template for this campaign.',
+      fix: { action: 'choose_template', label: 'Choose a template' },
+    };
+  }
 
-  return { ...prior, overlap };
+  if (template.metaStatus === 'APPROVED') return null;
+
+  const byStatus: Record<string, string> = {
+    PENDING: 'WhatsApp is still reviewing this template. Reviews usually finish in minutes, occasionally up to 24 hours.',
+    REJECTED: template.metaRejectedReason
+      ? `WhatsApp rejected this template: ${template.metaRejectedReason}`
+      : 'WhatsApp rejected this template. Edit it and submit it again.',
+    PAUSED: 'WhatsApp paused this template because of poor recipient feedback. Use a different one.',
+    DISABLED: 'WhatsApp disabled this template permanently. Use a different one.',
+  };
+
+  return {
+    key: 'template_not_approved',
+    kind: 'blocker',
+    label: `"${template.name}" is not approved for sending`,
+    detail:
+      byStatus[template.metaStatus ?? ''] ??
+      'This template has not been submitted to WhatsApp for review yet. Submit it, then send once approved.',
+    fix: { action: 'choose_template', label: 'Choose another template' },
+  };
 }
 
 export async function runPreflight(input: PreflightInput): Promise<PreflightResult> {
-  const window = quietWindow(input);
-  const message = input.message ?? '';
+  const findings: PreflightFinding[] = [];
 
   // 1. Resolve and canonicalize the audience.
   const audience = await resolveAudienceDetailed({
@@ -122,186 +188,174 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
     teamId: input.teamId,
   });
 
-  // 2. Strip anyone who has opted out or is otherwise suppressed. Unconditional.
-  const { allowed, suppressed } = await partitionSuppressed(audience.phones);
-  const optedOutCount = Array.from(suppressed.values()).filter((hit) => hit.reason === 'OPTED_OUT').length;
+  // 2. Attach contact identity for the plan rows.
+  const contacts = audience.phones.length
+    ? await prisma.contact.findMany({
+        where: { phone: { in: audience.phones } },
+        select: { id: true, phone: true, name: true },
+      })
+    : [];
+  const byPhone = new Map(contacts.map((c) => [c.phone, c]));
 
-  // 3. Score what remains and apply the fatigue cooldown.
-  const quality = await scoreAudience(allowed, { respectCooldown: !input.ignoreCooldown });
+  let plan: PlannedRecipient[] = audience.phones.map((phone) => ({
+    phone,
+    contactId: byPhone.get(phone)?.id ?? null,
+    name: byPhone.get(phone)?.name ?? null,
+  }));
 
-  // 3b. User-requested exclusions, applied as skips so the report can still show
-  // how many were removed and why.
-  if (input.excludeCold) {
-    for (const recipient of quality.recipients) {
-      if (!recipient.skipReason && recipient.isCold) recipient.skipReason = 'COLD_EXCLUDED';
-    }
-  }
+  // 3. Optional exclusion: anyone who already received a prior campaign.
+  let alreadyReceived = 0;
+  const excluded: PlannedRecipient[] = [];
   if (input.excludeReceivedFrom) {
-    const alreadySent = await prisma.broadcastRecipient.findMany({
-      where: { broadcastId: input.excludeReceivedFrom, status: 'sent', phone: { in: allowed } },
+    const prior = await prisma.broadcastRecipient.findMany({
+      where: { broadcastId: input.excludeReceivedFrom, status: 'sent', phone: { in: audience.phones } },
       select: { phone: true },
     });
-    const received = new Set(alreadySent.map((row) => row.phone));
-    for (const recipient of quality.recipients) {
-      if (!recipient.skipReason && received.has(recipient.phone)) recipient.skipReason = 'ALREADY_RECEIVED';
-    }
+    const received = new Set(prior.map((r) => r.phone));
+    alreadyReceived = received.size;
+    plan = plan.filter((r) => {
+      if (!received.has(r.phone)) return true;
+      excluded.push({ ...r, skipReason: 'ALREADY_RECEIVED' });
+      return false;
+    });
   }
 
-  // Re-derive the aggregates the exclusions just invalidated. Recomputing beats
-  // threading the flags into scoreAudience: it keeps the scorer's only job
-  // "score contacts", and the exclusions are policy, not quality.
-  if (input.excludeCold || input.excludeReceivedFrom) {
-    const remaining = quality.recipients.filter((recipient) => !recipient.skipReason);
-    quality.deliverable = remaining.length;
-    quality.skipped = quality.recipients.filter((recipient) => recipient.skipReason);
-    quality.counts = { HOT: 0, WARM: 0, COOL: 0, COLD: 0 };
-    for (const recipient of remaining) quality.counts[recipient.tier] += 1;
-    const coldCount = remaining.filter((recipient) => recipient.isCold).length;
-    quality.coldRatio = remaining.length ? coldCount / remaining.length : 0;
-    quality.averageScore = remaining.length
-      ? Math.round(remaining.reduce((sum, recipient) => sum + recipient.score, 0) / remaining.length)
-      : 0;
-    quality.unknownContacts = remaining.filter((recipient) => !recipient.contactId).length;
+  for (const phone of audience.invalid) {
+    excluded.push({ phone, contactId: null, name: null, skipReason: 'INVALID_PHONE' });
   }
 
-  // 4. Content.
-  const contentHash = contentFingerprint({
-    message,
-    mediaUrl: input.mediaUrl,
-    interactiveContent: input.interactiveContent,
-  });
-  const variants = resolveVariants(message);
-  const content = analyzeContent(message, {
-    hasMedia: Boolean(input.mediaUrl),
-    isInteractive: Boolean(input.interactiveContent),
-    audienceSize: quality.deliverable,
-  });
+  // 4. Channel + template gates.
+  const channel = await getChannel();
+  const status = await providerManager.getStatus();
 
-  // 5. Health and duplicate check, in parallel — neither depends on the other.
-  const [health, duplicateOf] = await Promise.all([
-    getAccountHealth(),
-    findDuplicate(contentHash, allowed, input.excludeBroadcastId),
-  ]);
+  if (!channel.cloud) {
+    findings.push({
+      key: 'channel_not_connected',
+      kind: 'blocker',
+      label: 'No WhatsApp number is connected',
+      detail: 'Connect your WhatsApp Business number in Settings before sending a campaign.',
+      fix: { action: 'connect_channel', label: 'Connect a number' },
+    });
+  } else if (status.status !== 'connected') {
+    findings.push({
+      key: 'channel_unavailable',
+      kind: 'blocker',
+      label: 'This WhatsApp number cannot send right now',
+      detail: status.error?.message ?? 'Meta is not accepting messages from this number at the moment.',
+    });
+  }
 
-  const deliverable = quality.recipients.filter((recipient) => !recipient.skipReason);
+  const templateFinding = await checkTemplate(input.templateId);
+  if (templateFinding) findings.push(templateFinding);
 
-  const report = assessCampaign({
-    health,
-    quality,
-    content,
-    requested: audience.requested,
-    suppressedCount: suppressed.size,
-    optedOutCount,
-    invalidCount: audience.invalid.length,
-    duplicateCount: audience.duplicates,
-    // Zone breakdown describes who actually receives the campaign, not who was
-    // originally selected.
-    phones: deliverable.map((recipient) => recipient.phone),
-    averageMessageLength: message.length || 120,
-    quietHours: window,
-    requestedProfile: input.pacingProfile,
-    duplicateOf,
-    isInteractive: Boolean(input.interactiveContent),
-  });
+  if (plan.length === 0) {
+    findings.push({
+      key: 'empty_audience',
+      kind: 'blocker',
+      label: 'No one would receive this campaign',
+      detail: 'Every selected contact was filtered out or has an unusable phone number.',
+    });
+  }
 
-  // Suppressed numbers were removed before scoring, so re-attach them as
-  // excluded rows — the UI has to be able to say *why* 2,000 became 1,740.
-  const suppressedRows: ScoredRecipient[] = Array.from(suppressed.values()).map((hit) => ({
-    phone: hit.phone,
-    contactId: null,
-    name: null,
-    tier: 'COLD',
-    score: 0,
-    isCold: true,
-    daysSinceInbound: null,
-    daysSinceLastBroadcast: null,
-    skipReason: hit.reason === 'OPTED_OUT' ? 'OPTED_OUT' : 'SUPPRESSED',
-  }));
+  // 5. Messaging tier headroom — informational, because Meta enforces it.
+  const capacity = channel.messagingLimit ? TIER_CAPACITY[channel.messagingLimit] : undefined;
+  if (capacity && plan.length > capacity) {
+    findings.push({
+      key: 'over_messaging_tier',
+      kind: 'warning',
+      label: `Your number can start ${capacity.toLocaleString()} conversations per day`,
+      detail:
+        `This campaign targets ${plan.length.toLocaleString()} people, so WhatsApp will refuse the excess until your ` +
+        'limit resets or Meta raises your tier. Delivery continues automatically the next day.',
+    });
+  }
 
-  const invalidRows: ScoredRecipient[] = audience.invalid.map((phone) => ({
-    phone,
-    contactId: null,
-    name: null,
-    tier: 'COLD',
-    score: 0,
-    isCold: true,
-    daysSinceInbound: null,
-    daysSinceLastBroadcast: null,
-    skipReason: 'INVALID_PHONE',
-  }));
+  if (channel.qualityRating === 'RED' || channel.qualityRating === 'YELLOW') {
+    findings.push({
+      key: 'quality_rating_low',
+      kind: 'warning',
+      label: `WhatsApp rates this number's quality as ${channel.qualityRating}`,
+      detail:
+        'Recipients have been blocking or reporting your messages. Sending more marketing now risks Meta lowering your messaging limit or restricting the number.',
+    });
+  }
+
+  const template = input.templateId
+    ? await prisma.messageTemplate.findUnique({
+        where: { id: input.templateId },
+        select: { id: true, name: true, metaStatus: true },
+      })
+    : null;
+
+  const report: PreflightReport = {
+    generatedAt: new Date().toISOString(),
+    canSend: findings.every((f) => f.kind !== 'blocker'),
+    findings,
+    audience: {
+      requested: audience.requested,
+      deliverable: plan.length,
+      invalid: audience.invalid.length,
+      duplicates: audience.duplicates,
+      alreadyReceived,
+    },
+    channel: {
+      connected: Boolean(channel.cloud),
+      displayPhoneNumber: channel.cloud?.displayPhoneNumber ?? null,
+      qualityRating: channel.qualityRating,
+      messagingLimit: channel.messagingLimit,
+    },
+    template: template
+      ? { id: template.id, name: template.name, status: template.metaStatus }
+      : null,
+  };
 
   return {
     report,
-    plan: orderForDelivery(deliverable),
-    excluded: [...suppressedRows, ...quality.skipped, ...invalidRows],
-    contentHash,
-    variants,
+    plan,
+    excluded,
+    contentHash: contentFingerprint({
+      message: input.message,
+      mediaUrl: input.mediaUrl,
+      templateId: input.templateId,
+    }),
   };
 }
 
-/**
- * Re-check just the account-level gates immediately before a claimed run starts.
- *
- * A campaign scheduled on Monday for Friday was assessed against Monday's health.
- * If the number picked up three 463s on Wednesday, Friday's send must not happen
- * on Monday's verdict — this is the cheap re-read that catches that, without
- * re-resolving a 50,000-row audience.
- */
-export type AccountGateCode = 'NOT_CONNECTED' | 'CONNECTING' | 'ACCOUNT_BLOCKED' | 'DAILY_BUDGET';
+// ── Claim-time gate ──────────────────────────────────────────────────────────
+
+export type AccountGateCode = 'NOT_CONNECTED' | 'CHANNEL_RESTRICTED';
 
 export interface AccountGate {
   ok: boolean;
   reason: string | null;
-  /** Machine-readable, so the caller can decide between refuse, park and retry. */
   code: AccountGateCode | null;
 }
 
+/**
+ * Re-check the channel immediately before a claimed run starts.
+ *
+ * A campaign scheduled on Monday for Friday was assessed against Monday's state.
+ * If the token expired or Meta restricted the number on Wednesday, Friday's send
+ * must not proceed on Monday's verdict — this is the cheap re-read that catches
+ * that without re-resolving a 50,000-row audience.
+ */
 export async function verifyAccountGate(): Promise<AccountGate> {
-  // ── Is there a line to send on at all? ─────────────────────────────────────
-  //
-  // Checked first, and outside the try: nothing below it matters without a
-  // connection, and it is the one gate that must never fail open.
-  //
-  // Without this a campaign starts happily while WhatsApp is offline, every
-  // recipient throws "WhatsApp is not connected" from the sender, and the run
-  // reports N failures for messages WhatsApp never even saw. Read through the
-  // provider rather than the Baileys client directly so the Meta path answers
-  // for itself.
-  const providerStatus = providerManager.getStatus().status;
-  if (providerStatus !== 'connected') {
-    return providerStatus === 'connecting'
-      ? {
-          ok: false,
-          code: 'CONNECTING',
-          reason: 'WhatsApp is still connecting. Sending will start on its own once the number is linked.',
-        }
-      : {
-          ok: false,
-          code: 'NOT_CONNECTED',
-          reason: 'No WhatsApp number is connected, so there is nothing to send from. Connect a number first.',
-        };
+  const status = await providerManager.getStatus();
+
+  if (status.status === 'connected') return { ok: true, reason: null, code: null };
+
+  const channel = await getChannel();
+  if (!channel.cloud) {
+    return {
+      ok: false,
+      code: 'NOT_CONNECTED',
+      reason: 'No WhatsApp number is connected, so there is nothing to send from. Connect a number first.',
+    };
   }
 
-  try {
-    const health = await getAccountHealth();
-    if (health.blocked) {
-      return { ok: false, code: 'ACCOUNT_BLOCKED', reason: health.blockedReason };
-    }
-    if (health.budget.remainingToday <= 0) {
-      return {
-        ok: false,
-        code: 'DAILY_BUDGET',
-        reason:
-          `This number has already sent its safe daily volume (${health.budget.usedToday}/${health.budget.dailyLimit}). ` +
-          'The campaign will continue automatically tomorrow.',
-      };
-    }
-    return { ok: true, reason: null, code: null };
-  } catch (error) {
-    // Never block a send because the health check itself broke.
-    logger.warn('broadcast.health_gate_unavailable', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { ok: true, reason: null, code: null };
-  }
+  return {
+    ok: false,
+    code: 'CHANNEL_RESTRICTED',
+    reason: status.error?.message ?? 'WhatsApp is not accepting messages from this number at the moment.',
+  };
 }

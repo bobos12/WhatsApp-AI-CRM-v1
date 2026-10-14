@@ -1,8 +1,204 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@400;500;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NEXUS — product design tokens
+   ──────────────────────────────────────────────────────────────────────────
+   Paper and ink, with one signal colour. Neutrals sit on the logo's green-grey
+   axis; emerald is reserved for "act here" and "this is live" so it keeps its
+   meaning. Values are RGB triplets so Tailwind opacity modifiers work.
+
+   canvas   app background            surface  panels, lists, the page body
+   raised   inputs, secondary fills    overlay  hover / pressed on raised
+   line     hairlines                  ink 1-4  text, strongest → faintest
+   brand    the signal (buttons, active, live) — brand-fg is text placed on it
+   nav      the sidebar, dark in both themes: it is the product's signature
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --canvas: 244 246 245;
+  --surface: 255 255 255;
+  --raised: 243 245 244;
+  --overlay: 233 237 235;
+  --line: 225 230 227;
+  --line-strong: 205 211 208;
+  --ink: 17 23 20;
+  --ink-2: 61 70 65;
+  --ink-3: 105 115 110;
+  --ink-4: 154 163 158;
+
+  /* #128245 on white is 4.9:1 — AA for the 13–14px labels buttons carry. The
+     logo's brighter #1DAE60 is used only where it isn't holding text. */
+  --brand: 18 130 69;
+  --brand-strong: 15 106 57;
+  --brand-fg: 255 255 255;
+  --brand-soft: 231 246 237;
+
+  /* Conversation surface. Outgoing bubbles keep a WhatsApp-like green so the
+     inbox reads as WhatsApp to anyone who has used it — just a quieter one. */
+  --chat-bg: 238 241 239;
+  --bubble-out: 214 243 225;
+  --bubble-in: 255 255 255;
+
+  --nav: 13 19 16;
+  --nav-ink: 232 237 234;
+  --nav-muted: 138 150 144;
+  --nav-line: 34 42 38;
+  --nav-hover: 28 36 32;
+
+  /* Legacy WhatsApp-palette variables, re-pointed at the tokens above so the
+     few places still reading them inherit the new palette. */
+  --wa-accent: rgb(var(--brand));
+  --wa-accent-dark: rgb(var(--brand-strong));
+  --wa-accent-light: rgb(var(--brand-soft));
+  --wa-bg-primary: rgb(var(--canvas));
+  --wa-bg-secondary: rgb(var(--surface));
+  --wa-bg-tertiary: rgb(var(--raised));
+  --wa-bubble-sent: #D9F5E3;
+  --wa-bubble-received: rgb(var(--surface));
+  --wa-text-primary: rgb(var(--ink));
+  --wa-text-secondary: rgb(var(--ink-3));
+  --wa-border-subtle: rgb(var(--line));
+
+  --font-latin: 'IBM Plex Sans', 'IBM Plex Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+  --font-arabic: 'IBM Plex Sans Arabic', 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+
+  /* ─── Motion — ONE language for the whole product ─────────────────────
+     ease-out    : expo-out. Decisive start, calm settle. Entrances, reveals.
+     ease-spring : soft overshoot. Small confirmations (toggles, checks).
+     ease-swift  : symmetric. Properties that morph in place (colour, size).
+     fast = touch feedback · base = UI state change · slow = panel / screen.
+     Only transform and opacity are animated, so nothing triggers layout. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --ease-swift: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 400ms;
+
+  /* ─── Shadcn UI tokens (light), derived from the palette above ─── */
+  --background: 150 9% 96%;
+  --foreground: 150 15% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 15% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 150 15% 8%;
+  --primary: 147 76% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 7% 96%;
+  --secondary-foreground: 150 15% 8%;
+  --muted: 150 7% 96%;
+  --muted-foreground: 150 4% 43%;
+  --accent: 150 7% 94%;
+  --accent-foreground: 150 15% 8%;
+  --destructive: 0 69% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 150 7% 89%;
+  --input: 150 7% 89%;
+  --ring: 147 76% 29%;
+  --radius: 0.5rem;
+}
+
+html.dark {
+  color-scheme: dark;
+  --canvas: 10 14 12;
+  --surface: 17 23 20;
+  --raised: 25 32 28;
+  --overlay: 34 42 38;
+  --line: 37 45 41;
+  --line-strong: 52 62 57;
+  --ink: 231 236 233;
+  --ink-2: 180 189 184;
+  --ink-3: 138 148 143;
+  --ink-4: 94 104 99;
+
+  /* Dark mode inverts the button: bright emerald carrying near-black text. */
+  --brand: 46 204 116;
+  --brand-strong: 72 219 137;
+  --brand-fg: 6 17 11;
+  --brand-soft: 20 46 32;
+
+  --chat-bg: 12 17 15;
+  --bubble-out: 18 66 43;
+  --bubble-in: 28 36 32;
+
+  --nav: 8 11 10;
+  --nav-line: 30 37 33;
+  --nav-hover: 24 31 28;
+
+  --wa-bubble-sent: #10402A;
+
+  --background: 150 17% 5%;
+  --foreground: 150 9% 91%;
+  --card: 150 15% 8%;
+  --card-foreground: 150 9% 91%;
+  --popover: 150 13% 11%;
+  --popover-foreground: 150 9% 91%;
+  --primary: 146 63% 49%;
+  --primary-foreground: 150 48% 5%;
+  --secondary: 150 12% 11%;
+  --secondary-foreground: 150 9% 91%;
+  --muted: 150 12% 11%;
+  --muted-foreground: 150 4% 56%;
+  --accent: 150 11% 15%;
+  --accent-foreground: 150 9% 91%;
+  --destructive: 0 72% 63%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 150 10% 16%;
+  --input: 150 11% 15%;
+  --ring: 146 63% 49%;
+}
+
+/* ─── Reset & base ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-latin);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  color-scheme: light;
+  /* Figures line up in every table, counter and timestamp by default. */
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  min-height: 100vh;
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* ─── Arabic / RTL ───────────────────────────────────────────
+   Plex Sans Arabic first, so Arabic glyphs come from it and Latin glyphs from
+   its matched Latin set. Line height is raised on the body only: forcing it on
+   every element (as this file once did) out-ranked `leading-none` and broke
+   every badge and counter in Arabic. */
+html[dir="rtl"],
+html.lang-ar {
+  font-family: var(--font-arabic);
+}
+html[dir="rtl"] body,
+html.lang-ar body {
+  direction: rtl;
+  text-align: right;
+  line-height: 1.6;
+}
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select,
+html[dir="rtl"] button,
+html.lang-ar input,
+html.lang-ar textarea,
+html.lang-ar select,
+html.lang-ar button {
+  font-family: var(--font-arabic);
+}
 
 /* ─── SpotlightCard (ReactBits) ──────────────────────────── */
 .spotlight-card {
@@ -10,7 +206,7 @@
   overflow: hidden;
   --mouse-x: 50%;
   --mouse-y: 50%;
-  --spotlight-color: rgba(37, 211, 102, 0.12);
+  --spotlight-color: rgb(var(--brand) / 0.08);
 }
 .spotlight-card::before {
   content: '';
@@ -30,159 +226,6 @@
   z-index: 1;
 }
 
-/* ─── CSS Variables ──────────────────────────────────────── */
-:root {
-  --wa-accent: #25D366;
-  --wa-accent-dark: #128C7E;
-  --wa-accent-light: #DCF8C6;
-  --wa-bg-primary: #0B141A;
-  --wa-bg-secondary: #111B21;
-  --wa-bg-tertiary: #202C33;
-  --wa-bubble-sent: #005C4B;
-  --wa-bubble-received: #202C33;
-  --wa-text-primary: #E9EDEF;
-  --wa-text-secondary: #8696A0;
-  --wa-border-subtle: rgba(255,255,255,0.08);
-
-  /* Arabic typography settings */
-  --font-arabic: 'IBM Plex Arabic', 'Segoe UI', system-ui, sans-serif;
-  --font-latin: 'Plus Jakarta Sans', 'Segoe UI', 'Helvetica Neue', ui-sans-serif, system-ui, sans-serif;
-
-  /* ─── Motion system — ONE language for the whole product ───
-     ease-out    : expo-out. Decisive start, calm settle. Entrances, reveals.
-     ease-spring : soft overshoot. Playful pops (icons, chips, toggles).
-     ease-swift  : symmetric. Property changes that morph in place (colors, size).
-     Durations   : fast = touch feedback · base = UI state · slow = screen-level. */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
-  --ease-swift: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 140ms;
-  --dur-base: 240ms;
-  --dur-slow: 420ms;
-
-  /* ─── Donezo emerald palette (dashboard surface) ─── */
-  --dz-accent: #16A34A;
-  --dz-accent-strong: #15803D;
-  --dz-page: #F4F5F7;
-
-  /* ─── Shadcn UI design tokens (light mode) ──────────────── */
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 142 71% 45%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 142 71% 45%;
-  --radius: 0.75rem;
-}
-
-/* ─── Reset & base ──────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html {
-  font-family: var(--font-latin);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv11', 'ss01';
-  scroll-behavior: smooth;
-  color-scheme: light;
-}
-
-/* ─── Arabic / RTL mode ──────────────────────────────────── */
-html[dir="rtl"],
-html.lang-ar {
-  font-family: var(--font-arabic);
-  /* IBM Plex Arabic optimized typography */
-  font-feature-settings: normal;
-  font-weight: 400;
-  letter-spacing: 0.3px;
-  word-spacing: 0.03em;
-}
-
-/* IBM Plex Arabic maintains consistent weight — keep headings at 700 */
-html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3,
-html[dir="rtl"] h4, html[dir="rtl"] h5, html[dir="rtl"] h6,
-html.lang-ar h1, html.lang-ar h2, html.lang-ar h3,
-html.lang-ar h4, html.lang-ar h5, html.lang-ar h6 {
-  font-weight: 700;
-}
-
-html[dir="rtl"] body,
-html.lang-ar body {
-  direction: rtl;
-  text-align: right;
-}
-
-/* Force IBM Plex Arabic on every element in RTL — overrides any Tailwind font-* class */
-html[dir="rtl"] *,
-html.lang-ar * {
-  font-family: var(--font-arabic);
-  line-height: 1.6;
-}
-
-html[dir="rtl"] button,
-html[dir="rtl"] input,
-html[dir="rtl"] select,
-html[dir="rtl"] textarea,
-html.lang-ar button,
-html.lang-ar input,
-html.lang-ar select,
-html.lang-ar textarea {
-  font-family: var(--font-arabic);
-  font-size: 0.9375rem; /* Slightly larger for Arabic readability */
-}
-
-/* ─── Dark mode ──────────────────────────────────────────── */
-html.dark {
-  color-scheme: dark;
-  /* Shadcn UI design tokens (dark mode) */
-  --background: 210 33% 7%;
-  --foreground: 210 17% 93%;
-  --card: 210 30% 10%;
-  --card-foreground: 210 17% 93%;
-  --popover: 210 30% 10%;
-  --popover-foreground: 210 17% 93%;
-  --primary: 143 86% 52%;
-  --primary-foreground: 210 33% 7%;
-  --secondary: 210 24% 17%;
-  --secondary-foreground: 210 17% 93%;
-  --muted: 210 24% 17%;
-  --muted-foreground: 210 9% 53%;
-  --accent: 210 24% 17%;
-  --accent-foreground: 210 17% 93%;
-  --destructive: 0 72% 57%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 210 20% 20%;
-  --input: 210 24% 17%;
-  --ring: 143 86% 52%;
-}
-
-body {
-  min-height: 100vh;
-  transition: background-color 0.2s ease, color 0.15s ease;
-  background-color: #ffffff;
-  color: #1f2937;
-}
-
-html.dark body {
-  background-color: var(--wa-bg-primary);
-  color: var(--wa-text-primary);
-}
-
 /* ─── Font inherit for all form elements ────────────────── */
 input, textarea, select, button {
   font-family: inherit;
@@ -191,11 +234,7 @@ input, textarea, select, button {
 /* ─── Placeholder ────────────────────────────────────────── */
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af;
-}
-.dark input::placeholder,
-.dark textarea::placeholder {
-  color: var(--wa-text-secondary);
+  color: rgb(var(--ink-4));
 }
 
 /* ─── RTL select dropdown arrow ──────────────────────────── */
@@ -222,31 +261,20 @@ html[dir="rtl"] select {
 
 select:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15);
-  border-color: #25D366;
-}
-
-.dark select:focus {
-  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
+  box-shadow: 0 0 0 3px rgb(var(--brand) / 0.16);
+  border-color: rgb(var(--brand));
 }
 
 /* ─── Text selection ─────────────────────────────────────── */
 ::selection {
-  background: rgba(37, 211, 102, 0.18);
-  color: #005C4B;
-}
-.dark ::selection {
-  background: rgba(37, 211, 102, 0.22);
-  color: #25D366;
+  background: rgb(var(--brand) / 0.2);
+  color: rgb(var(--ink));
 }
 
 /* ─── Scrollbars ─────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d4d4d8 transparent;
-}
-.dark * {
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: rgb(var(--line-strong)) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -257,18 +285,11 @@ select:focus {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
-  border-radius: 9999px;
-}
-.dark *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--line-strong));
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
-}
-.dark *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(var(--ink-4));
 }
 *::-webkit-scrollbar-corner {
   background: transparent;
@@ -285,12 +306,6 @@ select:focus {
     height: 0;
     display: none;
   }
-}
-
-/* ─── Hero card dot-grid overlay ────────────────────────── */
-.hero-dot-grid {
-  background-image: radial-gradient(circle, white 1px, transparent 1px);
-  background-size: 18px 18px;
 }
 
 /* ─── iOS safe-area padding utilities ───────────────────── */
@@ -312,7 +327,7 @@ select:focus {
 }
 @media (max-width: 639.98px) {
   :root {
-    --bottom-nav-space: calc(6.5rem + env(safe-area-inset-bottom));
+    --bottom-nav-space: calc(3.5rem + env(safe-area-inset-bottom));
   }
 }
 
@@ -327,7 +342,7 @@ select:focus {
 
 /* ─── Focus ring global ──────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #25D366;
+  outline: 2px solid rgb(var(--brand));
   outline-offset: 2px;
 }
 
@@ -573,11 +588,11 @@ html[dir="rtl"] .lead-alert-enter { animation: slideInFromLeft 0.32s cubic-bezie
    would make every voice note animate together). */
 .vn-range { -webkit-appearance: none; appearance: none; height: .35rem; border-radius: 9999px; outline: none; width: 100%; background: transparent; }
 .vn-range::-webkit-slider-runnable-track { height: .35rem; border-radius: 9999px; }
-.vn-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: .95rem; height: .95rem; border-radius: 9999px; margin-top: -.3rem; background: #fff; border: 2px solid #25D366; box-shadow: 0 2px 8px rgba(0, 0, 0, .22); }
-.vn-range::-moz-range-thumb { width: .95rem; height: .95rem; border-radius: 9999px; background: #fff; border: 2px solid #25D366; }
-.vn-light::-webkit-slider-runnable-track { background: linear-gradient(90deg, #25D366 0%, #25D366 var(--vn-progress, 0%), rgba(255, 255, 255, .45) var(--vn-progress, 0%), rgba(255, 255, 255, .45) 100%); }
-.vn-dark::-webkit-slider-runnable-track { background: linear-gradient(90deg, #25D366 0%, #25D366 var(--vn-progress, 0%), rgba(255, 255, 255, .15) var(--vn-progress, 0%), rgba(255, 255, 255, .15) 100%); }
-.vn-range::-moz-range-progress { height: .35rem; border-radius: 9999px; background: #25D366; }
+.vn-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: .95rem; height: .95rem; border-radius: 9999px; margin-top: -.3rem; background: #fff; border: 2px solid rgb(var(--brand)); box-shadow: 0 2px 8px rgba(0, 0, 0, .22); }
+.vn-range::-moz-range-thumb { width: .95rem; height: .95rem; border-radius: 9999px; background: #fff; border: 2px solid rgb(var(--brand)); }
+.vn-light::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgb(var(--brand)) 0%, rgb(var(--brand)) var(--vn-progress, 0%), rgb(var(--ink) / .14) var(--vn-progress, 0%), rgb(var(--ink) / .14) 100%); }
+.vn-dark::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgb(var(--brand)) 0%, rgb(var(--brand)) var(--vn-progress, 0%), rgb(var(--ink) / .14) var(--vn-progress, 0%), rgb(var(--ink) / .14) 100%); }
+.vn-range::-moz-range-progress { height: .35rem; border-radius: 9999px; background: rgb(var(--brand)); }
 .vn-light::-moz-range-track { height: .35rem; border-radius: 9999px; background: rgba(255, 255, 255, .45); }
 .vn-dark::-moz-range-track { height: .35rem; border-radius: 9999px; background: rgba(255, 255, 255, .15); }
 
@@ -625,14 +640,14 @@ html[dir="rtl"] .lead-alert-enter { animation: slideInFromLeft 0.32s cubic-bezie
 
 /* Accent bar colour per type */
 [data-tf-type="message"] .tf-bar,
-[data-tf-type="success"] .tf-bar { background: #25D366; box-shadow: 0 0 10px rgba(37,211,102,0.45); }
-[data-tf-type="error"]   .tf-bar { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,0.45); }
-[data-tf-type="info"]    .tf-bar { background: #3b82f6; box-shadow: 0 0 10px rgba(59,130,246,0.45); }
-[data-tf-type="warning"] .tf-bar { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.45); }
+[data-tf-type="success"] .tf-bar { background: rgb(var(--brand)); }
+[data-tf-type="error"]   .tf-bar { background: #DC4444; }
+[data-tf-type="info"]    .tf-bar { background: #3B7BE0; }
+[data-tf-type="warning"] .tf-bar { background: #D98E04; }
 
 /* Progress bar fill colour per type */
 [data-tf-type="message"] .tf-prog-fill,
-[data-tf-type="success"] .tf-prog-fill { background: #25D366; }
+[data-tf-type="success"] .tf-prog-fill { background: rgb(var(--brand)); }
 [data-tf-type="error"]   .tf-prog-fill { background: #ef4444; }
 [data-tf-type="info"]    .tf-prog-fill { background: #3b82f6; }
 [data-tf-type="warning"] .tf-prog-fill { background: #f59e0b; }
@@ -652,21 +667,20 @@ html[dir="rtl"] .tf-prog-fill {
 }
 
 /* Icon container bg per type */
-[data-tf-type="success"] .tf-icon-wrap { background: rgba(37,211,102,0.12); }
+[data-tf-type="success"] .tf-icon-wrap { background: rgb(var(--brand) / 0.12); }
 [data-tf-type="error"]   .tf-icon-wrap { background: rgba(239,68,68,0.12);  }
 [data-tf-type="info"]    .tf-icon-wrap { background: rgba(59,130,246,0.12); }
 [data-tf-type="warning"] .tf-icon-wrap { background: rgba(245,158,11,0.12); }
 
 /* Icon colour per type */
-[data-tf-type="success"] .tf-icon-wrap svg { color: #25D366; }
+[data-tf-type="success"] .tf-icon-wrap svg { color: rgb(var(--brand)); }
 [data-tf-type="error"]   .tf-icon-wrap svg { color: #f87171; }
 [data-tf-type="info"]    .tf-icon-wrap svg { color: #60a5fa; }
 [data-tf-type="warning"] .tf-icon-wrap svg { color: #fbbf24; }
 
 /* Avatar gradient */
 .tf-avatar {
-  background: linear-gradient(145deg, #25D366 0%, #128C7E 100%);
-  box-shadow: 0 4px 16px rgba(37,211,102,0.35);
+  background: rgb(var(--brand));
 }
 
 /* Top-edge shimmer */
@@ -1020,16 +1034,19 @@ html.pwa-standalone #app-splash {
 /* ══════════════════════════════════════════════════════════════════════════
    SKELETON LOADING BLOCKS — premium content placeholders (use <Skeleton/>).
    ══════════════════════════════════════════════════════════════════════════ */
-.skeleton { position: relative; overflow: hidden; background: rgba(148,163,184,0.18); border-radius: 10px; }
+/* In the components layer so a rounded-* utility on the element wins. */
+@layer components {
+  .skeleton { position: relative; overflow: hidden; background: rgb(var(--raised)); border-radius: 8px; }
+  .dark .skeleton { background: rgb(var(--overlay)); }
+}
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
   animation: skeletonSweep 1.5s infinite;
 }
-.dark .skeleton { background: rgba(255,255,255,0.07); }
 .dark .skeleton::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); }
 @keyframes skeletonSweep { 100% { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
@@ -1076,3 +1093,170 @@ input, textarea, select {
     box-shadow var(--dur-base) var(--ease-swift),
     background-color var(--dur-base) var(--ease-swift);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NEXUS COMPONENT LAYER
+   The handful of shapes every screen is built from. They live in
+   `@layer components`, so a utility on the same element still wins — a page
+   can say `panel p-0` without fighting specificity.
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  /* The one container. A hairline defines it; nothing floats unless it
+     actually floats over something. */
+  .panel { @apply rounded-xl border border-line bg-surface; }
+  .panel-head { @apply flex min-h-[48px] items-center justify-between gap-3 border-b border-line px-4 py-2.5; }
+  .panel-title { @apply text-[13px] font-semibold text-ink; }
+
+  /* Small uppercase label above a group — the product's section voice. */
+  .eyebrow { @apply text-2xs font-semibold uppercase tracking-[0.08em] text-ink-3; }
+
+  /* ── Buttons ── one family, four weights. */
+  .btn {
+    @apply inline-flex h-9 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5
+           text-[13px] font-semibold outline-none transition-[background-color,border-color,color,box-shadow,transform]
+           duration-fast ease-out focus-visible:ring-[3px] focus-visible:ring-brand/25
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  :where(.btn) svg { @apply h-4 w-4 shrink-0; }
+  .btn-primary { @apply bg-brand text-brand-fg shadow-brand hover:bg-brand-strong; }
+  .btn-secondary { @apply border border-line bg-surface text-ink hover:border-line-strong hover:bg-raised; }
+  .btn-ghost { @apply text-ink-2 hover:bg-raised hover:text-ink; }
+  .btn-danger { @apply border border-red-200 bg-surface text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10; }
+  .btn-sm { @apply h-8 gap-1 px-2.5 text-xs; }
+  .btn-lg { @apply h-10 px-4 text-sm; }
+  .btn-icon { @apply h-9 w-9 px-0; }
+  .btn-icon.btn-sm { @apply h-8 w-8; }
+
+  /* ── Form fields ── */
+  .field {
+    @apply h-9 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[13px] text-ink outline-none
+           transition-[border-color,box-shadow] duration-fast placeholder:text-ink-4
+           hover:border-line-strong focus:border-brand focus:ring-[3px] focus:ring-brand/15
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  textarea.field { @apply h-auto py-2 leading-relaxed; }
+  .field-sm { @apply h-8 text-xs; }
+  .label { @apply mb-1.5 block text-xs font-medium text-ink-2; }
+  .hint { @apply mt-1 text-2xs leading-4 text-ink-3; }
+
+  /* ── Chips: status and metadata, never decoration. ── */
+  .chip { @apply inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-2xs font-semibold leading-none; }
+  .chip-neutral { @apply bg-raised text-ink-2 ring-1 ring-inset ring-line; }
+  .chip-brand   { @apply bg-brand/10 text-brand; }
+  .chip-warn    { @apply bg-amber-500/12 text-amber-700 dark:text-amber-300; }
+  .chip-danger  { @apply bg-red-500/10 text-red-600 dark:text-red-400; }
+  .chip-info    { @apply bg-blue-500/10 text-blue-700 dark:text-blue-300; }
+  .chip-violet  { @apply bg-violet-500/10 text-violet-700 dark:text-violet-300; }
+
+  /* ── Segmented control (tabs that switch a view in place). ── */
+  .seg { @apply inline-flex items-center gap-0.5 rounded-lg bg-raised p-0.5 ring-1 ring-inset ring-line; }
+  .seg-item {
+    @apply relative inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-xs font-medium
+           text-ink-3 transition-colors duration-fast hover:text-ink;
+  }
+  .seg-item[data-active="true"] { @apply bg-surface text-ink shadow-soft ring-1 ring-line; }
+
+  /* ── Interactive rows and cards ── */
+  .row-hover { @apply transition-colors duration-fast hover:bg-raised; }
+  .lift {
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out),
+                border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+  }
+  .lift:hover { transform: translateY(-1px); border-color: rgb(var(--line-strong)); box-shadow: 0 6px 20px -10px rgb(10 16 12 / 0.18); }
+  .lift:active { transform: translateY(0) scale(0.995); }
+
+  .kbd { @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-line bg-surface px-1 font-mono text-[10px] font-medium text-ink-3; }
+
+  /* Live indicator: a dot with a slow expanding ring. */
+  .live-dot { @apply relative inline-flex h-2 w-2 shrink-0 rounded-full bg-brand; }
+  .live-dot::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; background: inherit;
+    animation: nxPing 2.4s var(--ease-out) infinite;
+  }
+}
+
+@keyframes nxPing {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* ─── Motion utilities ───────────────────────────────────────────────────── */
+@keyframes nxEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes nxPop {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes nxDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes nxGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes nxGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+.enter { animation: nxEnter var(--dur-slow) var(--ease-out) both; }
+.pop-enter { animation: nxPop var(--dur-base) var(--ease-out) both; }
+
+/* Children arrive in sequence — fast enough (35ms apart) that it reads as one
+   motion, not a queue. Beyond the twelfth the delay stops growing. */
+.stagger > * { animation: nxEnter var(--dur-slow) var(--ease-out) both; }
+.stagger > :nth-child(2)  { animation-delay: 35ms; }
+.stagger > :nth-child(3)  { animation-delay: 70ms; }
+.stagger > :nth-child(4)  { animation-delay: 105ms; }
+.stagger > :nth-child(5)  { animation-delay: 140ms; }
+.stagger > :nth-child(6)  { animation-delay: 175ms; }
+.stagger > :nth-child(7)  { animation-delay: 210ms; }
+.stagger > :nth-child(8)  { animation-delay: 245ms; }
+.stagger > :nth-child(9)  { animation-delay: 280ms; }
+.stagger > :nth-child(10) { animation-delay: 315ms; }
+.stagger > :nth-child(11) { animation-delay: 350ms; }
+.stagger > :nth-child(n+12) { animation-delay: 385ms; }
+
+/* Bars and meters build from their origin on first paint. */
+.grow-x { transform-origin: left; animation: nxGrowX 0.7s var(--ease-out) both; }
+html[dir="rtl"] .grow-x { transform-origin: right; }
+.grow-y { transform-origin: bottom; animation: nxGrowY 0.7s var(--ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Conversation canvas ─────────────────────────────────────────────────
+   A faint doodle texture behind messages: the cue that says "this is a chat"
+   to anyone who has used WhatsApp, drawn in the ink colour at low opacity so it
+   recedes behind the bubbles in both themes. */
+.chat-doodle {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cg fill='none' stroke='%23111714' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='40' cy='42' r='5'/%3E%3Cpath d='M98 70q14-18 28 0t28 0'/%3E%3Crect x='196' y='34' width='36' height='26' rx='5'/%3E%3Cpath d='M282 56l9-14 9 14z'/%3E%3Cpath d='M30 140q18-9 36 0t36 0'/%3E%3Ccircle cx='182' cy='146' r='9'/%3E%3Cpath d='M254 128l26 26M280 128l-26 26'/%3E%3Cpath d='M52 220q22-22 44 0t44 0'/%3E%3Crect x='186' y='204' width='22' height='22' rx='4' transform='rotate(15 197 215)'/%3E%3Ccircle cx='284' cy='220' r='13'/%3E%3Cpath d='M26 296l18-9 18 9 18-9 18 9'/%3E%3Ccircle cx='166' cy='310' r='5'/%3E%3Cpath d='M238 296q13 13 26 0t26 0'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 360px 360px;
+  opacity: 0.05;
+}
+.dark .chat-doodle {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cg fill='none' stroke='%23E7ECE9' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='40' cy='42' r='5'/%3E%3Cpath d='M98 70q14-18 28 0t28 0'/%3E%3Crect x='196' y='34' width='36' height='26' rx='5'/%3E%3Cpath d='M282 56l9-14 9 14z'/%3E%3Cpath d='M30 140q18-9 36 0t36 0'/%3E%3Ccircle cx='182' cy='146' r='9'/%3E%3Cpath d='M254 128l26 26M280 128l-26 26'/%3E%3Cpath d='M52 220q22-22 44 0t44 0'/%3E%3Crect x='186' y='204' width='22' height='22' rx='4' transform='rotate(15 197 215)'/%3E%3Ccircle cx='284' cy='220' r='13'/%3E%3Cpath d='M26 296l18-9 18 9 18-9 18 9'/%3E%3Ccircle cx='166' cy='310' r='5'/%3E%3Cpath d='M238 296q13 13 26 0t26 0'/%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.035;
+}
+
+/* ─── Range slider ───────────────────────────────────────────────────────── */
+.nx-range { -webkit-appearance: none; appearance: none; height: 20px; background: transparent; cursor: pointer; }
+.nx-range:focus { outline: none; }
+.nx-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 9999px;
+  background: linear-gradient(to right, rgb(var(--brand)) var(--range-pct, 50%), rgb(var(--line-strong)) var(--range-pct, 50%));
+}
+html[dir="rtl"] .nx-range::-webkit-slider-runnable-track {
+  background: linear-gradient(to left, rgb(var(--brand)) var(--range-pct, 50%), rgb(var(--line-strong)) var(--range-pct, 50%));
+}
+.nx-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -6px; width: 16px; height: 16px; border-radius: 9999px;
+  background: #fff; border: 1px solid rgb(var(--line-strong)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.nx-range:active::-webkit-slider-thumb { transform: scale(1.15); }
+.nx-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgb(var(--brand) / 0.25); }
+.nx-range::-moz-range-track { height: 4px; border-radius: 9999px; background: rgb(var(--line-strong)); }
+.nx-range::-moz-range-progress { height: 4px; border-radius: 9999px; background: rgb(var(--brand)); }
+.nx-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 9999px; background: #fff; border: 1px solid rgb(var(--line-strong)); }

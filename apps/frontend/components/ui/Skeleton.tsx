@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
  *
  * <Skeleton className="h-4 w-32 rounded-md" />
  */
-export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn('skeleton', className)} />;
+export function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <div aria-hidden className={cn('skeleton', className)} style={style} />;
 }
 
 /** A few text lines of decreasing width — for message/detail bodies. */
@@ -27,7 +27,7 @@ export function ConversationListSkeleton({ rows = 8 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-1 p-2" aria-hidden>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-xl px-2 py-2.5">
+        <div key={i} className="flex items-center gap-3 px-1 py-2.5">
           <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-center justify-between gap-2">

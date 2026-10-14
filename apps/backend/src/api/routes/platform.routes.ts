@@ -19,7 +19,6 @@ import { env } from '../../lib/env';
 import { authMiddleware } from '../../auth/auth.middleware';
 import { isDevSuperuserEmail } from '../../auth/authorize';
 import { provisionTenant } from '../../tenants/provision-tenant.service';
-import { sessionManager } from '../../whatsapp/session-manager';
 import { aiConfigService } from '../../services/ai-config.service';
 import { logger } from '../../lib/logger';
 
@@ -60,10 +59,13 @@ router.get('/tenants', async (_req, res) => {
   const tenants = await prismaUnscoped.tenant.findMany({ orderBy: { createdAt: 'desc' } });
   const rows = await Promise.all(
     tenants.map(async (t) => {
-      const [users, contacts, session] = await Promise.all([
+      const [users, contacts, channel] = await Promise.all([
         prismaUnscoped.user.count({ where: { tenantId: t.id } }),
         prismaUnscoped.contact.count({ where: { tenantId: t.id } }),
-        prismaUnscoped.whatsAppSession.findFirst({ where: { tenantId: t.id }, select: { sessionId: true } }),
+        prismaUnscoped.whatsAppChannel.findFirst({
+          where: { tenantId: t.id },
+          select: { phoneNumberId: true, displayPhoneNumber: true },
+        }),
       ]);
       return {
         id: t.id,
@@ -74,9 +76,9 @@ router.get('/tenants', async (_req, res) => {
         users,
         contacts,
         whatsapp: {
-          hasSession: Boolean(session),
-          status: sessionManager.getStatus(t.id),
-          connectedNumber: sessionManager.getConnectedNumber(t.id),
+          hasSession: Boolean(channel?.phoneNumberId),
+          status: channel?.phoneNumberId ? 'connected' : 'disconnected',
+          connectedNumber: channel?.displayPhoneNumber ?? null,
         },
       };
     }),
@@ -111,8 +113,9 @@ router.post('/tenants/:id/suspend', async (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
   await prismaUnscoped.tenant.update({ where: { id }, data: { status: 'SUSPENDED' } });
-  // Drop the WhatsApp socket immediately; data is untouched.
-  await sessionManager.disconnect(id).catch(() => undefined);
+  // Nothing to disconnect: the Cloud API is stateless HTTP. A suspended tenant
+  // is refused at the auth middleware, so their credentials simply stop being
+  // reachable. Their data is untouched.
   logger.info('platform.tenant_suspended', { tenantId: id });
   res.json({ success: true });
 });
@@ -123,9 +126,6 @@ router.post('/tenants/:id/activate', async (req, res) => {
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
   await prismaUnscoped.tenant.update({ where: { id }, data: { status: 'ACTIVE' } });
-  // Reconnect if the tenant already had a WhatsApp session.
-  const session = await prismaUnscoped.whatsAppSession.findFirst({ where: { tenantId: id }, select: { id: true } });
-  if (session) sessionManager.connect(id).catch(() => undefined);
   logger.info('platform.tenant_activated', { tenantId: id });
   res.json({ success: true });
 });
@@ -158,8 +158,6 @@ router.delete('/tenants/:id', async (req, res) => {
   const tenant = await prismaUnscoped.tenant.findUnique({ where: { id }, select: { id: true } });
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-  await sessionManager.disconnect(id).catch(() => undefined);
-
   try {
     const where = { tenantId: id };
     // Leaf rows first, then their parents.
@@ -184,7 +182,7 @@ router.delete('/tenants/:id', async (req, res) => {
     await prismaUnscoped.messageTemplate.deleteMany({ where });
     await prismaUnscoped.analytics.deleteMany({ where });
     await prismaUnscoped.auditLog.deleteMany({ where });
-    await prismaUnscoped.whatsAppSession.deleteMany({ where });
+    await prismaUnscoped.whatsAppChannel.deleteMany({ where });
     await prismaUnscoped.setting.deleteMany({ where });
     // Users last — detach team ownership first to avoid the Team.ownerId FK.
     await prismaUnscoped.user.updateMany({ where, data: { teamId: null } });

@@ -46,7 +46,7 @@ export function TablePagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-5 py-3 dark:border-white/8">
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-500 dark:text-[#8696A0]">
+        <span className="text-xs text-ink-3">
           {total === 0
             ? t('table.noResults')
             : t('pagination.showing', { from, to, total })}
@@ -57,7 +57,7 @@ export function TablePagination({
             onPageSizeChange(Number(e.target.value));
             onPageChange(1);
           }}
-          className="h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-[#8696A0] dark:focus:border-[#25D366]/50"
+          className="h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none focus:border-brand/50 dark:border-white/10 dark:bg-raised dark:text-ink-3 dark:focus:border-brand/50"
         >
           {pageSizes.map((s) => (
             <option key={s} value={s}>{s} {t('pagination.rowsPerPage').split(' ')[0]}</option>
@@ -70,7 +70,7 @@ export function TablePagination({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-ink-3 dark:hover:bg-white/10 dark:hover:text-white"
           aria-label={t('pagination.previous')}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
@@ -78,7 +78,7 @@ export function TablePagination({
 
         {visiblePages.map((p, i) =>
           p === 'dots' ? (
-            <span key={`d-${i}`} className="px-1 text-xs text-gray-400 dark:text-[#8696A0]">…</span>
+            <span key={`d-${i}`} className="px-1 text-xs text-ink-4">…</span>
           ) : (
             <button
               key={p}
@@ -87,8 +87,8 @@ export function TablePagination({
               className={cn(
                 'flex h-7 min-w-[28px] items-center justify-center rounded-lg px-1.5 text-xs font-medium transition-colors',
                 p === page
-                  ? 'bg-[#16A34A] text-white dark:bg-[#25D366] dark:text-[#0B141A]'
-                  : 'border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white',
+                  ? 'bg-brand text-brand-fg dark:bg-brand dark:text-brand-fg'
+                  : 'border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-ink-3 dark:hover:bg-white/10 dark:hover:text-white',
               )}
             >
               {p}
@@ -100,7 +100,7 @@ export function TablePagination({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-ink-3 dark:hover:bg-white/10 dark:hover:text-white"
           aria-label={t('pagination.next')}
         >
           <ChevronRight className="h-3.5 w-3.5" />

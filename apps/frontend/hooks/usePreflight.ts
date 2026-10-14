@@ -20,13 +20,18 @@ export interface PreflightDraft {
   tag?: string;
   mediaUrl?: string;
   interactiveContent?: object;
-  pacingProfile?: string;
-  quietHoursEnabled?: boolean;
-  quietHoursStart?: number;
-  quietHoursEnd?: number;
-  pilotSize?: number | null;
-  /** Server-resolved audience exclusions applied by the report's one-tap fixes. */
-  excludeCold?: boolean;
+  /**
+   * The approved template the campaign will send. Load-bearing rather than
+   * optional detail: without it the server always reports the "needs an approved
+   * template" blocker, so a composer that omits it shows the user a problem they
+   * have already fixed and never lets the report go green.
+   *
+   * The pacing / quiet-hours / pilot fields that used to sit here belonged to
+   * the ban-prevention engine the Cloud API made unnecessary; the server stopped
+   * reading them, so sending them only made the request look meaningful.
+   */
+  templateId?: string | null;
+  /** Server-resolved audience exclusion applied by the report's one-tap fix. */
   excludeReceivedFrom?: string | null;
 }
 
@@ -58,12 +63,7 @@ export function usePreflight(draft: PreflightDraft, options: { enabled?: boolean
         tag: draft.tag || undefined,
         mediaUrl: draft.mediaUrl || undefined,
         interactiveContent: draft.interactiveContent,
-        pacingProfile: draft.pacingProfile,
-        quietHoursEnabled: draft.quietHoursEnabled,
-        quietHoursStart: draft.quietHoursStart,
-        quietHoursEnd: draft.quietHoursEnd,
-        pilotSize: draft.pilotSize ?? undefined,
-        excludeCold: draft.excludeCold || undefined,
+        templateId: draft.templateId || undefined,
         excludeReceivedFrom: draft.excludeReceivedFrom || undefined,
       }),
     [
@@ -72,12 +72,7 @@ export function usePreflight(draft: PreflightDraft, options: { enabled?: boolean
       draft.tag,
       draft.mediaUrl,
       draft.interactiveContent,
-      draft.pacingProfile,
-      draft.quietHoursEnabled,
-      draft.quietHoursStart,
-      draft.quietHoursEnd,
-      draft.pilotSize,
-      draft.excludeCold,
+      draft.templateId,
       draft.excludeReceivedFrom,
     ],
   );
@@ -134,12 +129,12 @@ export function usePreflight(draft: PreflightDraft, options: { enabled?: boolean
 
 /** Account health on its own, for the dashboard widget. */
 export function useAccountHealth(pollMs = 0) {
-  const [health, setHealth] = useState<PreflightReport['health'] | null>(null);
+  const [health, setHealth] = useState<PreflightReport['channel'] | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const result = await api.get<PreflightReport['health']>('/api/broadcasts/health');
+      const result = await api.get<PreflightReport['channel']>('/api/broadcasts/health');
       setHealth(result);
     } catch {
       setHealth(null);

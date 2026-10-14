@@ -46,10 +46,10 @@ export default function ConnectWhatsAppModal({ open, onClose }: ConnectWhatsAppM
       open={open}
       onClose={onClose}
       aria-label={t('sidebarConnect.title')}
-      className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-[#111B21]"
+      className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-surface"
     >
       {/* ── Header — WhatsApp gradient ────────────────────────────────────── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#128C7E] via-[#1aa06e] to-[#25D366] px-5 py-4">
+      <div className="relative overflow-hidden bg-gradient-to-br from-brand-strong via-[#1aa06e] to-brand px-5 py-4">
         <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/40" />
         <div className="relative flex items-center gap-3">
@@ -75,19 +75,19 @@ export default function ConnectWhatsAppModal({ open, onClose }: ConnectWhatsAppM
       <div className="p-5">
         {connected ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center animate-fade-in">
-            <span className="grid h-16 w-16 place-items-center rounded-full bg-[#25D366]/15 text-[#16A34A] dark:text-[#25D366]">
+            <span className="grid h-16 w-16 place-items-center rounded-full bg-brand/15 text-brand dark:text-brand">
               <CheckCircle2 className="h-9 w-9" />
             </span>
-            <p className="text-lg font-bold text-gray-900 dark:text-white">{t('sidebarConnect.connectedTitle')}</p>
+            <p className="text-lg font-bold text-ink">{t('sidebarConnect.connectedTitle')}</p>
             {connectedPhone && (
-              <p className="font-mono text-sm text-gray-500 dark:text-[#8696A0]">{connectedPhone}</p>
+              <p className="font-mono text-sm text-ink-3">{connectedPhone}</p>
             )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             <WhatsAppLinkPanel size="md" />
 
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-[#8696A0]">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-ink-4">
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>{t('sidebarConnect.secure')}</span>
             </div>

@@ -80,30 +80,30 @@ export default function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPicke
     <div
       ref={containerRef}
       style={fixedStyle ? { position: 'fixed', zIndex: 9999, ...fixedStyle } : undefined}
-      className={`${!fixedStyle ? 'absolute bottom-full mb-2 start-0 z-[9999]' : ''} w-72 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] shadow-xl overflow-hidden`}
+      className={`${!fixedStyle ? 'absolute bottom-full mb-2 start-0 z-[9999]' : ''} w-72 rounded-xl border border-line bg-white dark:bg-raised shadow-xl overflow-hidden`}
     >
       {/* Search */}
-      <div className="p-2 border-b border-gray-100 dark:border-white/10">
+      <div className="p-2 border-b border-line">
         <input
           autoFocus
           type="text"
           placeholder={t('composer.searchEmoji')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-1.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#8696A0] outline-none focus:border-[#25D366]"
+          className="w-full rounded-lg border border-line bg-gray-50 dark:bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-4 outline-none focus:border-brand"
         />
       </div>
 
       {/* Category tabs */}
       {!search && (
-        <div className="flex overflow-x-auto border-b border-gray-100 dark:border-white/10">
+        <div className="flex overflow-x-auto border-b border-line">
           {EMOJI_CATEGORIES.map((cat, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setActiveCategory(i)}
               className={`shrink-0 px-3 py-2 text-base transition-colors ${
-                activeCategory === i ? 'bg-[#25D366]/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                activeCategory === i ? 'bg-brand/10' : 'hover:bg-raised'
               }`}
               title={cat.label}
             >
@@ -120,13 +120,13 @@ export default function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPicke
             key={i}
             type="button"
             onClick={() => { onSelect(emoji); }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-raised transition-colors"
           >
             {emoji}
           </button>
         ))}
         {filtered.length === 0 && (
-          <p className="col-span-8 py-4 text-center text-xs text-gray-400 dark:text-[#8696A0]">{t('composer.noResults')}</p>
+          <p className="col-span-8 py-4 text-center text-xs text-ink-4">{t('composer.noResults')}</p>
         )}
       </div>
     </div>

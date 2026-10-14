@@ -69,7 +69,7 @@ function WaText({ text }: { text: string }) {
 function PreviewBubble({ canonical, vars }: { canonical: CanonicalTemplate; vars: Record<string, string> }) {
   const renderable = toRenderable(canonical, vars);
   return (
-    <div className="flex flex-col items-end p-4 bg-[#0B141A] bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.025)_1px,transparent_0)] [background-size:18px_18px] rounded-2xl">
+    <div className="flex flex-col items-end p-4 bg-canvas bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.025)_1px,transparent_0)] [background-size:18px_18px] rounded-2xl">
       <div className="max-w-[95%] min-w-[180px] rounded-2xl rounded-tr-sm bg-[#005C4B] text-white shadow-lg overflow-hidden">
         {renderable.media && (
           <div className="overflow-hidden">
@@ -236,18 +236,18 @@ export default function SendTemplateDialog({
       />
 
       {/* Panel */}
-      <div className="relative flex flex-col w-full h-[94dvh] sm:h-auto sm:max-h-[85vh] sm:w-[min(920px,94vw)] bg-white dark:bg-[#111B21] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden">
+      <div className="relative flex flex-col w-full h-[94dvh] sm:h-auto sm:max-h-[85vh] sm:w-[min(920px,94vw)] bg-surface sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
+        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-line flex-shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/15 text-brand">
             <Send className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <p className="text-sm font-semibold text-ink truncate">
               {t('send.title', { defaultValue: 'Send template' })} · {template.name}
             </p>
-            <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">
+            <p className="text-[11px] text-ink-3">
               {t('send.subtitle', { defaultValue: 'Arrives on WhatsApp exactly as previewed' })}
             </p>
           </div>
@@ -264,26 +264,26 @@ export default function SendTemplateDialog({
         <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-y-auto sm:overflow-hidden">
 
           {/* ── Recipients ── */}
-          <div className="flex flex-col sm:w-[320px] sm:flex-shrink-0 sm:border-e border-gray-200 dark:border-white/10 sm:overflow-hidden">
+          <div className="flex flex-col sm:w-[320px] sm:flex-shrink-0 sm:border-e border-line sm:overflow-hidden">
             <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-shrink-0">
-              <Users className="h-4 w-4 text-[#25D366]" />
-              <span className="text-xs font-semibold text-gray-900 dark:text-white">
+              <Users className="h-4 w-4 text-brand" />
+              <span className="text-xs font-semibold text-ink">
                 {t('send.recipients', { defaultValue: 'Recipients' })}
               </span>
               {selected.size > 0 && (
-                <span className="ms-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#25D366] px-1.5 text-[10px] font-bold text-white">
+                <span className="ms-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-brand-fg">
                   {selected.size}
                 </span>
               )}
             </div>
             <div className="px-3 pb-2 flex-shrink-0">
               <div className="relative">
-                <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8696A0]" />
+                <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder={t('send.searchContacts', { defaultValue: 'Search contacts…' })}
-                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] py-1.5 ps-8 pe-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#25D366]/60"
+                  className="field w-full ps-8 pe-3"
                 />
               </div>
             </div>
@@ -291,10 +291,10 @@ export default function SendTemplateDialog({
               <button
                 type="button"
                 onClick={toggleAll}
-                className="mx-3 mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:text-[#8696A0] dark:hover:bg-white/5 transition-colors flex-shrink-0"
+                className="mx-3 mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:text-ink-3 dark:hover:bg-white/5 transition-colors flex-shrink-0"
               >
                 <span className={`flex h-4 w-4 items-center justify-center rounded border transition-all ${
-                  allVisibleChecked ? 'border-[#25D366] bg-[#25D366]' : 'border-gray-300 dark:border-white/30'
+                  allVisibleChecked ? 'border-brand bg-brand' : 'border-gray-300 dark:border-white/30'
                 }`}>
                   {allVisibleChecked && (
                     <svg viewBox="0 0 12 10" className="h-2.5 w-2.5" aria-hidden>
@@ -312,13 +312,13 @@ export default function SendTemplateDialog({
               {loading ? (
                 <div className="space-y-1.5 p-2">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="h-11 rounded-xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+                    <div key={i} className="h-11 rounded-xl bg-raised animate-pulse" />
                   ))}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
-                  <MessageCircle className="h-7 w-7 text-[#8696A0] opacity-40" />
-                  <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+                  <MessageCircle className="h-7 w-7 text-ink-3 opacity-40" />
+                  <p className="text-xs text-ink-3">
                     {t('send.noContacts', { defaultValue: 'No contacts found' })}
                   </p>
                 </div>
@@ -332,11 +332,11 @@ export default function SendTemplateDialog({
                       type="button"
                       onClick={() => toggle(conv.id)}
                       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-start transition-colors ${
-                        checked ? 'bg-[#25D366]/12' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                        checked ? 'bg-brand/12' : 'hover:bg-raised'
                       }`}
                     >
                       <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 transition-all ${
-                        checked ? 'border-[#25D366] bg-[#25D366]' : 'border-gray-300 dark:border-white/30'
+                        checked ? 'border-brand bg-brand' : 'border-gray-300 dark:border-white/30'
                       }`}>
                         {checked && (
                           <svg viewBox="0 0 12 10" className="h-2.5 w-2.5" aria-hidden>
@@ -344,13 +344,13 @@ export default function SendTemplateDialog({
                           </svg>
                         )}
                       </span>
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-[10px] font-semibold text-white">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white">
                         {name.slice(0, 2).toUpperCase()}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-gray-900 dark:text-[#E9EDEF]"><bdi>{name}</bdi></span>
+                        <span className="block truncate text-sm font-medium text-ink"><bdi>{name}</bdi></span>
                         {conv.contact?.phone && (
-                          <span className="block truncate text-[11px] text-gray-500 dark:text-[#8696A0]"><bdi>{formatPhone(conv.contact.phone)}</bdi></span>
+                          <span className="block truncate text-[11px] text-ink-3"><bdi>{formatPhone(conv.contact.phone)}</bdi></span>
                         )}
                       </span>
                     </button>
@@ -361,18 +361,18 @@ export default function SendTemplateDialog({
           </div>
 
           {/* ── Personalize + preview ── */}
-          <div className="flex-1 sm:overflow-y-auto border-t sm:border-t-0 border-gray-200 dark:border-white/10">
+          <div className="flex-1 sm:overflow-y-auto border-t sm:border-t-0 border-line">
             <div className="p-4 sm:p-5 space-y-4">
 
               {/* Variables */}
               <div>
-                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0] mb-2">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-ink-3 mb-2">
                   <AtSign className="h-3 w-3" />
                   {t('send.personalize', { defaultValue: 'Personalization' })}
                 </p>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {varNames.filter(v => AUTO_VARS.has(v)).map(v => (
-                    <span key={v} className="inline-flex items-center gap-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/20 px-2 py-0.5 text-[10px] font-mono text-[#25D366]">
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full bg-brand/10 border border-brand/20 px-2 py-0.5 text-[10px] font-mono text-brand">
                       {`{{${v}}}`}
                       <span className="font-sans text-[9px] opacity-80">· {t('send.auto', { defaultValue: 'auto per contact' })}</span>
                     </span>
@@ -382,18 +382,18 @@ export default function SendTemplateDialog({
                   <div className="space-y-2">
                     {editableVars.map(v => (
                       <div key={v} className="flex items-center gap-2">
-                        <span className="w-28 shrink-0 text-[11px] font-mono text-[#25D366]">{`{{${v}}}`}</span>
+                        <span className="w-28 shrink-0 text-[11px] font-mono text-brand">{`{{${v}}}`}</span>
                         <input
                           value={vars[v] ?? ''}
                           onChange={e => setVars(prev => ({ ...prev, [v]: e.target.value }))}
                           placeholder={t('send.varPlaceholder', { defaultValue: 'Value for everyone…' })}
-                          className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] px-3 py-1.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#25D366]/60"
+                          className="field flex-1"
                         />
                       </div>
                     ))}
                   </div>
                 ) : varNames.length === 0 ? (
-                  <p className="text-[11px] text-gray-400 dark:text-[#8696A0]">
+                  <p className="text-[11px] text-ink-4">
                     {t('send.noVariables', { defaultValue: 'This template has no variables — ready to go.' })}
                   </p>
                 ) : null}
@@ -401,7 +401,7 @@ export default function SendTemplateDialog({
 
               {/* Preview */}
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0] mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-3 mb-2">
                   {t('send.preview', { defaultValue: 'Preview' })}
                   {firstSelected?.contact?.name && (
                     <span className="normal-case font-normal tracking-normal"> · {firstSelected.contact.name}</span>
@@ -418,9 +418,9 @@ export default function SendTemplateDialog({
               {/* Completed with failures — grouped, friendly "why" breakdown. */}
               {result && (
                 <div className="space-y-2.5">
-                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-2.5">
-                    <CheckCircle2 className={`h-4 w-4 shrink-0 ${result.sent > 0 ? 'text-[#25D366]' : 'text-gray-400'}`} />
-                    <p className="text-xs font-medium text-gray-700 dark:text-white/80">
+                  <div className="flex items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2.5">
+                    <CheckCircle2 className={`h-4 w-4 shrink-0 ${result.sent > 0 ? 'text-brand' : 'text-gray-400'}`} />
+                    <p className="text-xs font-medium text-ink-2/80">
                       {t('send.resultSummary', {
                         defaultValue: 'Sent to {{sent}} · {{failed}} couldn’t be delivered',
                         sent: result.sent,
@@ -433,7 +433,7 @@ export default function SendTemplateDialog({
                       <FriendlyError key={g.code} classified={g.sample} count={g.count} compact hideAction />
                     ))
                   ) : (
-                    <p className="px-1 text-[11px] text-gray-500 dark:text-[#8696A0]">
+                    <p className="px-1 text-[11px] text-ink-3">
                       {t('send.resultNoDetail', {
                         defaultValue: 'Some recipients had no valid WhatsApp number.',
                       })}
@@ -446,12 +446,12 @@ export default function SendTemplateDialog({
         </div>
 
         {/* Footer — sticky, above mobile safe area */}
-        <div className="flex-shrink-0 border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] px-4 sm:px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="flex-shrink-0 border-t border-line bg-surface px-4 sm:px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           {result ? (
             <button
               type="button"
               onClick={finishWithResult}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-3 text-sm font-semibold text-white transition-all hover:bg-[#1FAA5C] active:scale-[0.99]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-semibold text-brand-fg transition-all hover:bg-brand-strong active:scale-[0.99]"
             >
               <CheckCircle2 className="h-4 w-4" />
               {t('send.done', { defaultValue: 'Done' })}
@@ -461,7 +461,7 @@ export default function SendTemplateDialog({
               type="button"
               onClick={handleSend}
               disabled={!canSend}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-3 text-sm font-semibold text-white transition-all hover:bg-[#1FAA5C] disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.99]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-semibold text-brand-fg transition-all hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.99]"
             >
               {sending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> {t('send.sending', { defaultValue: 'Sending…' })}</>

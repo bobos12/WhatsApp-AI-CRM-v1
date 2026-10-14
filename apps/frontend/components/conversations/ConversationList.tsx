@@ -1,33 +1,27 @@
 'use client';
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
-  Search, User, Inbox, LayoutList,
-  Pin, PinOff, Clock, BellOff, Bookmark, BookmarkCheck, X as XIcon,
+  Pin, PinOff, Clock, BellOff, Bookmark, X as XIcon, SlidersHorizontal, ChevronDown, Inbox, SearchX,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
+import { cn } from '../../lib/utils';
 import { formatPhone } from '../../lib/phone';
+import { formatListTime, localeFor } from '../../lib/format';
 import { useSocket } from '../../hooks/useSocket';
 import { useTags } from '../../hooks/useTags';
 import { useMessagingStore, type ConversationSummary } from '../../stores/messaging-store';
 import Avatar from '../ui/Avatar';
+import { SearchField, EmptyState } from '../ui/page';
 import { ConversationListSkeleton } from '../ui/Skeleton';
 
-
 type InboxView = 'all' | 'mine' | 'unassigned';
+type Chip = InboxView | 'unread';
 
-const STATUS_PILLS = ['OPEN', 'RESOLVED'];
-
-const PIPELINE_COLORS: Record<string, string> = {
-  LEAD: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-  QUALIFIED: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300',
-  NEGOTIATION: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-  WON: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
-  LOST: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-};
-
+const STATUS_OPTIONS = ['', 'OPEN', 'RESOLVED'];
 
 interface ConversationListProps {
   selectedId: string | null;
@@ -38,9 +32,31 @@ export interface ConversationListHandle {
   refetch: () => void;
 }
 
+/** Click-outside + Escape for a small popover. */
+function useDismiss(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', down);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
+  }, [open, onClose]);
+  return ref;
+}
+
+/**
+ * The chat list, shaped like WhatsApp's because that is the list everyone
+ * already knows: avatar, name, time, last message, unread count. CRM context
+ * (stage, owner, status) sits on a quiet third line only when it exists, and
+ * filtering collapses into chips plus one popover — it used to be four stacked
+ * rows of pills above the first conversation.
+ */
 const ConversationList = forwardRef<ConversationListHandle, ConversationListProps>(
   ({ selectedId, onSelect }, ref) => {
-    const { t } = useTranslation(['chat', 'common']);
+    const { t, i18n } = useTranslation(['chat', 'common']);
+    const locale = localeFor(i18n.language);
     const { data: session } = useSession();
 
     const SNOOZE_OPTIONS = [
@@ -50,17 +66,14 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
       { label: t('snooze.tomorrowMorning'), minutes: null, tomorrowMorning: true },
     ];
 
-    const VIEWS: { key: InboxView; label: string; icon: React.ElementType }[] = [
-      { key: 'all',        label: t('filterAll'),          icon: LayoutList },
-      { key: 'mine',       label: t('filterMine'),         icon: User },
-      { key: 'unassigned', label: t('details.unassigned'), icon: Inbox },
-    ];
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState<InboxView>('all');
+    const [unreadOnly, setUnreadOnly] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
     const [tagFilter, setTagFilter] = useState('');   // tag id, '' = all
-    const [snoozeMenu, setSnoozeMenu] = useState<string | null>(null); // conversationId
+    const [rowMenu, setRowMenu] = useState<string | null>(null); // conversationId
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const allTags = useTags();
 
     // ── Zustand store ─────────────────────────────────────────────────────────
@@ -75,7 +88,6 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     // ── Saved views (localStorage) ────────────────────────────────────────────
     interface SavedView { id: string; name: string; view: InboxView; status: string }
     const [savedViews, setSavedViews] = useState<SavedView[]>([]);
-    const [savingView, setSavingView] = useState(false);
     const [newViewName, setNewViewName] = useState('');
 
     useEffect(() => {
@@ -94,7 +106,6 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
       if (!name) return;
       persistViews([...savedViews, { id: Date.now().toString(), name, view: activeView, status: statusFilter }]);
       setNewViewName('');
-      setSavingView(false);
     }
     function removeSavedView(id: string) {
       persistViews(savedViews.filter((v) => v.id !== id));
@@ -102,6 +113,8 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     function applySavedView(v: SavedView) {
       setActiveView(v.view);
       setStatusFilter(v.status);
+      setUnreadOnly(false);
+      setFiltersOpen(false);
     }
 
     // ── Fetch ────────────────────────────────────────────────────────────────
@@ -195,17 +208,16 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     }, [typingStop]));
 
     // ── Actions ───────────────────────────────────────────────────────────────
-    async function togglePin(e: React.MouseEvent, conv: ConversationSummary) {
-      e.stopPropagation();
+    async function togglePin(conv: ConversationSummary) {
+      setRowMenu(null);
       try {
         await api.put(`/api/conversations/${conv.id}/pin`, { isPinned: !conv.isPinned });
         patchConversation(conv.id, { isPinned: !conv.isPinned });
       } catch { /* ignore */ }
     }
 
-    async function snooze(e: React.MouseEvent, conv: ConversationSummary, option: typeof SNOOZE_OPTIONS[0]) {
-      e.stopPropagation();
-      setSnoozeMenu(null);
+    async function snooze(conv: ConversationSummary, option: typeof SNOOZE_OPTIONS[0]) {
+      setRowMenu(null);
       let snoozedUntil: string;
       if (option.tomorrowMorning) {
         const d = new Date();
@@ -221,8 +233,8 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
       } catch { /* ignore */ }
     }
 
-    async function unsnooze(e: React.MouseEvent, conv: ConversationSummary) {
-      e.stopPropagation();
+    async function unsnooze(conv: ConversationSummary) {
+      setRowMenu(null);
       try {
         await api.put(`/api/conversations/${conv.id}/snooze`, { snoozedUntil: null });
         patchConversation(conv.id, { snoozedUntil: null, status: 'OPEN' });
@@ -231,180 +243,189 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
 
     const currentUserId = (session?.user as { id?: string } | undefined)?.id;
 
-    // Read from store, apply search + tag filters client-side
+    // Read from store, apply search + tag + unread filters client-side
     const sorted = storeOrder
       .map(id => storeConversations.get(id))
       .filter((c): c is ConversationSummary => {
         if (!c) return false;
-        // search filter
         if (search) {
           const name = String((c as any).contact?.name ?? '').toLowerCase();
           const phone = String((c as any).contact?.phone ?? '').toLowerCase();
           const q = search.toLowerCase();
           if (!name.includes(q) && !phone.includes(q)) return false;
         }
-        // tag filter — uses contactTags included by the backend
         if (tagFilter) {
           const ctags: any[] = (c as any).contact?.contactTags ?? [];
           if (!ctags.some((ct: any) => ct.tag?.id === tagFilter)) return false;
         }
+        if (unreadOnly && !((c.unreadCount ?? 0) > 0)) return false;
         return true;
       });
 
+    const activeChip: Chip = unreadOnly ? 'unread' : activeView;
+    const chips: { key: Chip; label: string }[] = [
+      { key: 'all', label: t('list.all') },
+      { key: 'unread', label: t('list.unread') },
+      { key: 'mine', label: t('list.mine') },
+      { key: 'unassigned', label: t('list.unassigned') },
+    ];
+    const selectChip = (k: Chip) => {
+      if (k === 'unread') { setUnreadOnly(true); setActiveView('all'); }
+      else { setUnreadOnly(false); setActiveView(k); }
+    };
+
+    const tagName = allTags.find((tg) => tg.id === tagFilter)?.name;
+    const filterCount = (statusFilter ? 1 : 0) + (tagFilter ? 1 : 0);
+    const closeFilters = useCallback(() => setFiltersOpen(false), []);
+    const filtersRef = useDismiss(filtersOpen, closeFilters);
+    const closeRowMenu = useCallback(() => setRowMenu(null), []);
+    const rowMenuRef = useDismiss(rowMenu !== null, closeRowMenu);
+    const totalUnread = sorted.reduce((n, c) => n + ((c.unreadCount ?? 0) > 0 ? 1 : 0), 0);
+
+    const menuItem = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-ink-2 hover:bg-raised hover:text-ink';
+
     return (
-      <div className="flex h-full flex-col bg-white dark:bg-[#111B21]">
-        {/* Search */}
-        <div className="border-b border-gray-200 dark:border-white/5 p-3">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:text-[#8696A0]" />
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-full border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:border-[#25D366] focus:outline-none focus:ring-2 focus:ring-[#25D366]/20"
-              />
-            </div>
+      <div className="flex h-full flex-col bg-surface">
+        {/* ── Header ── */}
+        <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4">
+          <h1 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink">
+            {t('list.inbox')}
+            {totalUnread > 0 && <span className="chip chip-brand tabular-nums">{totalUnread}</span>}
+          </h1>
+          <div className="relative" ref={filtersRef}>
             <button
               type="button"
-              title="Save current view"
-              onClick={() => setSavingView((v) => !v)}
-              className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-[#25D366] transition-colors"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+              aria-label={t('list.filters')}
+              title={t('list.filters')}
+              className={cn('btn btn-ghost btn-icon btn-sm relative', (filtersOpen || filterCount > 0) && 'bg-raised text-ink')}
             >
-              <Bookmark className="h-4 w-4" />
+              <SlidersHorizontal aria-hidden="true" />
+              {filterCount > 0 && <span className="absolute end-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />}
             </button>
-          </div>
-        </div>
-
-        {/* Inbox view tabs */}
-        <div className="flex border-b border-gray-200 dark:border-white/5 overflow-x-auto">
-          {VIEWS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => { setActiveView(key); setStatusFilter(''); }}
-              className={`flex flex-1 min-w-0 flex-col items-center gap-0.5 px-2 py-2.5 text-xs font-medium transition-colors ${
-                activeView === key
-                  ? 'border-b-2 border-[#25D366] text-[#25D366]'
-                  : 'text-gray-500 dark:text-[#8696A0] hover:text-gray-800 dark:hover:text-white'
-              }`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Status filter pills */}
-        <div className="flex gap-1.5 px-3 py-2 border-b border-gray-100 dark:border-white/5">
-          {['', ...STATUS_PILLS].map((s) => (
-            <button
-              key={s || 'ALL'}
-              type="button"
-              onClick={() => setStatusFilter(s)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                statusFilter === s
-                  ? 'bg-[#25D366] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#202C33] dark:text-[#8696A0] dark:hover:bg-[#2a3942]'
-              }`}
-            >
-              {s ? t(`details.statusOptions.${s}`) : t('filterAll')}
-            </button>
-          ))}
-        </div>
-
-        {/* Tag filter pills — only shown when tags exist */}
-        {allTags.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto px-3 py-2 border-b border-gray-100 dark:border-white/5">
-            {/* "All" chip */}
-            <button
-              type="button"
-              onClick={() => setTagFilter('')}
-              className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                !tagFilter
-                  ? 'bg-[#25D366] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#202C33] dark:text-[#8696A0] dark:hover:bg-[#2a3942]'
-              }`}
-            >
-              {t('filterAll')}
-            </button>
-            {allTags.map((tag) => {
-              const active = tagFilter === tag.id;
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => setTagFilter(active ? '' : tag.id)}
-                  className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                    active ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#202C33] dark:text-[#8696A0] dark:hover:bg-[#2a3942]'
-                  }`}
-                  style={active ? { backgroundColor: tag.color } : undefined}
+            <AnimatePresence>
+              {filtersOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.1 } }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute end-0 top-[calc(100%+6px)] z-40 w-72 rounded-xl bg-surface p-3 shadow-pop"
                 >
-                  <span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: active ? 'rgba(255,255,255,0.6)' : tag.color }}
-                  />
-                  {tag.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
+                  <p className="eyebrow mb-2">{t('list.status')}</p>
+                  <div className="seg w-full">
+                    {STATUS_OPTIONS.map((s) => (
+                      <button key={s || 'any'} type="button" data-active={statusFilter === s} onClick={() => setStatusFilter(s)} className="seg-item flex-1">
+                        {s ? t(`details.statusOptions.${s}`) : t('list.anyStatus')}
+                      </button>
+                    ))}
+                  </div>
 
-        {/* Saved views */}
-        {(savedViews.length > 0 || savingView) && (
-          <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 border-b border-gray-100 dark:border-white/5">
-            {savedViews.map((v) => (
-              <span
-                key={v.id}
-                className="group flex shrink-0 items-center gap-1 rounded-full bg-gray-100 dark:bg-[#202C33] px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:text-[#E9EDEF] cursor-pointer hover:bg-[#25D366]/10 transition-colors"
-                onClick={() => applySavedView(v)}
+                  {allTags.length > 0 && (
+                    <>
+                      <p className="eyebrow mb-2 mt-4">{t('list.tags')}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allTags.map((tag) => {
+                          const on = tagFilter === tag.id;
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => setTagFilter(on ? '' : tag.id)}
+                              className={cn(
+                                'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors',
+                                on ? 'border-transparent bg-ink text-surface' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink',
+                              )}
+                            >
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tag.color }} aria-hidden="true" />
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  <p className="eyebrow mb-2 mt-4">{t('list.savedViews')}</p>
+                  {savedViews.length > 0 && (
+                    <ul className="mb-2 space-y-0.5">
+                      {savedViews.map((v) => (
+                        <li key={v.id} className="group flex items-center gap-1 rounded-md hover:bg-raised">
+                          <button type="button" onClick={() => applySavedView(v)} className="flex flex-1 items-center gap-2 px-2 py-1.5 text-start text-[13px] text-ink-2">
+                            <Bookmark className="h-3.5 w-3.5 text-ink-4" aria-hidden="true" />
+                            <span className="truncate">{v.name}</span>
+                          </button>
+                          <button type="button" onClick={() => removeSavedView(v.id)} className="me-1 rounded p-1 text-ink-4 opacity-0 hover:text-red-500 group-hover:opacity-100" aria-label="Remove">
+                            <XIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex gap-1.5">
+                    <input
+                      value={newViewName}
+                      onChange={(e) => setNewViewName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addSavedView(); }}
+                      placeholder={t('list.viewName')}
+                      className="field field-sm flex-1"
+                    />
+                    <button type="button" onClick={addSavedView} disabled={!newViewName.trim()} className="btn btn-secondary btn-sm">
+                      {t('common:actions.save')}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* ── Search + quick chips ── */}
+        <div className="shrink-0 space-y-2.5 px-3 pb-2.5">
+          <SearchField value={search} onChange={setSearch} placeholder={t('searchPlaceholder')} inputClassName="border-transparent bg-raised hover:border-line focus:bg-surface" />
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+            {chips.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => selectChip(c.key)}
+                className={cn(
+                  'h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors duration-fast',
+                  activeChip === c.key ? 'bg-brand/12 text-brand' : 'bg-raised text-ink-2 hover:bg-overlay hover:text-ink',
+                )}
               >
-                <BookmarkCheck className="h-3 w-3 text-[#25D366]" />
-                {v.name}
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); removeSavedView(v.id); }}
-                  className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <XIcon className="h-3 w-3 text-gray-400 hover:text-red-500" />
-                </button>
-              </span>
+                {c.label}
+              </button>
             ))}
-            {savingView && (
-              <div className="flex shrink-0 items-center gap-1">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder={t('window.searchMessages')}
-                  value={newViewName}
-                  onChange={(e) => setNewViewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') addSavedView(); if (e.key === 'Escape') setSavingView(false); }}
-                  className="w-28 rounded-full border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-2.5 py-0.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-[#25D366]"
-                />
-                <button type="button" onClick={addSavedView} className="text-xs text-[#25D366] font-semibold hover:underline">{t('common:actions.save')}</button>
-                <button type="button" onClick={() => setSavingView(false)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
-              </div>
-            )}
           </div>
-        )}
+          {(statusFilter || tagFilter) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {statusFilter && (
+                <button type="button" onClick={() => setStatusFilter('')} className="chip chip-neutral h-6 gap-1 px-2">
+                  {t(`details.statusOptions.${statusFilter}`)} <XIcon className="h-3 w-3" aria-hidden="true" />
+                </button>
+              )}
+              {tagFilter && tagName && (
+                <button type="button" onClick={() => setTagFilter('')} className="chip chip-neutral h-6 gap-1 px-2">
+                  {tagName} <XIcon className="h-3 w-3" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* Conversation list — reserve the floating bottom-nav's footprint on
-            mobile (this pane owns its own scroll; the dashboard spacer can't
-            reach it). 0 on sm+, so the desktop split view is unaffected. */}
-        <div className="flex-1 overflow-y-auto pb-[var(--bottom-nav-space)]" dir="rtl">
-          <div dir="ltr">
-            {loading && sorted.length === 0 && <ConversationListSkeleton />}
+        {/* ── Rows ── own scroll; reserves the phone tab bar's footprint (0 on sm+). */}
+        <div className="flex-1 overflow-y-auto border-t border-line pb-[var(--bottom-nav-space)]">
+          {loading && sorted.length === 0 && <ConversationListSkeleton />}
 
-            {!loading && sorted.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center text-sm text-gray-500 dark:text-[#8696A0]">
-                <Inbox className="mb-3 h-8 w-8 opacity-40" />
-                <p className="font-medium">{t('noConversations')}</p>
-                <p className="mt-1 text-xs opacity-70">{t('noConversationsSubtitle')}</p>
-              </div>
-            )}
+          {!loading && sorted.length === 0 && (
+            search || filterCount || unreadOnly || activeView !== 'all'
+              ? <EmptyState compact icon={SearchX} title={t('list.noMatch')} description={t('list.noMatchSub')} />
+              : <EmptyState compact icon={Inbox} title={t('noConversations')} description={t('noConversationsSubtitle')} />
+          )}
 
+          <ul>
             {sorted.map((conv) => {
               const contact = (conv as any).contact ?? {};
               const displayName = contact.name || formatPhone(contact.phone || '');
@@ -412,187 +433,136 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
               const unread = conv.unreadCount ?? 0;
               const isSnoozed = Boolean(conv.snoozedUntil);
               const isTyping = (typingStore.get(conv.id)?.activeUserIds.size ?? 0) > 0;
+              const selected = selectedId === conv.id;
+              const assigneeName = (conv as any).assignedUser
+                ? (isAssignedToMe ? t('list.mine') : ((conv as any).assignedUser.name || (conv as any).assignedUser.email))
+                : null;
+              const meta = [
+                conv.pipeline ? t(`details.pipeline.${conv.pipeline}`, { defaultValue: conv.pipeline }) : null,
+                assigneeName,
+              ].filter(Boolean).join(' · ');
+              const showUnread = unread > 0 && !selected;
 
               return (
-                <div
-                  key={conv.id}
-                  onClick={() => onSelect(conv.id)}
-                  className={`group relative cursor-pointer border-b border-gray-100 dark:border-white/5 p-3 transition ${
-                    selectedId === conv.id
-                      ? 'bg-gray-100 dark:bg-[#202C33]'
-                      : 'hover:bg-gray-50 dark:hover:bg-[#202C33]/50'
-                  }`}
-                >
-                  {/* Pin indicator stripe */}
-                  {conv.isPinned && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#25D366] rounded-r" />
-                  )}
-
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
+                <li key={conv.id} className="relative">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelect(conv.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(conv.id); } }}
+                    aria-current={selected ? 'true' : undefined}
+                    className={cn(
+                      'group flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-start outline-none transition-colors duration-fast focus-visible:bg-raised',
+                      selected ? 'bg-raised' : 'hover:bg-raised/60',
+                    )}
+                  >
+                    {selected && <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-brand" aria-hidden="true" />}
                     <div className="relative shrink-0">
-                      <Avatar
-                        src={contact.customFields?.avatarUrl}
-                        name={displayName}
-                        contactId={contact.id}
-                        size={40}
-                        className="shadow-[0_2px_8px_rgba(37,211,102,0.2)]"
-                      />
+                      <Avatar src={contact.customFields?.avatarUrl} name={displayName} contactId={contact.id} size={44} />
                       {isSnoozed && (
-                        <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-400 ring-1 ring-white dark:ring-[#111B21]">
-                          <BellOff className="h-2.5 w-2.5 text-white" />
-                        </div>
+                        <span className="absolute -bottom-0.5 -end-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-surface">
+                          <BellOff className="h-2.5 w-2.5 text-white" aria-hidden="true" />
+                        </span>
                       )}
                     </div>
 
-                    {/* Content */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="flex items-center gap-1 truncate text-sm font-semibold text-gray-900 dark:text-white">
-                          {conv.isPinned && <Pin className="h-3 w-3 shrink-0 text-[#25D366]" />}
-                          {displayName.startsWith('+')
-                            ? <span dir="ltr">{'‎'}{displayName}</span>
-                            : <bdi>{displayName}</bdi>}
+                      <div className="flex items-baseline gap-2">
+                        <span className={cn('min-w-0 flex-1 truncate text-[14px] text-ink', showUnread ? 'font-semibold' : 'font-medium')}>
+                          {displayName.startsWith('+') ? <span dir="ltr">{displayName}</span> : <bdi>{displayName}</bdi>}
                         </span>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {unread > 0 && selectedId !== conv.id && (
-                            <span dir="ltr" className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#25D366] px-1 text-xs font-bold text-white">
+                        {conv.lastMessageAt && (
+                          <span className={cn('shrink-0 text-[11px] tabular-nums', showUnread ? 'font-semibold text-brand' : 'text-ink-4')}>
+                            {formatListTime(conv.lastMessageAt, locale, t('window.yesterday'))}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-0.5 flex items-center gap-2">
+                        {isTyping ? (
+                          <span className="flex min-w-0 flex-1 items-center gap-1 text-[13px] font-medium text-brand">
+                            {t('window.typing')}
+                            <span className="inline-flex gap-0.5" aria-hidden="true">
+                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:0ms]" />
+                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:150ms]" />
+                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:300ms]" />
+                            </span>
+                          </span>
+                        ) : (
+                          <span className={cn('min-w-0 flex-1 truncate text-[13px]', showUnread ? 'text-ink-2' : 'text-ink-3')}>
+                            <bdi>{(conv.lastMessagePreview ?? conv.lastMessage) || t('window.noMessages')}</bdi>
+                          </span>
+                        )}
+                        <span className="flex shrink-0 items-center gap-1">
+                          {conv.isPinned && <Pin className="h-3.5 w-3.5 rotate-45 text-ink-4" aria-hidden="true" />}
+                          {showUnread && (
+                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold tabular-nums text-brand-fg">
                               {unread > 99 ? '99+' : unread}
                             </span>
                           )}
-                          <span dir="ltr" className="text-xs text-gray-400 dark:text-[#8696A0]">
-                            {conv.lastMessageAt &&
-                              new Date(conv.lastMessageAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Last message / typing indicator */}
-                      {isTyping ? (
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-[#25D366]">
-                          <span className="inline-flex gap-0.5">
-                            <span className="h-1 w-1 animate-bounce rounded-full bg-[#25D366] [animation-delay:0ms]" />
-                            <span className="h-1 w-1 animate-bounce rounded-full bg-[#25D366] [animation-delay:150ms]" />
-                            <span className="h-1 w-1 animate-bounce rounded-full bg-[#25D366] [animation-delay:300ms]" />
-                          </span>
-                          {t('window.typing')}
-                        </p>
-                      ) : (
-                        <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-[#8696A0]">
-                          {(conv.lastMessagePreview ?? conv.lastMessage) || t('window.noMessages')}
-                        </p>
-                      )}
-
-                      {/* Snooze label */}
-                      {isSnoozed && (
-                        <p className="mt-0.5 text-xs text-orange-500">
-                          {t('common:time.today')} · <span dir="ltr">{new Date(conv.snoozedUntil!).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </p>
-                      )}
-
-                      {/* Badges */}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                            conv.status === 'OPEN'
-                              ? 'bg-[#25D366]/15 text-[#25D366]'
-                              : conv.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-200'
-                              : conv.status === 'ON_HOLD'
-                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-200'
-                              : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-[#8696A0]'
-                          }`}
-                        >
-                          {conv.status}
+                          {/* Row menu trigger — slides in on hover, like WhatsApp Web; always present on touch. */}
+                          <button
+                            type="button"
+                            aria-label={t('list.chatOptions')}
+                            onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === conv.id ? null : conv.id); }}
+                            className={cn(
+                              'flex h-5 w-5 items-center justify-center overflow-hidden rounded text-ink-3 transition-all duration-fast hover:text-ink',
+                              '[@media(hover:hover)]:w-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:w-5 [@media(hover:hover)]:group-hover:opacity-100',
+                              rowMenu === conv.id && '!w-5 !opacity-100',
+                            )}
+                          >
+                            <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          </button>
                         </span>
-
-                        {conv.pipeline && (
-                          <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${PIPELINE_COLORS[conv.pipeline] || 'bg-gray-100 text-gray-600'}`}>
-                            {conv.pipeline}
-                          </span>
-                        )}
-
-                        {isAssignedToMe && (
-                          <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                            {t('filterMine')}
-                          </span>
-                        )}
-
-                        {(conv as any).assignedUser && !isAssignedToMe && (
-                          <span className="truncate rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-white/10 dark:text-[#8696A0]">
-                            {(conv as any).assignedUser.name || (conv as any).assignedUser.email}
-                          </span>
-                        )}
-
-                        {(conv as any).assignedTeam && (
-                          <span className="truncate rounded-full bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-                            {(conv as any).assignedTeam.name}
-                          </span>
-                        )}
                       </div>
+
+                      {(meta || conv.status !== 'OPEN' || isSnoozed) && (
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-ink-4">
+                          {conv.status !== 'OPEN' && !isSnoozed && (
+                            <span className={cn('chip h-[18px]', conv.status === 'PENDING' ? 'chip-warn' : 'chip-neutral')}>
+                              {t(`details.statusOptions.${conv.status}`, { defaultValue: conv.status })}
+                            </span>
+                          )}
+                          {isSnoozed && (
+                            <span className="text-amber-700 dark:text-amber-400">
+                              {t('list.snoozedUntil', { time: new Date(conv.snoozedUntil!).toLocaleString(locale, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) })}
+                            </span>
+                          )}
+                          {meta && <span className="truncate">{meta}</span>}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Action buttons — visible on hover */}
-                  <div
-                    className="absolute right-2 bottom-2 hidden items-center gap-1 group-hover:flex"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Pin / Unpin */}
-                    <button
-                      type="button"
-                      title={conv.isPinned ? t('common:actions.unpin') : t('common:actions.pin')}
-                      onClick={(e) => togglePin(e, conv)}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
-                    >
-                      {conv.isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                    </button>
-
-                    {/* Snooze */}
-                    {isSnoozed ? (
-                      <button
-                        type="button"
-                        title="Unsnooze"
-                        onClick={(e) => unsnooze(e, conv)}
-                        className="rounded p-1 text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/15"
-                      >
-                        <BellOff className="h-3.5 w-3.5" />
+                  {rowMenu === conv.id && (
+                    <div ref={rowMenuRef} className="pop-enter absolute end-3 top-12 z-30 w-48 rounded-lg bg-surface p-1 shadow-pop">
+                      <button type="button" onClick={() => togglePin(conv)} className={menuItem}>
+                        {conv.isPinned ? <PinOff className="h-4 w-4 text-ink-3" /> : <Pin className="h-4 w-4 text-ink-3" />}
+                        {conv.isPinned ? t('list.unpin') : t('list.pin')}
                       </button>
-                    ) : (
-                      <div className="relative">
-                        <button
-                          type="button"
-                          title="Snooze"
-                          onClick={(e) => { e.stopPropagation(); setSnoozeMenu(snoozeMenu === conv.id ? null : conv.id); }}
-                          className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
-                        >
-                          <Clock className="h-3.5 w-3.5" />
+                      <div className="my-1 h-px bg-line" />
+                      {isSnoozed ? (
+                        <button type="button" onClick={() => unsnooze(conv)} className={menuItem}>
+                          <BellOff className="h-4 w-4 text-ink-3" />
+                          {t('list.unsnooze')}
                         </button>
-
-                        {snoozeMenu === conv.id && (
-                          <div className="absolute right-0 top-6 z-50 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-[#233038]">
-                            {SNOOZE_OPTIONS.map((opt) => (
-                              <button
-                                key={opt.label}
-                                type="button"
-                                onClick={(e) => snooze(e, conv, opt)}
-                                className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-white dark:hover:bg-white/10"
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      ) : (
+                        <>
+                          <p className="px-2.5 pb-1 pt-1.5 text-2xs font-medium text-ink-4">{t('list.snoozeFor')}</p>
+                          {SNOOZE_OPTIONS.map((opt) => (
+                            <button key={opt.label} type="button" onClick={() => snooze(conv, opt)} className={cn(menuItem, 'py-1.5')}>
+                              <Clock className="h-3.5 w-3.5 text-ink-4" />
+                              {opt.label}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       </div>
     );

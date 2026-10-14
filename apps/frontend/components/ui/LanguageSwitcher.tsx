@@ -28,24 +28,24 @@ export default function LanguageSwitcher({ variant = 'compact', className }: Lan
             className={cn(
               'flex items-center gap-3 rounded-xl border px-4 py-3 text-start transition-all duration-150',
               language === lang.code
-                ? 'border-[#25D366]/50 bg-[#25D366]/10 text-[#25D366]'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-[#25D366]/30 hover:bg-[#25D366]/5',
+                ? 'border-brand/50 bg-brand/10 text-brand'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-brand/30 hover:bg-brand/5',
               'dark:border-white/10 dark:bg-white/5 dark:text-white',
-              language === lang.code && 'dark:border-[#25D366]/40 dark:bg-[#25D366]/15 dark:text-[#25D366]',
+              language === lang.code && 'dark:border-brand/40 dark:bg-brand/15 dark:text-brand',
             )}
           >
             <span className="text-xl leading-none">{lang.flag}</span>
             <div className="flex-1">
               <div className="text-sm font-semibold">{lang.nativeLabel}</div>
               {lang.code === 'ar' && (
-                <div className="text-xs text-gray-500 dark:text-[#8696A0]">Arabic — RTL</div>
+                <div className="text-xs text-ink-3">Arabic — RTL</div>
               )}
               {lang.code === 'en' && (
-                <div className="text-xs text-gray-500 dark:text-[#8696A0]">English — LTR</div>
+                <div className="text-xs text-ink-3">English — LTR</div>
               )}
             </div>
             {language === lang.code && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#25D366] text-[10px] text-white font-bold">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] text-brand-fg font-bold">
                 ✓
               </span>
             )}
@@ -65,8 +65,8 @@ export default function LanguageSwitcher({ variant = 'compact', className }: Lan
         title={`Switch to ${next.nativeLabel}`}
         className={cn(
           'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors duration-150',
-          'border-gray-200 bg-white text-gray-600 hover:border-[#25D366]/30 hover:bg-[#25D366]/5 hover:text-[#25D366]',
-          'dark:border-white/5 dark:bg-white/5 dark:text-[#8696A0] dark:hover:border-[#25D366]/30 dark:hover:bg-[#25D366]/10 dark:hover:text-[#25D366]',
+          'border-gray-200 bg-white text-gray-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand',
+          'dark:border-white/5 dark:bg-white/5 dark:text-ink-3 dark:hover:border-brand/30 dark:hover:bg-brand/10 dark:hover:text-brand',
           className,
         )}
       >
@@ -86,8 +86,8 @@ export default function LanguageSwitcher({ variant = 'compact', className }: Lan
       aria-label={`Switch to ${next.nativeLabel}`}
       className={cn(
         'rounded-lg border p-2 transition-colors duration-150',
-        'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-[#25D366]',
-        'dark:border-white/5 dark:bg-transparent dark:text-[#8696A0] dark:hover:bg-white/8 dark:hover:text-[#25D366]',
+        'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-brand',
+        'dark:border-white/5 dark:bg-transparent dark:text-ink-3 dark:hover:bg-white/8 dark:hover:text-brand',
         className,
       )}
     >

@@ -127,25 +127,6 @@ export async function backfillLegacyRowsIntoDefault(tenantId: string): Promise<v
   // Every other tenant-scoped table: sweep null → default. (Setting is intentionally omitted.)
   await prismaUnscoped.team.updateMany({ where: { tenantId: null }, data: { tenantId } });
 
-  // WhatsAppSession.tenantId is @unique (one connection per tenant), so we can't
-  // bulk-assign several legacy rows to the same tenant. Attach only the most
-  // recently used session to the default tenant; leave any stale extras unattached
-  // (multiple null rows are allowed and reconnectAll ignores them).
-  const existingSession = await prismaUnscoped.whatsAppSession.findFirst({
-    where: { tenantId },
-    select: { id: true },
-  });
-  if (!existingSession) {
-    const primarySession = await prismaUnscoped.whatsAppSession.findFirst({
-      where: { tenantId: null },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true },
-    });
-    if (primarySession) {
-      await prismaUnscoped.whatsAppSession.update({ where: { id: primarySession.id }, data: { tenantId } });
-    }
-  }
-
   await prismaUnscoped.contact.updateMany({ where: { tenantId: null }, data: { tenantId } });
   await prismaUnscoped.customFieldDefinition.updateMany({ where: { tenantId: null }, data: { tenantId } });
   await prismaUnscoped.tag.updateMany({ where: { tenantId: null }, data: { tenantId } });

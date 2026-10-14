@@ -13,6 +13,7 @@ import { Input } from '../../../components/ui/input';
 import { TablePagination } from '../../../components/ui/TablePagination';
 import { Modal } from '../../../components/ui/modal';
 import { cn } from '../../../lib/utils';
+import { PageHeader } from '../../../components/ui/page';
 import { useSocket } from '../../../hooks/useSocket';
 import { useToast } from '../../../hooks/useToast';
 
@@ -37,9 +38,9 @@ type ContactOption = { id: string; name: string | null; phone: string };
 type MemberOption  = { id: string; name: string | null; email: string };
 
 const STATUS_STYLES: Record<TaskStatus, string> = {
-  OPEN:        'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-[#8696A0]',
+  OPEN:        'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-ink-3',
   IN_PROGRESS: 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300',
-  DONE:        'bg-green-100 text-green-700 dark:bg-[#25D366]/15 dark:text-[#25D366]',
+  DONE:        'bg-green-100 text-green-700 dark:bg-brand/15 dark:text-brand',
 };
 
 const STATUS_ICONS: Record<TaskStatus, React.ElementType> = {
@@ -47,7 +48,7 @@ const STATUS_ICONS: Record<TaskStatus, React.ElementType> = {
 };
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
-  LOW:    'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-[#8696A0]',
+  LOW:    'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-ink-3',
   MEDIUM: 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400',
   HIGH:   'bg-red-100 text-red-600 dark:bg-red-400/15 dark:text-red-400',
 };
@@ -73,8 +74,8 @@ function isOverdue(task: Task): boolean {
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
   return dir === 'asc'
-    ? <ArrowUp className="h-3 w-3 text-[#25D366]" />
-    : <ArrowDown className="h-3 w-3 text-[#25D366]" />;
+    ? <ArrowUp className="h-3 w-3 text-brand" />
+    : <ArrowDown className="h-3 w-3 text-brand" />;
 }
 
 export default function TasksPage() {
@@ -252,7 +253,7 @@ export default function TasksPage() {
       onClick={() => handleSort(k)}
       className={cn(
         'cursor-pointer select-none px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider transition-colors',
-        sortKey === k ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
+        sortKey === k ? 'text-brand' : 'text-ink-3 hover:text-ink',
         className,
       )}
     >
@@ -396,81 +397,60 @@ export default function TasksPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,211,102,0.08),transparent_40%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <CheckSquare className="h-3.5 w-3.5" />
-              {isAdmin ? t('allTeamTasks') : t('myTasks')}
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
-              {isAdmin ? t('adminSubtitle') : t('agentSubtitle')}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={filterStatus}
-              onChange={(e) => { setFilter(e.target.value as any); setPage(1); }}
-              className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
-            >
-              <option value="ALL">{t('filters.allStatuses')}</option>
-              <option value="OPEN">{t('status.OPEN')}</option>
-              <option value="IN_PROGRESS">{t('status.IN_PROGRESS')}</option>
-              <option value="DONE">{t('status.DONE')}</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setShowFilters((f) => !f)}
-              className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-sm transition-colors',
-                showFilters || advancedFilterCount > 0
-                  ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                  : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
-              )}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {t('common:actions.filter')}
-              {advancedFilterCount > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-slate-950">
-                  {advancedFilterCount}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setEditing(null); setShowForm(true); }}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-[#25D366]/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              {t('newTask')}
-            </button>
-          </div>
-        </div>
+      <PageHeader
+        title={t('title')}
+        description={isAdmin ? t('adminSubtitle') : t('agentSubtitle')}
+        actions={
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} className="btn btn-primary">
+            <Plus aria-hidden="true" />
+            {t('newTask')}
+          </button>
+        }
+      />
 
-        {/* Stats bar */}
-        <div className="relative mt-5 flex flex-wrap gap-4 border-t border-gray-100 dark:border-white/5 pt-4">
-          <StatChip icon={Circle}       label={t('status.OPEN')}        value={openCount}       className="text-[#8696A0]" />
-          <StatChip icon={Clock}        label={t('status.IN_PROGRESS')} value={inProgressCount} className="text-blue-400" />
-          <StatChip icon={CheckCircle2} label={t('status.DONE')}        value={doneCount}       className="text-[#25D366]" />
-          {overdueCount > 0 && (
-            <StatChip icon={Clock} label={t('overdue')} value={overdueCount} className="text-red-400" />
-          )}
+      {/* Status filter doubles as the count summary — one control, not two. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="seg max-w-full overflow-x-auto scrollbar-none">
+          {([
+            { key: 'ALL', label: t('filters.allStatuses'), count: openCount + inProgressCount + doneCount },
+            { key: 'OPEN', label: t('status.OPEN'), count: openCount },
+            { key: 'IN_PROGRESS', label: t('status.IN_PROGRESS'), count: inProgressCount },
+            { key: 'DONE', label: t('status.DONE'), count: doneCount },
+          ] as const).map((s) => (
+            <button key={s.key} type="button" data-active={filterStatus === s.key} onClick={() => { setFilter(s.key as any); setPage(1); }} className="seg-item">
+              {s.label}
+              <span className="tabular-nums text-ink-4">{s.count}</span>
+            </button>
+          ))}
         </div>
-      </section>
+        {overdueCount > 0 && <span className="chip chip-danger h-6 px-2">{overdueCount} {t('overdue')}</span>}
+        <span className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setShowFilters((f) => !f)}
+          aria-expanded={showFilters}
+          className={cn('btn btn-secondary', (showFilters || advancedFilterCount > 0) && 'border-brand/40 text-brand')}
+        >
+          <SlidersHorizontal aria-hidden="true" />
+          {t('common:actions.filter')}
+          {advancedFilterCount > 0 && (
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
+              {advancedFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* ── Advanced filter panel ── */}
       {showFilters && (
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] px-5 py-4">
+        <div className="rounded-xl border border-line bg-surface px-5 py-4">
           <div className="flex flex-wrap items-end gap-4">
             <div>
-              <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('filters.priority')}</p>
+              <p className="mb-1.5 text-xs font-medium text-ink-3">{t('filters.priority')}</p>
               <select
                 value={filterPriority}
                 onChange={(e) => { setFilterPriority(e.target.value as any); setPage(1); }}
-                className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                className="field w-auto"
               >
                 <option value="ALL">{t('filters.allPriorities')}</option>
                 <option value="HIGH">{t('priority.HIGH')}</option>
@@ -479,11 +459,11 @@ export default function TasksPage() {
               </select>
             </div>
             <div>
-              <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('filters.assignee')}</p>
+              <p className="mb-1.5 text-xs font-medium text-ink-3">{t('filters.assignee')}</p>
               <select
                 value={filterAssignee}
                 onChange={(e) => { setFilterAssignee(e.target.value); setPage(1); }}
-                className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                className="field w-auto"
               >
                 <option value="">{t('filters.allAssignees')}</option>
                 {members.map((m) => (
@@ -492,28 +472,28 @@ export default function TasksPage() {
               </select>
             </div>
             <div>
-              <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('filters.dueFrom')}</p>
+              <p className="mb-1.5 text-xs font-medium text-ink-3">{t('filters.dueFrom')}</p>
               <input
                 type="date"
                 value={dueFrom}
                 onChange={(e) => { setDueFrom(e.target.value); setPage(1); }}
-                className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                className="field w-auto"
               />
             </div>
             <div>
-              <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('filters.dueTo')}</p>
+              <p className="mb-1.5 text-xs font-medium text-ink-3">{t('filters.dueTo')}</p>
               <input
                 type="date"
                 value={dueTo}
                 onChange={(e) => { setDueTo(e.target.value); setPage(1); }}
-                className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                className="field w-auto"
               />
             </div>
             {advancedFilterCount > 0 && (
               <button
                 type="button"
                 onClick={clearAdvancedFilters}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-white/10 px-3 text-sm text-gray-500 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-ink-3 hover:bg-raised transition-colors"
               >
                 <X className="h-3.5 w-3.5" /> {t('filters.clear')}
               </button>
@@ -523,21 +503,21 @@ export default function TasksPage() {
       )}
 
       {/* ── Task table ── */}
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden">
 
         {/* Results info */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/10">
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
+          <p className="text-xs text-ink-3">
             {totalCount} {totalCount === 1 ? t('title').toLowerCase().replace(/s$/, '') : t('title').toLowerCase()}
             {selectedIds.size > 0 && (
-              <span className="ml-2 font-medium text-[#25D366]">· {selectedIds.size} selected</span>
+              <span className="ml-2 font-medium text-brand">· {selectedIds.size} selected</span>
             )}
           </p>
           {selectedIds.size > 0 && (
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="text-xs text-ink-3 hover:text-ink transition-colors"
             >
               {t('bulk.clearSelection')}
             </button>
@@ -547,7 +527,7 @@ export default function TasksPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33]">
+              <tr className="border-b border-line bg-raised">
                 <th scope="col" className="w-10 px-5 py-3.5">
                   <span className="sr-only">Select</span>
                   <input
@@ -555,37 +535,37 @@ export default function TasksPage() {
                     checked={allPageSelected}
                     ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                     onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                    className="h-4 w-4 cursor-pointer rounded border-white/20 accent-brand"
                   />
                 </th>
                 <SortTh k="title"    label={t('table.title')} />
                 <SortTh k="priority" label={t('table.priority')} />
-                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{t('table.contact')}</th>
-                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{t('table.assignedTo')}</th>
+                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-ink-3">{t('table.contact')}</th>
+                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-ink-3">{t('table.assignedTo')}</th>
                 <SortTh k="dueDate" label={t('table.dueDate')} />
                 <SortTh k="status"  label={t('table.status')} />
                 <th scope="col" className="px-5 py-3.5"><span className="sr-only">{t('table.actions')}</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody className="divide-y divide-line">
               {loading ? (
                 [...Array(4)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="px-5 py-4"><div className="h-4 w-4 rounded bg-gray-100 dark:bg-white/8" /></td>
                     <td className="px-5 py-4"><div className="h-4 w-48 rounded bg-gray-100 dark:bg-white/8" /></td>
                     <td className="px-5 py-4"><div className="h-5 w-16 rounded-full bg-gray-100 dark:bg-white/8" /></td>
-                    <td className="px-5 py-4"><div className="h-3 w-24 rounded bg-gray-50 dark:bg-white/5" /></td>
-                    <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-gray-50 dark:bg-white/5" /></td>
-                    <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-gray-50 dark:bg-white/5" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-24 rounded bg-raised" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-raised" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-raised" /></td>
                     <td className="px-5 py-4"><div className="h-6 w-24 rounded-full bg-gray-100 dark:bg-white/8" /></td>
-                    <td className="px-5 py-4"><div className="h-7 w-20 rounded bg-gray-50 dark:bg-white/5" /></td>
+                    <td className="px-5 py-4"><div className="h-7 w-20 rounded bg-raised" /></td>
                   </tr>
                 ))
               ) : paginatedTasks.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-16 text-center">
-                    <CheckSquare className="mx-auto mb-3 h-8 w-8 text-gray-400 dark:text-[#8696A0]/30" />
-                    <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                    <CheckSquare className="mx-auto mb-3 h-8 w-8 text-ink-4/30" />
+                    <p className="text-sm text-ink-3">
                       {filterStatus === 'ALL' && advancedFilterCount === 0
                         ? t('noTasks')
                         : t('noResults')}
@@ -594,7 +574,7 @@ export default function TasksPage() {
                       <button
                         type="button"
                         onClick={() => { setFilter('ALL'); clearAdvancedFilters(); }}
-                        className="mt-2 text-xs text-[#25D366] hover:underline"
+                        className="mt-2 text-xs text-brand hover:underline"
                       >
                         {t('clearAllFilters')}
                       </button>
@@ -608,8 +588,8 @@ export default function TasksPage() {
                     <tr
                       key={task.id}
                       className={cn(
-                        'group transition-colors hover:bg-gray-50 dark:hover:bg-white/3',
-                        selectedIds.has(task.id) && 'bg-[#25D366]/8',
+                        'group transition-colors hover:bg-raised/60',
+                        selectedIds.has(task.id) && 'bg-brand/8',
                       )}
                     >
                       <td className="w-10 px-5 py-3.5">
@@ -617,15 +597,15 @@ export default function TasksPage() {
                           type="checkbox"
                           checked={selectedIds.has(task.id)}
                           onChange={() => toggleSelect(task.id)}
-                          className="h-4 w-4 cursor-pointer rounded border-white/20 accent-[#25D366]"
+                          className="h-4 w-4 cursor-pointer rounded border-white/20 accent-brand"
                         />
                       </td>
                       <td className="px-5 py-3.5 max-w-[240px]">
-                        <p className={cn('text-sm font-medium text-gray-900 dark:text-white', overdue && 'text-red-300')}>
+                        <p className={cn('text-sm font-medium text-ink', overdue && 'text-red-300')}>
                           {task.title}
                         </p>
                         {task.description && (
-                          <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-[#8696A0]">{task.description}</p>
+                          <p className="mt-0.5 truncate text-xs text-ink-3">{task.description}</p>
                         )}
                         {overdue && (
                           <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-red-400">
@@ -639,13 +619,13 @@ export default function TasksPage() {
                           {t(`priority.${task.priority ?? 'MEDIUM'}`)}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8696A0]">
+                      <td className="px-5 py-3.5 text-sm text-ink-3">
                         {task.contact?.name || task.contact?.phone || '—'}
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8696A0]">
+                      <td className="px-5 py-3.5 text-sm text-ink-3">
                         {task.assignee?.name || task.assignee?.email || '—'}
                       </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8696A0]">
+                      <td className="px-5 py-3.5 text-sm text-ink-3">
                         {task.dueDate
                           ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                           : '—'}
@@ -654,8 +634,8 @@ export default function TasksPage() {
                         {confirmDeleteId === task.id ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-red-300">{t('deleteConfirm.inline')}</span>
-                            <button type="button" onClick={() => handleDelete(task.id)} className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600 transition-colors">{t('deleteConfirm.yes')}</button>
-                            <button type="button" onClick={() => setConfirmDeleteId(null)} className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-2.5 py-1 text-xs text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">{t('deleteConfirm.no')}</button>
+                            <button type="button" onClick={() => handleDelete(task.id)} className="btn btn-sm bg-red-600 text-white hover:bg-red-700">{t('deleteConfirm.yes')}</button>
+                            <button type="button" onClick={() => setConfirmDeleteId(null)} className="btn btn-secondary btn-sm">{t('deleteConfirm.no')}</button>
                           </div>
                         ) : (
                           <select
@@ -675,7 +655,7 @@ export default function TasksPage() {
                             <button
                               type="button"
                               onClick={() => { setEditing(task); setShowForm(true); }}
-                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] px-2.5 py-1.5 text-xs text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                              className="btn btn-secondary btn-sm inline-flex"
                             >
                               <Pencil className="h-3 w-3" /> {t('common:actions.edit')}
                             </button>
@@ -710,8 +690,8 @@ export default function TasksPage() {
 
       {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
+        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white dark:bg-raised px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+          <span className="text-sm font-medium text-ink">
             {selectedIds.size} {selectedIds.size === 1 ? t('title').toLowerCase().replace(/s$/, '') : t('title').toLowerCase()} selected
           </span>
           <div className="h-5 w-px bg-gray-200 dark:bg-white/15" />
@@ -719,7 +699,7 @@ export default function TasksPage() {
           {/* Bulk status change */}
           {bulkStatusTarget ? (
             <>
-              <span className="text-xs text-gray-500 dark:text-[#8696A0]">
+              <span className="text-xs text-ink-3">
                 {t('bulk.markAsConfirm', { status: t(`status.${bulkStatusTarget}`) })}
               </span>
               <button
@@ -732,7 +712,7 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => setBulkStatusTarget(null)}
-                className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 {t('bulk.cancel')}
               </button>
@@ -744,14 +724,14 @@ export default function TasksPage() {
                 type="button"
                 onClick={handleBulkDelete}
                 disabled={bulkDeleting}
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {bulkDeleting ? t('bulk.deleting') : t('bulk.yesDelete')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowBulkConfirm(false)}
-                className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 {t('bulk.cancel')}
               </button>
@@ -761,7 +741,7 @@ export default function TasksPage() {
               <select
                 value=""
                 onChange={(e) => e.target.value && setBulkStatusTarget(e.target.value as TaskStatus)}
-                className="h-7 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-2 text-xs text-gray-500 dark:text-[#8696A0] outline-none"
+                className="h-7 rounded-lg border border-line bg-gray-50 dark:bg-surface px-2 text-xs text-ink-3 outline-none"
               >
                 <option value="">{t('bulk.markAs')}</option>
                 <option value="OPEN">{t('status.OPEN')}</option>
@@ -780,7 +760,7 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 {t('common:actions.deselectAll')}
               </button>
@@ -795,16 +775,16 @@ export default function TasksPage() {
         onClose={() => { setShowForm(false); setEditing(null); }}
         aria-label={editingTask ? t('form.editTitle') : t('form.createTitle')}
         overlayClassName="bg-black/75"
-        className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.4)]"
+        className="w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-pop"
       >
           <form onSubmit={handleSubmit}>
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{editingTask ? t('form.editTitle') : t('form.createTitle')}</h2>
+              <h2 className="text-xl font-semibold text-ink">{editingTask ? t('form.editTitle') : t('form.createTitle')}</h2>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditing(null); }}
                 aria-label={tc('actions.close')}
-                className="rounded-lg p-1.5 text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="rounded-lg p-1.5 text-ink-3 hover:bg-raised hover:text-ink transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -812,7 +792,7 @@ export default function TasksPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.taskTitle')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.taskTitle')}</label>
                 <Input
                   required
                   value={formData.title}
@@ -821,21 +801,21 @@ export default function TasksPage() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.description')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.description')}</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   placeholder={t('form.descriptionPlaceholder')}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors placeholder:text-gray-400 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50 dark:placeholder:text-[#8696A0]/50"
+                  className="field w-full resize-none transition-colors"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.contact')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.contact')}</label>
                 <select
                   value={formData.contactId}
                   onChange={(e) => setFormData({ ...formData, contactId: e.target.value })}
-                  className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-10 w-full transition-colors"
                 >
                   <option value="">{t('form.noContact')}</option>
                   {contacts.map((c) => <option key={c.id} value={c.id}>{c.name || c.phone}</option>)}
@@ -843,11 +823,11 @@ export default function TasksPage() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.priority')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.priority')}</label>
                   <select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value as TaskPriority })}
-                    className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                    className="field h-10 w-full transition-colors"
                   >
                     <option value="LOW">{t('priority.LOW')}</option>
                     <option value="MEDIUM">{t('priority.MEDIUM')}</option>
@@ -855,11 +835,11 @@ export default function TasksPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.status')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.status')}</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
-                    className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                    className="field h-10 w-full transition-colors"
                   >
                     <option value="OPEN">{t('status.OPEN')}</option>
                     <option value="IN_PROGRESS">{t('status.IN_PROGRESS')}</option>
@@ -867,7 +847,7 @@ export default function TasksPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.dueDate')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.dueDate')}</label>
                   <Input
                     type="date"
                     value={formData.dueDate}
@@ -876,11 +856,11 @@ export default function TasksPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('form.assignedTo')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('form.assignedTo')}</label>
                 <select
                   value={formData.assigneeId}
                   onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
-                  className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-10 w-full transition-colors"
                 >
                   <option value="">{t('form.unassigned')}</option>
                   {members.map((m) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
@@ -892,14 +872,14 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditing(null); }}
-                className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="btn btn-secondary"
               >
                 {t('form.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-xl bg-[#25D366] px-5 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50 hover:bg-[#25D366]/90 transition-colors"
+                className="btn btn-primary disabled:opacity-50"
               >
                 {saving ? t('form.saving') : editingTask ? t('form.updateTask') : t('form.createTask')}
               </button>
@@ -926,7 +906,7 @@ function StatChip({
   return (
     <div className="flex items-center gap-2">
       <Icon className={cn('h-3.5 w-3.5', className)} />
-      <span className="text-xs text-[#8696A0]">{label}</span>
+      <span className="text-xs text-ink-3">{label}</span>
       <span className={cn('text-sm font-bold', className)}>{value}</span>
     </div>
   );

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { batchProgress } from '../../lib/smart-sending';
-import { RISK_STYLES, riskLabel, type PreflightReport, type RiskLevel } from '../../lib/preflight';
+import { type PreflightReport } from '../../lib/preflight';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,6 @@ export interface BroadcastSummary {
   // ── Deliverability ─────────────────────────────────────────────────────────
   /** 0–100 pre-flight risk. Higher is riskier. Null on campaigns saved before it existed. */
   riskScore?: number | null;
-  riskLevel?: RiskLevel | null;
   pacingProfile?: string | null;
   /** Set when the circuit breaker paused the run rather than a person. */
   healthPausedAt?: string | null;
@@ -106,13 +105,13 @@ export const MEDIA_ICONS: Record<string, typeof ImageIcon> = {
 };
 
 export const STATUS_STYLES: Record<string, string> = {
-  DRAFT:     'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-[#8696A0]',
+  DRAFT:     'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-ink-3',
   SCHEDULED: 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300',
   SENDING:   'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
   PAUSED:    'bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300',
-  SENT:      'bg-green-100 text-green-700 dark:bg-[#25D366]/15 dark:text-[#25D366]',
+  SENT:      'bg-green-100 text-green-700 dark:bg-brand/15 dark:text-brand',
   FAILED:    'bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-300',
-  CANCELLED: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-[#8696A0]/80',
+  CANCELLED: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-ink-3/80',
 };
 
 export const STATUS_DOTS: Record<string, string> = {
@@ -120,7 +119,7 @@ export const STATUS_DOTS: Record<string, string> = {
   SCHEDULED: 'bg-blue-400',
   SENDING:   'bg-amber-400 animate-pulse',
   PAUSED:    'bg-orange-400',
-  SENT:      'bg-[#25D366]',
+  SENT:      'bg-brand',
   FAILED:    'bg-red-400',
   CANCELLED: 'bg-gray-400',
 };
@@ -153,24 +152,24 @@ export function StatusPill({ status, size = 'sm' }: { status: string; size?: 'sm
  * existed. A badge on every row would be wallpaper; a badge on the two rows that
  * deserve attention is a signal.
  */
-export function RiskBadge({ level, score, size = 'sm' }: { level?: RiskLevel | null; score?: number | null; size?: 'sm' | 'md' }) {
-  const { t } = useTranslation('broadcasts');
-  if (!level || level === 'LOW') return null;
-
-  const style = RISK_STYLES[level];
+/**
+ * Whether a campaign can be sent. This replaced a 0-100 risk score that was an
+ * inference about an unofficial transport; on the official API a campaign is
+ * either blocked by something specific or it is not.
+ */
+export function RiskBadge({ canSend, size = 'sm' }: { canSend?: boolean | null; size?: 'sm' | 'md' }) {
+  if (canSend == null) return null;
   return (
     <span
-      className={cn(
-        'inline-flex shrink-0 items-center gap-1 rounded-full border font-medium',
+      className={[
+        'inline-flex items-center rounded-full font-semibold',
         size === 'md' ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-[10px]',
-        style.ring,
-        style.bg,
-        style.text,
-      )}
-      title={typeof score === 'number' ? `Risk score ${score}/100` : undefined}
+        canSend
+          ? 'bg-brand/15 text-brand dark:text-brand'
+          : 'bg-red-500/10 text-red-600 dark:text-red-300',
+      ].join(' ')}
     >
-      <ShieldAlert className={size === 'md' ? 'h-3.5 w-3.5' : 'h-2.5 w-2.5'} />
-      {t(`risk.${level}`, { defaultValue: riskLabel(level) })}
+      {canSend ? 'Ready' : 'Blocked'}
     </span>
   );
 }
@@ -298,7 +297,7 @@ export function IconButton({
         'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40',
         danger
           ? 'border-red-400/20 bg-red-400/8 text-red-500 hover:bg-red-400/15 dark:text-red-400'
-          : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white',
+          : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-ink-3 dark:hover:bg-white/10 dark:hover:text-white',
       )}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -399,7 +398,7 @@ export function BroadcastActions({
         <button
           type="button"
           onClick={onConfirmDelete}
-          className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-600"
+          className="btn btn-sm bg-red-600 text-white hover:bg-red-700"
         >
           {live ? t('deleteConfirm.liveConfirm', { defaultValue: 'Stop & delete' }) : t('common:yes')}
         </button>
@@ -455,7 +454,7 @@ export function BroadcastActions({
         onClick={onSend}
         disabled={sending}
         title={label}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[#25D366] px-2.5 text-xs font-semibold text-slate-950 transition-colors hover:bg-[#25D366]/90 disabled:opacity-50"
+        className="btn btn-primary btn-sm inline-flex shrink-0 disabled:opacity-50"
       >
         {sending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <Send className="h-3.5 w-3.5 shrink-0" />}
         <span className={labelCls}>{label}</span>
@@ -576,10 +575,10 @@ export function SmartBatchProgress({ broadcast, now }: { broadcast: BroadcastSum
                 className={cn(
                   'flex h-5 min-w-[1.25rem] items-center justify-center rounded text-[10px] font-semibold tabular-nums',
                   isDone
-                    ? 'bg-[#25D366]/20 text-[#25D366]'
+                    ? 'bg-brand/20 text-brand'
                     : isCurrent
                       ? 'bg-amber-400/20 text-amber-500 dark:text-amber-300'
-                      : 'bg-gray-200 text-gray-400 dark:bg-white/8 dark:text-[#8696A0]/70',
+                      : 'bg-gray-200 text-gray-400 dark:bg-white/8 dark:text-ink-3/70',
                 )}
               >
                 {isDone ? <Check className="h-3 w-3" /> : n}
@@ -588,9 +587,9 @@ export function SmartBatchProgress({ broadcast, now }: { broadcast: BroadcastSum
           })}
         </div>
       ) : (
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-overlay">
           <div
-            className="h-full rounded-full bg-[#25D366] transition-all"
+            className="h-full rounded-full bg-brand transition-all"
             style={{ width: `${numBatches ? Math.max(0, current - 1) / numBatches * 100 : 0}%` }}
           />
         </div>

@@ -47,21 +47,14 @@ export default function SettingsPage() {
     sectionParam && validSections.includes(sectionParam) ? sectionParam : 'whatsapp',
   );
 
-  // ── WhatsApp state ────────────────────────────────────────────────────────
+  // ── WhatsApp channel ──────────────────────────────────────────────────────
   //
-  // The pairing half (QR, expired-pairing flag, refresh) comes from the shell's
-  // shared handshake. This page used to run its own, which meant its "New QR
-  // code" button issued a second `POST /connect` against a socket the shared one
-  // was already pairing — each wiping the other's credentials mid-handshake.
-  // What stays local is everything the shared connector has no concept of:
-  // warm-up, session reset, and the detailed error read-out.
-  const { refreshQr } = useWhatsAppConnection();
-  const [status, setStatus]               = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
-  const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
-  const [whatsAppError, setWhatsAppError] = useState<string>('');
-  const [waLoading, setWaLoading]         = useState(false);
-  const [warmupEnabled, setWarmupEnabled] = useState(false);
-  const [warmupSaving, setWarmupSaving]   = useState(false);
+  // Status is read from the app-wide connector. There is no pairing handshake to
+  // own here any more: connecting is done in the wizard below, and everything
+  // this page used to manage locally — QR refresh, warm-up, session reset — was
+  // a property of the unofficial socket and no longer exists.
+  const { status, connectedPhone, verifiedName, configured, health, error: whatsAppError, refresh } =
+    useWhatsAppConnection();
 
   // ── Password change state ──────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword]   = useState('');
@@ -73,89 +66,6 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword]   = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // ── Fetchers ──────────────────────────────────────────────────────────────
-  const fetchStatus = useCallback(async () => {
-    try {
-      const data = await api.get('/api/whatsapp/status');
-      setStatus(data.status);
-      setConnectedPhone(data.connectedPhone ?? null);
-      if (typeof data.session?.warmupEnabled === 'boolean') {
-        setWarmupEnabled(data.session.warmupEnabled);
-      }
-      const e = data?.error;
-      if (e?.statusCode || e?.reason || e?.message) {
-        const parts = [
-          e.statusCode ? `Status ${e.statusCode}` : null,
-          e.reason     ? `Reason ${e.reason}` : null,
-          e.message    ? e.message : null,
-        ].filter(Boolean);
-        setWhatsAppError(parts.join(' — '));
-      } else {
-        setWhatsAppError('');
-      }
-    } catch (err) {
-      setWhatsAppError(err instanceof Error ? err.message : 'Failed to fetch status');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (sessionStatus === 'loading' || sessionStatus !== 'authenticated') return;
-    fetchStatus();
-    const iv = setInterval(fetchStatus, 5000);
-    return () => clearInterval(iv);
-  }, [sessionStatus, fetchStatus]);
-
-  useSocket('wa:status', fetchStatus);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  //
-  // Anything that starts a pairing goes through the shared connector's
-  // `refreshQr`, so this page can never be handshaking against a socket the rest
-  // of the shell is already pairing with.
-  const handleConnect = async () => {
-    setWaLoading(true);
-    try {
-      setWhatsAppError('');
-      setStatus('connecting');
-      await refreshQr();
-      await fetchStatus();
-    } catch (err) {
-      setWhatsAppError(err instanceof Error ? err.message : 'Failed to connect');
-    } finally { setWaLoading(false); }
-  };
-
-  const handleDisconnect = async () => {
-    setWaLoading(true);
-    try {
-      await api.post('/api/whatsapp/disconnect', {});
-      setStatus('disconnected');
-      setConnectedPhone(null);
-    } catch {} finally { setWaLoading(false); }
-  };
-
-  const handleWarmupToggle = async (enabled: boolean) => {
-    setWarmupSaving(true);
-    try {
-      await api.patch('/api/whatsapp/session-settings', { warmupEnabled: enabled });
-      setWarmupEnabled(enabled);
-    } catch {} finally { setWarmupSaving(false); }
-  };
-
-  const handleResetSession = async () => {
-    setWaLoading(true);
-    try {
-      setWhatsAppError('');
-      setStatus('disconnected');
-      setConnectedPhone(null);
-      await api.post('/api/whatsapp/reset-auth', {});
-      await refreshQr();
-      setStatus('connecting');
-      await fetchStatus();
-    } catch (err) {
-      setWhatsAppError(err instanceof Error ? err.message : 'Failed to reset');
-    } finally { setWaLoading(false); }
-  };
 
   // ── Password change handler ───────────────────────────────────────────────
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -216,150 +126,87 @@ export default function SettingsPage() {
 
   // ── Content renderers ─────────────────────────────────────────────────────
   function WhatsAppSection() {
-    const statusConfig = {
-      connected:    { color: 'text-[#25D366]', bg: 'bg-[#25D366]/10', border: 'border-[#25D366]/30', dot: 'bg-[#25D366]', icon: Wifi },
-      // Not red. Having no number linked is a setup step, not a fault — and this
-      // card sits directly above the form that resolves it.
-      disconnected: { color: 'text-gray-600 dark:text-[#8696A0]', bg: 'bg-gray-100 dark:bg-white/5', border: 'border-gray-200 dark:border-white/10', dot: 'bg-gray-400', icon: WifiOff },
-      connecting:   { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', dot: 'bg-amber-400', icon: RefreshCw },
-    }[status];
-
-    const StatusIcon = statusConfig.icon;
-
     return (
       <div className="space-y-4">
-        {/* Status card */}
-        <div className={cn('rounded-2xl border p-5', statusConfig.bg, statusConfig.border)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', statusConfig.bg, 'border', statusConfig.border)}>
-                <StatusIcon className={cn('h-5 w-5', statusConfig.color, status === 'connecting' && 'animate-spin')} />
-              </div>
-              <div>
-                <p className={cn('font-semibold', statusConfig.color)}>
-                  {t(`whatsapp.status.${status}`)}
+        {/* Meta reports the number's health; there is nothing else to configure.
+            The old block here held pairing status, QR linking, warm-up and
+            session reset — all of which were properties of running an
+            unofficial WhatsApp Web socket, and none of which exist on the
+            official API. */}
+        {configured && (
+          <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-raised">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">
+                  {status === 'connected' ? 'Connected' : 'Not sending'}
                 </p>
-                {status === 'connected' && connectedPhone && (
-                  <p className="text-xs text-gray-500 mt-0.5 font-mono dark:text-[#8696A0]">{connectedPhone}</p>
+                {connectedPhone && (
+                  <p className="mt-0.5 font-mono text-sm text-ink-3">{connectedPhone}</p>
                 )}
-                {status === 'disconnected' && (
-                  <p className="text-xs text-gray-500 mt-0.5 dark:text-[#8696A0]">{t('whatsapp.noQR')}</p>
+                {verifiedName && (
+                  <p className="mt-0.5 text-xs text-ink-3">Verified as “{verifiedName}”</p>
                 )}
               </div>
-            </div>
-            <span className="relative flex h-2.5 w-2.5">
-              {status === 'connected' && (
-                <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-75', statusConfig.dot)} />
-              )}
-              <span className={cn('relative inline-flex h-2.5 w-2.5 rounded-full', statusConfig.dot)} />
-            </span>
-          </div>
-        </div>
-
-        {/* Error — friendly, actionable explanation. Action is hidden since the
-            connect controls live right here on this page.
-            Suppressed while connected-less by design: the server no longer
-            reports pairing-cycle closes as account errors, and anything left is
-            worth reading. */}
-        {whatsAppError && (
-          <FriendlyError error={whatsAppError} hideAction compact onRetry={handleConnect} />
-        )}
-
-        {/* Linking — the same panel the dashboard and the connect popup render,
-            so both routes (scan, or type a code) behave identically wherever the
-            user happens to be looking. */}
-        {status !== 'connected' && (
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-white/10 dark:bg-[#202C33]">
-            {/* Not "scan this QR code" — on a phone there is no QR on screen to
-                scan, and the panel decides which route to offer. */}
-            <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">
-              {t('whatsapp.linkTitle', { defaultValue: 'Connect your WhatsApp' })}
-            </p>
-            <p className="mb-4 text-xs leading-relaxed text-gray-500 dark:text-[#8696A0]">
-              {t('whatsapp.linkBody', {
-                defaultValue: "Enter your number and we'll give you a code to type into WhatsApp.",
-              })}
-            </p>
-            <WhatsAppLinkPanel size="lg" />
-          </div>
-        )}
-
-        {/* Warm-up toggle */}
-        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-[#202C33]">
-          <div className="flex items-start gap-3">
-            <div className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-              warmupEnabled
-                ? 'bg-amber-500/15 text-amber-500'
-                : 'bg-[#25D366]/10 text-[#25D366]',
-            )}>
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('whatsapp.warmup.label')}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-[#8696A0]">{t('whatsapp.warmup.description')}</p>
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={warmupEnabled}
-                  disabled={warmupSaving}
-                  onClick={() => handleWarmupToggle(!warmupEnabled)}
-                  className={cn(
-                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50 disabled:opacity-50 disabled:cursor-not-allowed',
-                    warmupEnabled ? 'bg-amber-500' : 'bg-gray-200 dark:bg-white/20',
-                  )}
-                >
-                  <span className={cn(
-                    'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200',
-                    warmupEnabled ? 'translate-x-5' : 'translate-x-0.5',
-                  )} />
-                </button>
-                <span className={cn(
-                  'text-xs font-medium',
-                  warmupEnabled ? 'text-amber-500' : 'text-[#25D366]',
-                )}>
-                  {warmupSaving ? t('whatsapp.warmup.saving') : warmupEnabled ? t('whatsapp.warmup.on') : t('whatsapp.warmup.off')}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 pt-1">
-          {status !== 'connected' && (
-            <>
-              <Button
-                onClick={handleConnect}
-                disabled={waLoading || status === 'connecting'}
-                className="gap-2 bg-[#25D366] text-black hover:bg-[#128C7E] hover:text-white"
+              <span
+                className={cn(
+                  'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
+                  status === 'connected'
+                    ? 'bg-brand/15 text-brand dark:text-brand'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-300',
+                )}
               >
-                <Wifi className="h-4 w-4" />
-                {t('whatsapp.connect')}
-              </Button>
-              <Button
-                onClick={handleResetSession}
-                disabled={waLoading}
-                variant="outline"
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {t('whatsapp.resetSession')}
-              </Button>
-            </>
-          )}
-          {status === 'connected' && (
-            <Button
-              onClick={handleDisconnect}
-              disabled={waLoading}
-              variant="destructive"
-              className="gap-2"
+                {status === 'connected' ? 'Live' : 'Offline'}
+              </span>
+            </div>
+
+            {/* Meta's own signals. Shown because a falling quality rating is the
+                only advance warning before Meta limits or restricts a number. */}
+            {health && (
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 dark:border-white/5">
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wide text-ink-4">Quality</dt>
+                  <dd
+                    className={cn(
+                      'mt-0.5 text-sm font-semibold',
+                      health.qualityRating === 'GREEN' && 'text-brand dark:text-brand',
+                      health.qualityRating === 'YELLOW' && 'text-amber-500',
+                      health.qualityRating === 'RED' && 'text-red-500',
+                      health.qualityRating === 'UNKNOWN' && 'text-ink-3',
+                    )}
+                  >
+                    {health.qualityRating === 'UNKNOWN' ? 'Not rated yet' : health.qualityRating}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wide text-ink-4">Daily limit</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-ink">
+                    {health.messagingLimit
+                      ? health.messagingLimit.replace('TIER_', '').replace('UNLIMITED', 'Unlimited')
+                      : '—'}
+                  </dd>
+                </div>
+              </dl>
+            )}
+
+            {whatsAppError && (
+              <p className="mt-3 rounded-xl bg-red-500/10 p-2.5 text-[11px] text-red-700 dark:text-red-300">
+                {whatsAppError}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="mt-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline dark:text-ink-3"
             >
-              <WifiOff className="h-4 w-4" />
-              {t('whatsapp.disconnect')}
-            </Button>
-          )}
+              Re-check now
+            </button>
+          </div>
+        )}
+
+        {/* The connect / update-credentials wizard. */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-raised">
+          <WhatsAppLinkPanel size="md" />
         </div>
       </div>
     );
@@ -373,13 +220,13 @@ export default function SettingsPage() {
     return (
       <div className="space-y-5">
         {/* Profile card */}
-        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 flex items-center gap-4 dark:border-white/10 dark:bg-[#202C33]">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-lg font-bold text-white shadow-[0_4px_12px_rgba(37,211,102,0.3)]">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 flex items-center gap-4 dark:border-white/10 dark:bg-raised">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-bold text-white shadow-[0_4px_12px_rgba(37,211,102,0.3)]">
             {initials(name, email)}
           </div>
           <div className="min-w-0 flex-1">
-            {name && <p className="truncate text-base font-semibold text-gray-900 dark:text-white">{name}</p>}
-            <p className="truncate text-sm text-gray-500 dark:text-[#8696A0]">{email}</p>
+            {name && <p className="truncate text-base font-semibold text-ink">{name}</p>}
+            <p className="truncate text-sm text-ink-3">{email}</p>
             <span className={cn('mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide', SIMPLE_ROLE_BADGE[toSimpleRole(role)])}>
               {t(`team.roles.${toSimpleRole(role)}`, { defaultValue: SIMPLE_ROLE_LABEL[toSimpleRole(role)] })}
             </span>
@@ -387,9 +234,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Sign out */}
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
-          <p className="mb-3 text-sm font-medium text-gray-900 dark:text-white">{t('account.signOutConfirm.title')}</p>
-          <p className="mb-4 text-xs text-gray-500 dark:text-[#8696A0]">{t('account.signOutConfirm.message')}</p>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+          <p className="mb-3 text-sm font-medium text-ink">{t('account.signOutConfirm.title')}</p>
+          <p className="mb-4 text-xs text-ink-3">{t('account.signOutConfirm.message')}</p>
           <Button
             onClick={() => signOut()}
             variant="destructive"
@@ -413,8 +260,8 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Current password - Full width on mobile */}
           <div className="md:col-span-2">
-            <label htmlFor="current-password" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2.5 flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[#25D366]" />
+            <label htmlFor="current-password" className="block text-sm font-semibold text-ink mb-2.5 flex items-center gap-2">
+              <Lock className="h-4 w-4 text-brand" />
               {tPass('password.currentPassword')}
             </label>
             <div className="relative group">
@@ -424,7 +271,7 @@ export default function SettingsPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 disabled={changingPassword}
-                className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300/60 bg-white/50 text-sm text-gray-900 placeholder:text-gray-500 outline-none transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/10 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/30 disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-[#8696A0]"
+                className="field w-full pr-12 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={tPass('password.currentPasswordPlaceholder')}
                 required
               />
@@ -442,8 +289,8 @@ export default function SettingsPage() {
 
           {/* New password */}
           <div>
-            <label htmlFor="new-password" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2.5 flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[#25D366]" />
+            <label htmlFor="new-password" className="block text-sm font-semibold text-ink mb-2.5 flex items-center gap-2">
+              <Lock className="h-4 w-4 text-brand" />
               {tPass('password.newPassword')}
             </label>
             <div className="relative group">
@@ -453,7 +300,7 @@ export default function SettingsPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={changingPassword}
-                className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300/60 bg-white/50 text-sm text-gray-900 placeholder:text-gray-500 outline-none transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/10 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/30 disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-[#8696A0]"
+                className="field w-full pr-12 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={tPass('password.newPasswordPlaceholder')}
                 required
               />
@@ -471,8 +318,8 @@ export default function SettingsPage() {
 
           {/* Confirm password */}
           <div>
-            <label htmlFor="confirm-password" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2.5 flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[#25D366]" />
+            <label htmlFor="confirm-password" className="block text-sm font-semibold text-ink mb-2.5 flex items-center gap-2">
+              <Lock className="h-4 w-4 text-brand" />
               {tPass('password.confirmPassword')}
             </label>
             <div className="relative group">
@@ -482,7 +329,7 @@ export default function SettingsPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={changingPassword}
-                className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300/60 bg-white/50 text-sm text-gray-900 placeholder:text-gray-500 outline-none transition-all duration-200 hover:bg-white/70 dark:hover:bg-white/10 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/30 disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-[#8696A0]"
+                className="field w-full pr-12 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={tPass('password.confirmPasswordPlaceholder')}
                 required
               />
@@ -508,10 +355,10 @@ export default function SettingsPage() {
 
         {/* Success message */}
         {passwordSuccess && (
-          <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-[#25D366]/30 bg-[#25D366]/10 backdrop-blur px-4 py-3">
+          <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-brand/30 bg-brand/10 backdrop-blur px-4 py-3">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-[#25D366] flex-shrink-0" />
-              <p className="text-sm font-medium text-[#25D366]">{tPass('password.successMessage')}</p>
+              <CheckCircle2 className="h-5 w-5 text-brand flex-shrink-0" />
+              <p className="text-sm font-medium text-brand">{tPass('password.successMessage')}</p>
             </div>
           </div>
         )}
@@ -520,7 +367,7 @@ export default function SettingsPage() {
         <Button
           type="submit"
           disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-          className="w-full gap-2 bg-gradient-to-r from-[#25D366] to-emerald-600 text-white hover:from-[#25D366]/90 hover:to-emerald-600/90 shadow-lg shadow-[#25D366]/30 hover:shadow-[#25D366]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl font-semibold text-base"
+          className="w-full gap-2 bg-gradient-to-r from-brand to-emerald-600 text-white hover:from-brand/90 hover:to-emerald-600/90 shadow-lg shadow-brand/30 hover:shadow-brand/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl font-semibold text-base"
         >
           {changingPassword ? (
             <>
@@ -551,26 +398,26 @@ export default function SettingsPage() {
   function LanguageSection() {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-gray-500 dark:text-[#8696A0]">{t('language.description')}</p>
+        <p className="text-sm text-ink-3">{t('language.description')}</p>
 
         <LanguageSwitcher variant="full" className="max-w-sm" />
 
         <div className={cn(
           'flex items-center gap-3 rounded-xl border p-4',
-          'border-[#25D366]/30 bg-[#25D366]/8',
+          'border-brand/30 bg-brand/8',
         )}>
-          <CheckCircle2 className="h-5 w-5 text-[#25D366] shrink-0" />
+          <CheckCircle2 className="h-5 w-5 text-brand shrink-0" />
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">
+            <p className="text-sm font-medium text-ink">
               {language === 'ar' ? t('language.languages.ar') : t('language.languages.en')}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5 dark:text-[#8696A0]">
+            <p className="text-xs text-gray-500 mt-0.5 dark:text-ink-3">
               {language === 'ar' ? t('language.direction.rtl') : t('language.direction.ltr')}
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('language.restartNotice')}</p>
+        <p className="text-xs text-ink-3">{t('language.restartNotice')}</p>
       </div>
     );
   }
@@ -592,13 +439,9 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* ── Header ── */}
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)] dark:border-white/10 dark:bg-[#111B21]">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-          <Settings2 className="h-3.5 w-3.5" />
-          {t('badge')}
-        </div>
-        <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500 dark:text-[#8696A0]">{t('subtitle')}</p>
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-surface">
+        <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('title')}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-3">{t('subtitle')}</p>
       </section>
 
       {/* ── Mobile nav ── */}
@@ -614,8 +457,8 @@ export default function SettingsPage() {
               className={cn(
                 'flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all',
                 active
-                  ? 'border-[#25D366]/30 bg-[#25D366]/10 text-[#25D366]'
-                  : 'border-gray-200 bg-gray-50 text-gray-500 hover:text-gray-900 dark:border-white/10 dark:bg-[#202C33] dark:text-[#8696A0] dark:hover:text-white',
+                  ? 'border-brand/30 bg-brand/10 text-brand'
+                  : 'border-gray-200 bg-gray-50 text-gray-500 hover:text-gray-900 dark:border-white/10 dark:bg-raised dark:text-ink-3 dark:hover:text-white',
               )}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -627,7 +470,7 @@ export default function SettingsPage() {
         {/* Contact fields live on their own route, not as a section of this page. */}
         <Link
           href="/settings/custom-fields"
-          className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500 transition-all hover:text-gray-900 dark:border-white/10 dark:bg-[#202C33] dark:text-[#8696A0] dark:hover:text-white"
+          className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500 transition-all hover:text-gray-900 dark:border-white/10 dark:bg-raised dark:text-ink-3 dark:hover:text-white"
         >
           <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
           {t('customFields.title', { defaultValue: 'Contact fields' })}
@@ -638,7 +481,7 @@ export default function SettingsPage() {
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
 
         {/* ── Sidebar nav (desktop) ── */}
-        <aside className="hidden md:flex w-52 shrink-0 flex-col gap-1 rounded-2xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-[#111B21]">
+        <aside className="hidden md:flex w-52 shrink-0 flex-col gap-1 rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-surface">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeSection === item.id;
@@ -650,11 +493,11 @@ export default function SettingsPage() {
                 className={cn(
                   'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
                   active
-                    ? 'bg-[#25D366]/10 text-[#25D366]'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-[#8696A0] dark:hover:bg-white/5 dark:hover:text-white',
+                    ? 'bg-brand/10 text-brand'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-ink-3 dark:hover:bg-white/5 dark:hover:text-white',
                 )}
               >
-                <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-[#25D366]' : 'text-gray-500 group-hover:text-gray-900 dark:text-[#8696A0] dark:group-hover:text-white')} />
+                <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-brand' : 'text-gray-500 group-hover:text-ink-3 dark:group-hover:text-white')} />
                 <span className="flex-1 text-start">{item.label}</span>
                 {active && <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" />}
               </button>
@@ -663,20 +506,20 @@ export default function SettingsPage() {
 
           <Link
             href="/settings/custom-fields"
-            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 transition-all hover:bg-gray-50 hover:text-gray-900 dark:text-[#8696A0] dark:hover:bg-white/5 dark:hover:text-white"
+            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 transition-all hover:bg-gray-50 hover:text-ink-3 dark:hover:bg-white/5 dark:hover:text-white"
           >
-            <SlidersHorizontal className="h-4 w-4 shrink-0 text-gray-500 transition-colors group-hover:text-gray-900 dark:text-[#8696A0] dark:group-hover:text-white" />
+            <SlidersHorizontal className="h-4 w-4 shrink-0 text-gray-500 transition-colors group-hover:text-ink-3 dark:group-hover:text-white" />
             <span className="flex-1 text-start">{t('customFields.title', { defaultValue: 'Contact fields' })}</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
           </Link>
         </aside>
 
         {/* ── Content panel ── */}
-        <div className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-[#111B21]">
+        <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-surface">
           {/* Section header */}
           <div className="mb-6 border-b border-gray-200 pb-5 dark:border-white/10">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{sectionTitles[activeSection]}</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-[#8696A0]">{sectionDesc[activeSection]}</p>
+            <h2 className="text-lg font-semibold text-ink">{sectionTitles[activeSection]}</h2>
+            <p className="mt-1 text-sm text-ink-3">{sectionDesc[activeSection]}</p>
           </div>
 
           {/* Section content */}

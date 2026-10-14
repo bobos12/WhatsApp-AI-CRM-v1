@@ -10,7 +10,7 @@ import { prisma } from '../../lib/prisma';
 import { HttpError, type AuthActor } from '../../auth/authorize';
 import { validateBody } from '../validate';
 import { AUDIENCE_OPERATORS } from '../../broadcasts/audience';
-import { getConnectedNumber } from '../../whatsapp/client';
+import { getChannelOrDefault } from '../../providers/channel.service';
 import { regionOfPhone } from '../../lib/phone';
 import {
   DUPLICATE_STRATEGIES,
@@ -33,9 +33,11 @@ const upload = multer();
  * the business's country — and leave it unset otherwise so `normalizePhone`'s env
  * default applies.
  */
-function withResolvedRegion<T extends { defaultCountry?: string }>(options: T): T {
+async function withResolvedRegion<T extends { defaultCountry?: string }>(options: T): Promise<T> {
   if (options.defaultCountry) return options;
-  const region = regionOfPhone(getConnectedNumber() || '');
+  // Default dialling region follows the business's own connected number.
+  const channel = await getChannelOrDefault();
+  const region = regionOfPhone(channel.cloud?.displayPhoneNumber || '');
   return region ? { ...options, defaultCountry: region } : options;
 }
 
@@ -216,7 +218,7 @@ router.post(
   async (req, res) => {
     try {
       const { rows, options } = req.body as { rows: ImportRow[]; options: any };
-      const result = await validateRows(rows, withResolvedRegion(options), (req as any).user?.teamId);
+      const result = await validateRows(rows, await withResolvedRegion(options), (req as any).user?.teamId);
       res.json(result);
     } catch (error) {
       sendError(res, error);
@@ -232,7 +234,7 @@ router.post(
   async (req, res) => {
     try {
       const { rows, options } = req.body as { rows: ImportRow[]; options: any };
-      const summary = await importRows(rows, withResolvedRegion(options), (req as any).user?.teamId);
+      const summary = await importRows(rows, await withResolvedRegion(options), (req as any).user?.teamId);
       res.json(summary);
     } catch (error) {
       sendError(res, error);
@@ -277,7 +279,7 @@ router.post('/import', checkPermission('create', 'contacts'), upload.single('fil
     });
 
     const legacyOptions: ImportOptions = { duplicateStrategy: 'SKIP' };
-    const summary = await importRows(rows, withResolvedRegion(legacyOptions), teamId);
+    const summary = await importRows(rows, await withResolvedRegion(legacyOptions), teamId);
     const imported = summary.created + summary.updated + summary.merged;
     res.json({ imported, total: rows.length, failed: summary.failed, skipped: summary.skipped });
   } catch (error) {

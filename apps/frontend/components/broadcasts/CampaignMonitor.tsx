@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
-import { PACING_LABELS, type PacingProfile } from '../../lib/preflight';
 
 export interface LiveStatus {
   id: string;
@@ -72,7 +71,7 @@ export interface LiveStatus {
 
 /** Health score → colour. Mirrors the grades the backend assigns. */
 function scoreTone(score: number): { text: string; ring: string; bg: string } {
-  if (score >= 75) return { text: 'text-[#16A34A] dark:text-[#25D366]', ring: 'border-[#25D366]/30', bg: 'bg-[#25D366]/[0.07]' };
+  if (score >= 75) return { text: 'text-brand dark:text-brand', ring: 'border-brand/30', bg: 'bg-brand/[0.07]' };
   if (score >= 50) return { text: 'text-amber-600 dark:text-amber-400', ring: 'border-amber-400/30', bg: 'bg-amber-400/[0.07]' };
   return { text: 'text-red-600 dark:text-red-400', ring: 'border-red-400/30', bg: 'bg-red-400/[0.07]' };
 }
@@ -96,13 +95,13 @@ function Metric({ label, value, sub, icon: Icon, pulse }: {
   pulse?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-3 dark:border-white/10 dark:bg-[#0B141A]">
+    <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-3 dark:border-white/10 dark:bg-canvas">
       <div className="flex items-center gap-1.5">
-        <Icon className={cn('h-3 w-3 text-[#25D366]', pulse && 'animate-pulse')} />
-        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{label}</p>
+        <Icon className={cn('h-3 w-3 text-brand', pulse && 'animate-pulse')} />
+        <p className="text-[10px] uppercase tracking-wider text-ink-3">{label}</p>
       </div>
-      <p className="mt-1 text-lg font-bold tabular-nums text-gray-900 dark:text-white">{value}</p>
-      {sub && <p className="mt-0.5 text-[10px] text-gray-500 dark:text-[#8696A0]">{sub}</p>}
+      <p className="mt-1 text-lg font-bold tabular-nums text-ink">{value}</p>
+      {sub && <p className="mt-0.5 text-[10px] text-ink-3">{sub}</p>}
     </div>
   );
 }
@@ -155,7 +154,8 @@ export default function CampaignMonitor({
   const autoPaused = active && live.autoPaused && !live.pilotCompletedAt;
   const pilotHold = Boolean(live.pilotCompletedAt) && live.counts.pending > 0 && status === 'PAUSED';
   const eta = formatEta(live.throughput.etaMinutes);
-  const profile = (PACING_LABELS[live.pacingProfile as PacingProfile] ?? PACING_LABELS.BALANCED);
+  // Pacing profiles were a Baileys-era control; Meta sets the rate now.
+  const profile = { label: 'Standard', hint: 'Sent at the rate WhatsApp allows for your number.' };
 
   const resume = async (acknowledged: boolean) => {
     setResuming(true);
@@ -175,7 +175,7 @@ export default function CampaignMonitor({
     <div className="space-y-3">
       {/* ── Automatic pause ─────────────────────────────────────────────────── */}
       {autoPaused && (
-        <div className="rounded-2xl border border-red-300/60 bg-red-50 p-4 dark:border-red-500/30 dark:bg-red-500/[0.08]">
+        <div className="rounded-xl border border-red-300/60 bg-red-50 p-4 dark:border-red-500/30 dark:bg-red-500/[0.08]">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400">
               <AlertOctagon className="h-5 w-5" />
@@ -215,16 +215,16 @@ export default function CampaignMonitor({
 
       {/* ── Pilot hold ──────────────────────────────────────────────────────── */}
       {pilotHold && (
-        <div className="rounded-2xl border border-[#25D366]/30 bg-[#25D366]/[0.07] p-4">
+        <div className="rounded-xl border border-brand/30 bg-brand/[0.07] p-4">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand">
               <FlaskConical className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-ink">
                 {t('monitor.pilotDone', { defaultValue: 'Pilot batch delivered' })}
               </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-gray-600 dark:text-[#8696A0]">
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-3">
                 {live.healthPauseReason ??
                   t('monitor.pilotHint', {
                     defaultValue: 'Check for replies and blocks, then release the rest of the campaign.',
@@ -234,7 +234,7 @@ export default function CampaignMonitor({
                 type="button"
                 onClick={() => void resume(true)}
                 disabled={resuming}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-[#25D366]/90 disabled:opacity-50"
+                className="btn btn-primary btn-sm mt-3 inline-flex disabled:opacity-50"
               >
                 {resuming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 {t('monitor.releaseRest', {
@@ -260,10 +260,10 @@ export default function CampaignMonitor({
         const pushback = obs.hardBlocks + obs.coldReachoutBlocks;
 
         return (
-          <div className={cn('rounded-2xl border p-4', tone.ring, tone.bg)}>
+          <div className={cn('rounded-xl border p-4', tone.ring, tone.bg)}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">
                   {/* The label is the honest part: before a send this is a
                       forecast, during one it is a measurement. */}
                   {measured
@@ -278,10 +278,10 @@ export default function CampaignMonitor({
               </div>
 
               <div className="text-end">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-3">
                   {t('monitor.budgetToday', { defaultValue: 'Today' })}
                 </p>
-                <p className="mt-1 text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                <p className="mt-1 text-sm font-bold tabular-nums text-ink">
                   {h.budget.usedToday.toLocaleString()} / {h.budget.dailyLimit.toLocaleString()}
                 </p>
               </div>
@@ -301,22 +301,22 @@ export default function CampaignMonitor({
                   {
                     label: t('monitor.attempted', { defaultValue: 'Attempted' }),
                     value: obs.attempted.toLocaleString(),
-                    tone: 'text-gray-900 dark:text-white',
+                    tone: 'text-ink',
                   },
                   {
                     label: t('monitor.failureRate', { defaultValue: 'Failed' }),
                     value: `${Math.round(obs.failureRate * 100)}%`,
-                    tone: obs.failureRate > 0.15 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white',
+                    tone: obs.failureRate > 0.15 ? 'text-red-600 dark:text-red-400' : 'text-ink',
                   },
                   {
                     label: t('monitor.pushback', { defaultValue: 'Refused by WhatsApp' }),
                     value: pushback.toLocaleString(),
-                    tone: pushback > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white',
+                    tone: pushback > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink',
                   },
                 ].map((cell) => (
                   <div key={cell.label} className="min-w-0">
                     <dd className={cn('text-sm font-bold tabular-nums', cell.tone)}>{cell.value}</dd>
-                    <dt className="mt-0.5 text-[9px] uppercase leading-tight tracking-wide text-gray-500 break-words dark:text-[#8696A0]">
+                    <dt className="mt-0.5 text-[9px] uppercase leading-tight tracking-wide text-gray-500 break-words dark:text-ink-3">
                       {cell.label}
                     </dt>
                   </div>
@@ -357,8 +357,8 @@ export default function CampaignMonitor({
         <Metric
           icon={Gauge}
           label={t('monitor.pace', { defaultValue: 'Pace' })}
-          value={t(`safety.pacing_${live.pacingProfile}`, { defaultValue: profile.name })}
-          sub={live.throttlePerHour ? `max ${live.throttlePerHour}/hr` : profile.rate}
+          value={profile.label}
+          sub={profile.hint}
         />
         <Metric
           icon={ShieldAlert}
@@ -371,7 +371,7 @@ export default function CampaignMonitor({
 
       {/* ── Waiting between batches ─────────────────────────────────────────── */}
       {live.nextBatchAt && status === 'SENDING' && (
-        <p className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-[11px] text-gray-500 dark:border-white/10 dark:bg-[#0B141A] dark:text-[#8696A0]">
+        <p className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-[11px] text-gray-500 dark:border-white/10 dark:bg-canvas dark:text-ink-3">
           <Clock className="h-3 w-3 shrink-0" />
           {t('monitor.waiting', {
             defaultValue: 'Pausing between batches — delivery resumes at {{time}}.',

@@ -43,35 +43,15 @@ export default function AppUpdateBanner() {
   };
 
   return (
-    <div className="px-4 pt-3 sm:px-6 sm:pt-4">
-      <button
-        type="button"
-        onClick={onUpdate}
-        disabled={updating}
-        className={cn(
-          'group flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-start transition-colors',
-          'border-[#25D366]/40 bg-[#25D366]/[0.08] hover:bg-[#25D366]/[0.14]',
-          'dark:border-[#25D366]/25 dark:bg-[#25D366]/[0.08] dark:hover:bg-[#25D366]/[0.14]',
-          updating && 'cursor-wait opacity-80',
-        )}
-      >
-        <RefreshCw className={cn('h-4 w-4 shrink-0 text-[#128C7E] dark:text-[#25D366]', updating && 'animate-spin')} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-semibold text-[#0b6b3f] dark:text-[#25D366]">
-            {updating ? t('appUpdate.updating') : t('appUpdate.title')}
-          </span>
-          {!updating && (
-            <span className="block truncate text-[11px] text-[#128C7E]/80 dark:text-[#25D366]/70">
-              {t('appUpdate.body')}
-            </span>
-          )}
-        </span>
-        {!updating && (
-          <span className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-[#075E54] shadow-sm dark:bg-white/90">
-            {t('appUpdate.action')}
-          </span>
-        )}
-      </button>
+    <div className="enter flex shrink-0 items-center gap-3 border-b border-line bg-brand-soft px-4 py-2 sm:px-6">
+      <RefreshCw className={cn('h-4 w-4 shrink-0 text-brand', updating && 'animate-spin')} aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
+        {updating ? t('appUpdate.updating') : t('appUpdate.title')}
+        {!updating && <span className="ms-2 hidden font-normal text-ink-3 md:inline">{t('appUpdate.body')}</span>}
+      </p>
+      {!updating && (
+        <button type="button" onClick={onUpdate} className="btn btn-primary btn-sm">{t('appUpdate.action')}</button>
+      )}
     </div>
   );
 }

@@ -1,13 +1,21 @@
 /**
  * Interactive Message Service
  *
- * Sends interactive messages (buttons, list, CTA) via Baileys.
- * Interactive message types are auto-downgraded to numbered plain-text
- * menus since WhatsApp blocks programmatic interactive sends on web clients.
+ * Sends interactive messages (buttons, list, CTA).
+ *
+ * The structure is now passed through to the provider rather than flattened
+ * here. That matters because the two transports can do genuinely different
+ * things with it: Baileys must degrade to a numbered text menu (WhatsApp Web
+ * cannot deliver interactive payloads), while the Cloud API renders real
+ * tappable buttons and list sheets. Flattening at this layer, as the previous
+ * version did, silently denied Cloud API tenants a feature they are paying for.
+ *
+ * `buildText` is kept and still used by the Baileys path and by previews.
  */
 
 import { logger } from '../lib/logger';
 import { providerManager } from '../providers/manager';
+import type { OutboundInteractive } from '../providers/types';
 
 // ── Baileys text builder ──────────────────────────────────────────────────────
 
@@ -45,18 +53,53 @@ function buildText(content: any): string {
 
 export type InteractiveKind = 'interactive_buttons' | 'interactive_list' | 'interactive_cta';
 
+/** Normalise the loosely-typed builder payload into the provider's shape. */
+function toOutbound(content: { kind: InteractiveKind; [key: string]: any }): OutboundInteractive {
+  return {
+    kind: content.kind,
+    headerText: content.header?.text ?? undefined,
+    body: String(content.body ?? ''),
+    footer: content.footer ?? undefined,
+    buttons: Array.isArray(content.buttons)
+      ? content.buttons.map((b: any, i: number) => ({
+          // Baileys builders did not always assign ids; the Cloud API requires
+          // one per button because it is what comes back on a tap.
+          id: String(b.id ?? `btn_${i + 1}`),
+          title: String(b.title ?? ''),
+        }))
+      : undefined,
+    buttonText: content.buttonText ?? undefined,
+    sections: Array.isArray(content.sections)
+      ? content.sections.map((s: any) => ({
+          title: String(s.title ?? ''),
+          rows: (s.rows ?? []).map((r: any, i: number) => ({
+            id: String(r.id ?? `row_${i + 1}`),
+            title: String(r.title ?? ''),
+            description: r.description ?? undefined,
+          })),
+        }))
+      : undefined,
+    cta: content.cta ?? undefined,
+  };
+}
+
 export const interactiveMessageService = {
   /**
-   * Send an interactive message as formatted Baileys text.
-   * Buttons and list options are rendered as numbered choices.
+   * Send an interactive message, letting the active provider decide how to
+   * render it.
    */
   async send(
     phone: string,
     content: { kind: InteractiveKind; [key: string]: unknown },
+    options?: { conversationId?: string; clientId?: string },
   ): Promise<{ messageId: string }> {
-    const text = buildText(content);
     logger.info('interactive.send', { phone, kind: content.kind });
-    const result = await providerManager.sendMessage({ phone, text });
+    const result = await providerManager.sendMessage({
+      phone,
+      interactive: toOutbound(content as any),
+      conversationId: options?.conversationId,
+      clientId: options?.clientId,
+    });
     logger.info('interactive.sent', { phone, kind: content.kind, messageId: result.messageId });
     return result;
   },

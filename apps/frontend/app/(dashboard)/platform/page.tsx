@@ -29,14 +29,14 @@ const emptyForm = { name: '', ownerName: '', ownerEmail: '', ownerPassword: '' }
 
 function StatCard({ icon: Icon, label, value, tint }: { icon: React.ElementType; label: string; value: number | string; tint: string }) {
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-5">
+    <div className="rounded-xl border border-line bg-white dark:bg-raised p-5">
       <div className="flex items-center gap-3">
         <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tint)}>
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-white leading-none">{value}</p>
-          <p className="mt-1 text-xs text-gray-500 dark:text-[#8696A0]">{label}</p>
+          <p className="text-2xl font-semibold text-ink leading-none">{value}</p>
+          <p className="mt-1 text-xs text-ink-3">{label}</p>
         </div>
       </div>
     </div>
@@ -45,12 +45,12 @@ function StatCard({ icon: Icon, label, value, tint }: { icon: React.ElementType;
 
 function WaBadge({ s, hasSession }: { s: WaStatus; hasSession: boolean }) {
   if (!hasSession) {
-    return <span className="inline-flex items-center gap-1.5 text-xs text-gray-400 dark:text-[#8696A0]"><Circle className="h-2 w-2 fill-current" /> Not linked</span>;
+    return <span className="inline-flex items-center gap-1.5 text-xs text-ink-4"><Circle className="h-2 w-2 fill-current" /> Not linked</span>;
   }
   const map: Record<WaStatus, { c: string; t: string }> = {
-    connected:    { c: 'text-[#25D366]', t: 'Connected' },
+    connected:    { c: 'text-brand', t: 'Connected' },
     connecting:   { c: 'text-amber-500 dark:text-amber-400', t: 'Connecting' },
-    disconnected: { c: 'text-gray-400 dark:text-[#8696A0]', t: 'Offline' },
+    disconnected: { c: 'text-ink-4', t: 'Offline' },
   };
   const m = map[s];
   return <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', m.c)}><Circle className="h-2 w-2 fill-current" /> {m.t}</span>;
@@ -200,15 +200,15 @@ export default function PlatformPage() {
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-6">
+      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/40 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#16A34A] dark:text-[#25D366]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand dark:text-brand">
               <ShieldCheck className="h-3.5 w-3.5" />
               Operator console
             </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">Client Management</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
+            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">Client Management</h1>
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
               Every business on this deployment. Create, suspend, open, or remove a client — each one is fully isolated.
             </p>
           </div>
@@ -216,14 +216,14 @@ export default function PlatformPage() {
             <button
               type="button"
               onClick={() => loadTenants()}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-gray-600 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+              className="btn btn-secondary inline-flex"
             >
               <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} /> Refresh
             </button>
             <button
               type="button"
               onClick={() => { setCreated(null); setForm(emptyForm); setFormError(''); setShowForm(true); }}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#25D366]/90 transition-colors"
+              className="btn btn-primary inline-flex"
             >
               <Plus className="h-4 w-4" /> New client
             </button>
@@ -233,7 +233,7 @@ export default function PlatformPage() {
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard icon={Building2}    label="Total clients"  value={stats.total}     tint="bg-[#25D366]/15 text-[#16A34A] dark:text-[#25D366]" />
+        <StatCard icon={Building2}    label="Total clients"  value={stats.total}     tint="bg-brand/15 text-brand dark:text-brand" />
         <StatCard icon={CheckCircle2} label="Active"         value={stats.active}    tint="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" />
         <StatCard icon={PauseCircle}  label="Suspended"      value={stats.suspended} tint="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
         <StatCard icon={Smartphone}   label="WhatsApp online" value={stats.online}   tint="bg-sky-500/15 text-sky-600 dark:text-sky-400" />
@@ -241,19 +241,19 @@ export default function PlatformPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] px-5 py-3.5">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-raised px-5 py-3.5">
           <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-[#8696A0]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" />
             <input
               type="text"
               placeholder="Search clients…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] outline-none focus:border-[#25D366]/50"
+              className="field w-full pl-10 pr-4"
             />
           </div>
-          <span className="ml-auto text-xs text-gray-500 dark:text-[#8696A0]">
+          <span className="ml-auto text-xs text-ink-3">
             {filtered.length} {filtered.length === 1 ? 'client' : 'clients'}
           </span>
         </div>
@@ -261,17 +261,17 @@ export default function PlatformPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33]">
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">Business</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">Status</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">WhatsApp</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">Members</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">Contacts</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">Created</th>
+              <tr className="border-b border-line bg-raised">
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">Business</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">Status</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">WhatsApp</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">Members</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">Contacts</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-3">Created</th>
                 <th className="px-5 py-3.5"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody className="divide-y divide-line">
               {loading ? (
                 [...Array(4)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
@@ -283,21 +283,21 @@ export default function PlatformPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-16 text-center">
-                    <Building2 className="mx-auto mb-3 h-8 w-8 text-gray-300 dark:text-[#8696A0]/30" />
-                    <p className="text-sm text-gray-500 dark:text-[#8696A0]">{search ? 'No clients match your search.' : 'No clients yet. Create your first one.'}</p>
+                    <Building2 className="mx-auto mb-3 h-8 w-8 text-gray-300 dark:text-ink-3/30" />
+                    <p className="text-sm text-ink-3">{search ? 'No clients match your search.' : 'No clients yet. Create your first one.'}</p>
                   </td>
                 </tr>
               ) : (
                 filtered.map((t) => (
-                  <tr key={t.id} className="group transition-colors hover:bg-gray-50 dark:hover:bg-white/3">
+                  <tr key={t.id} className="group transition-colors hover:bg-raised/60">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E] text-sm font-bold text-white">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white">
                           {t.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{t.name}</p>
-                          <p className="truncate text-xs text-gray-400 dark:text-[#8696A0]">/{t.slug}</p>
+                          <p className="truncate text-sm font-medium text-ink">{t.name}</p>
+                          <p className="truncate text-xs text-ink-4">/{t.slug}</p>
                         </div>
                       </div>
                     </td>
@@ -314,18 +314,18 @@ export default function PlatformPage() {
                     <td className="px-5 py-3.5">
                       <WaBadge s={t.whatsapp.status} hasSession={t.whatsapp.hasSession} />
                       {t.whatsapp.connectedNumber && (
-                        <p className="mt-0.5 text-[11px] text-gray-400 dark:text-[#8696A0]">{t.whatsapp.connectedNumber}</p>
+                        <p className="mt-0.5 text-[11px] text-ink-4">{t.whatsapp.connectedNumber}</p>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">{t.users}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">{t.contacts}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">{new Date(t.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3.5 text-sm text-ink-3">{t.users}</td>
+                    <td className="px-5 py-3.5 text-sm text-ink-3">{t.contacts}</td>
+                    <td className="px-5 py-3.5 text-sm text-ink-3">{new Date(t.createdAt).toLocaleDateString()}</td>
                     <td className="px-5 py-3.5">
                       {confirmDeleteId === t.id ? (
                         <div className="flex items-center justify-end gap-2">
                           <span className="text-xs text-red-500 dark:text-red-300">Delete all data?</span>
-                          <button type="button" onClick={() => handleDelete(t)} className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600 transition-colors">Yes, delete</button>
-                          <button type="button" onClick={() => setConfirmDeleteId(null)} className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-xs text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">Cancel</button>
+                          <button type="button" onClick={() => handleDelete(t)} className="btn btn-sm bg-red-600 text-white hover:bg-red-700">Yes, delete</button>
+                          <button type="button" onClick={() => setConfirmDeleteId(null)} className="btn btn-secondary btn-sm">Cancel</button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-end gap-2">
@@ -334,7 +334,7 @@ export default function PlatformPage() {
                             onClick={() => impersonate(t)}
                             disabled={busyId === t.id || t.status === 'SUSPENDED'}
                             title={t.status === 'SUSPENDED' ? 'Reactivate to open' : 'Open this client’s workspace'}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 transition-colors"
+                            className="btn btn-secondary btn-sm inline-flex disabled:opacity-40"
                           >
                             <LogIn className="h-3 w-3" /> Open
                           </button>
@@ -376,57 +376,57 @@ export default function PlatformPage() {
         onClose={() => { setShowForm(false); setCreated(null); }}
         aria-label="Create client"
         overlayClassName="bg-black/70"
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111B21] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.4)]"
+        className="w-full max-w-md rounded-xl border border-line bg-surface p-6 shadow-pop"
       >
         {created ? (
           <div>
             <div className="mb-4 flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-[#25D366]" />
+              <CheckCircle2 className="h-5 w-5 text-brand" />
               <h2 className="text-lg font-semibold text-white">Client is ready</h2>
             </div>
-            <p className="mb-4 text-sm text-[#8696A0]">Share these login details with the client. They log in at the same app and see only their own business.</p>
-            <div className="space-y-2 rounded-xl border border-white/10 bg-[#202C33] p-4">
+            <p className="mb-4 text-sm text-ink-3">Share these login details with the client. They log in at the same app and see only their own business.</p>
+            <div className="space-y-2 rounded-xl border border-line bg-raised p-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-[#8696A0]">Email</span>
+                <span className="text-xs text-ink-3">Email</span>
                 <span className="flex items-center gap-2 text-sm text-white"><code>{created.email}</code>
-                  <button type="button" onClick={() => copy(created.email)} className="text-[#8696A0] hover:text-white"><Copy className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => copy(created.email)} className="text-ink-3 hover:text-white"><Copy className="h-3.5 w-3.5" /></button>
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-[#8696A0]">Password</span>
+                <span className="text-xs text-ink-3">Password</span>
                 <span className="flex items-center gap-2 text-sm text-white"><code>{created.password}</code>
-                  <button type="button" onClick={() => copy(created.password)} className="text-[#8696A0] hover:text-white"><Copy className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => copy(created.password)} className="text-ink-3 hover:text-white"><Copy className="h-3.5 w-3.5" /></button>
                 </span>
               </div>
             </div>
             <div className="mt-6 flex justify-end">
-              <button type="button" onClick={() => { setShowForm(false); setCreated(null); }} className="rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white hover:bg-[#25D366]/90 transition-colors">Done</button>
+              <button type="button" onClick={() => { setShowForm(false); setCreated(null); }} className="btn btn-primary">Done</button>
             </div>
           </div>
         ) : (
           <form onSubmit={handleCreate}>
             <div className="mb-5 flex items-center gap-3">
-              <Building2 className="h-5 w-5 text-[#25D366]" />
+              <Building2 className="h-5 w-5 text-brand" />
               <h2 className="text-lg font-semibold text-white">New client</h2>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">Business name</label>
-                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Acme Dental" className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]" />
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">Business name</label>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Acme Dental" className="field w-full" />
               </div>
-              <div className="rounded-xl border border-white/5 bg-[#0B141A] p-3">
-                <p className="mb-3 text-xs font-medium text-[#8696A0]">Owner login (optional — you can add members later)</p>
+              <div className="rounded-xl border border-line bg-canvas p-3">
+                <p className="mb-3 text-xs font-medium text-ink-3">Owner login (optional — you can add members later)</p>
                 <div className="space-y-3">
-                  <input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} placeholder="Owner name" className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]" />
-                  <input type="email" value={form.ownerEmail} onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} placeholder="owner@business.com" className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]" />
-                  <input type="text" value={form.ownerPassword} onChange={(e) => setForm({ ...form, ownerPassword: e.target.value })} placeholder="Temporary password" className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]" />
+                  <input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} placeholder="Owner name" className="field w-full" />
+                  <input type="email" value={form.ownerEmail} onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} placeholder="owner@business.com" className="field w-full" />
+                  <input type="text" value={form.ownerPassword} onChange={(e) => setForm({ ...form, ownerPassword: e.target.value })} placeholder="Temporary password" className="field w-full" />
                 </div>
               </div>
             </div>
             {formError && <p className="mt-3 text-xs text-red-400">{formError}</p>}
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="rounded-xl border border-white/10 bg-[#202C33] px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors">Cancel</button>
-              <button type="submit" disabled={saving} className="rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#25D366]/90 transition-colors">{saving ? 'Creating…' : 'Create client'}</button>
+              <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving} className="btn btn-primary disabled:opacity-50">{saving ? 'Creating…' : 'Create client'}</button>
             </div>
           </form>
         )}

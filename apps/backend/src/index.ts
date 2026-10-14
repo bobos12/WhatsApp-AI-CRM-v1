@@ -9,7 +9,6 @@ import { Server } from 'socket.io';
 import { loadEnv } from './lib/env';
 import { logger } from './lib/logger';
 import { runAsPlatform } from './lib/tenant-context';
-import { sessionManager } from './whatsapp/session-manager';
 import { bindRealtimeServer } from './realtime/socket';
 import { startSnoozeWakeupScheduler } from './conversations/snooze-wakeup';
 import { startBroadcastScheduler } from './broadcasts/broadcast.scheduler';
@@ -22,6 +21,7 @@ import { provisionPlatformOwner } from './auth/provision-platform-owner';
 import { bootstrapDefaultTenant } from './tenants/provision-tenant.service';
 import { chatbotSettingsService } from './services/chatbot-settings.service';
 import { storageMode, LOCAL_UPLOADS_DIR } from './lib/storage';
+import { assertCredentialKeyValidIfPresent } from './lib/crypto';
 import authRoutes from './api/routes/auth.routes';
 import whatsappRoutes from './api/routes/whatsapp.routes';
 import conversationsRoutes from './api/routes/conversations.routes';
@@ -29,7 +29,6 @@ import contactsRoutes from './api/routes/contacts.routes';
 import customFieldsRoutes from './api/routes/custom-fields.routes';
 import automationsRoutes from './api/routes/automations.routes';
 import broadcastsRoutes from './api/routes/broadcasts.routes';
-import suppressionRoutes from './api/routes/suppression.routes';
 import analyticsRoutes from './api/routes/analytics.routes';
 import teamsRoutes from './api/routes/teams.routes';
 import tagsRoutes from './api/routes/tags.routes';
@@ -46,9 +45,14 @@ import notificationsRoutes from './api/routes/notifications.routes';
 import pushRoutes from './api/routes/push.routes';
 import searchRoutes from './api/routes/search.routes';
 import platformRoutes from './api/routes/platform.routes';
+import channelRoutes from './api/routes/channel.routes';
 
 // Fail fast on missing/weak required configuration before binding the server.
 const config = loadEnv();
+// A malformed CREDENTIAL_ENCRYPTION_KEY must fail here, not at the moment a
+// tenant clicks Save on their Meta credentials. Absent is fine — only Cloud API
+// tenants need it, and every existing Baileys tenant runs without one.
+assertCredentialKeyValidIfPresent();
 
 const app = express();
 // Trust the first proxy hop so `req.ip` reflects the real client (X-Forwarded-For)
@@ -114,6 +118,21 @@ app.set('json replacer', (_key: string, value: unknown) =>
 // route-level parser mounted later would never see the body. Non-JSON bodies
 // (the legacy multipart CSV upload on this same path) fall through untouched.
 app.use('/api/contacts/import', express.json({ limit: '12mb' }));
+// Meta signs the webhook body with HMAC-SHA256 and we must verify against the
+// exact bytes it signed — `JSON.stringify(req.body)` is not those bytes, since
+// key order and whitespace are not preserved through a parse/serialise round
+// trip. Capturing the raw buffer during parsing is the only way to check the
+// signature, and an unverifiable webhook is an open door into any tenant's inbox.
+// Mounted before the global parser for the same reason as the import route above.
+app.use(
+  '/api/whatsapp/meta-webhook',
+  express.json({
+    limit: '2mb',
+    verify: (req, _res, buf) => {
+      (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+    },
+  }),
+);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -140,7 +159,11 @@ app.get('/health', (_req, res) => {
 // WhatsApp QR screen is open — frequent status/QR polling). The lightweight,
 // read-only WhatsApp status/QR polls are exempt so keeping that screen open can
 // never starve the rest of the API.
-const POLL_EXEMPT = /\/api\/whatsapp\/(status|qr)\b/;
+// Meta's webhook is also exempt. It is signature-verified rather than
+// rate-limited, and a busy tenant's delivery receipts arrive in bursts from
+// Meta's own IPs — throttling them means Meta retries, then disables the
+// subscription, and the CRM silently stops receiving messages.
+const POLL_EXEMPT = /\/api\/whatsapp\/(status|qr|meta-webhook)\b/;
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3000,
@@ -169,7 +192,6 @@ app.use('/api/contacts', contactsRoutes);
 app.use('/api/custom-fields', customFieldsRoutes);
 app.use('/api/automations', automationsRoutes);
 app.use('/api/broadcasts', broadcastsRoutes);
-app.use('/api/suppression', suppressionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/teams', teamsRoutes);
 app.use('/api/tags', tagsRoutes);
@@ -186,6 +208,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/platform', platformRoutes);
+app.use('/api/channel', channelRoutes);
 
 // ── DEV ONLY: force re-analysis of the most recent 1-to-1 chats. Runs inside
 // the live server so lead notifications/popups are pushed over the socket.
@@ -283,11 +306,8 @@ server.listen(PORT, async () => {
     ensureFlowWorker();
     startNoReplyDetector();
     aiBotService.register(new GroqBotProvider());
-    if (process.env.WHATSAPP_AUTO_CONNECT !== 'false') {
-      // Reconnect every ACTIVE tenant that already has a stored WhatsApp session.
-      sessionManager.reconnectAll().catch((err: Error) => {
-        console.error('WhatsApp reconnect-all failed:', err.message);
-      });
-    }
+    // Nothing to reconnect at boot: the Cloud API is stateless HTTP, so a
+    // tenant is reachable the moment their credentials are stored. The old
+    // socket pool that had to be re-established here is gone.
   });
 });

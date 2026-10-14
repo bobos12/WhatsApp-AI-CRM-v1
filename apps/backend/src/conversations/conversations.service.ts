@@ -351,6 +351,12 @@ export class ConversationsService {
     replyTo?: { replyToId?: string; replyToBody?: string },
     clientId?: string,
     agentId?: string,
+    /**
+     * Send an approved template instead of free-form text. On the Cloud API this
+     * is how an agent reopens a conversation whose 24h window has closed — the
+     * only content Meta will deliver at that point.
+     */
+    template?: import('../providers/types').OutboundTemplate,
   ) {
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -366,12 +372,24 @@ export class ConversationsService {
     const exactPhone = normalizePhone(resolvedContact.phone);
     if (!exactPhone) throw new Error('Invalid contact phone number');
 
+    // Refuse a send the provider is certain to reject, and say why in terms the
+    // agent can act on. Without this the failure surfaces as an opaque Meta
+    // error code after a wasted round trip — and on the Cloud API a closed
+    // window is an ordinary daily occurrence, not an edge case.
+    const { assertCanSend } = await import('../messaging/send-policy');
+    await assertCanSend({
+      conversationId,
+      kind: template ? 'template' : 'text',
+      lastInboundAt: conversation.lastInboundAt,
+    });
+
     const { providerManager: pm } = await import('../providers/manager');
     await pm.sendMessage({
       clientId,
       conversationId,
       phone: exactPhone,
       text: message,
+      template,
       media: media?.mediaBuffer
         ? {
             buffer: media.mediaBuffer,

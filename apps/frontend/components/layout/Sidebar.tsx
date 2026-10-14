@@ -1,304 +1,206 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
-import {
-  BarChart3,
-  MessageSquare,
-  Users,
-  Send,
-  Settings,
-  Tags,
-  MessageSquareReply,
-  BriefcaseBusiness,
-  CheckSquare,
-  ShieldCheck,
-  UserCog,
-  UsersRound,
-  FileText,
-  Menu,
-  X,
-  LayoutTemplate,
-  Bot,
-  Target,
-  Smartphone,
-  Sparkles,
-  Building2,
-} from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { Search, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLiveCounts } from '../../hooks/useLiveCounts';
 import { useLeadAlerts } from '../../hooks/useLeadAlerts';
-import { useDirection } from '../../hooks/useDirection';
 import { useOperatorAccess } from '../../hooks/useOperatorAccess';
 import { isManager } from '../../lib/roles';
 import SidebarConnect from '../whatsapp/SidebarConnect';
+import NotificationBell from '../notifications/NotificationBell';
+import AccountMenu from './AccountMenu';
+import { visibleGroups, isActive, type NavItem, type LiveKey } from './nav-config';
+import { openCommandPalette } from './CommandPalette';
 
+const COLLAPSE_KEY = 'nx-sidebar-collapsed';
+
+/**
+ * The sidebar is the product's signature surface: dark in both themes, so the
+ * workspace beside it reads as paper on a desk. Full width (240px) on large
+ * screens, an icon rail (64px) on tablets — and on large screens the user can
+ * choose the rail too, for more room in the inbox.
+ */
 export default function Sidebar() {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
   const { t } = useTranslation('sidebar');
-  const { isRTL } = useDirection();
-
-  const role    = (session?.user as any)?.role ?? 'AGENT';
-  const isAdmin = isManager(role);
+  const reduceMotion = useReducedMotion();
   const { isOperator } = useOperatorAccess();
-
   const { openConversations } = useLiveCounts();
-
   const { needsAttention } = useLeadAlerts();
+  const [collapsed, setCollapsed] = useState(false);
 
-  const liveCounts: Record<string, number | null> = {
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === '1'); } catch { /* storage blocked */ }
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      try { localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1'); } catch { /* storage blocked */ }
+      return !c;
+    });
+  };
+
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const groups = visibleGroups({ manager: isManager(role), operator: isOperator });
+  const counts: Record<LiveKey, number | null> = {
     openConversations,
     leadsNeedsAttention: needsAttention,
   };
 
-  const mainNav = [
-    { key: 'dashboard',    href: '/dashboard',    icon: BarChart3 },
-    { key: 'conversations',href: '/conversations', icon: MessageSquare, liveKey: 'openConversations' as const },
-    { key: 'contacts',     href: '/contacts',      icon: Users },
-    { key: 'tags',         href: '/tags',          icon: Tags },
-    { key: 'savedReplies', href: '/saved-replies', icon: MessageSquareReply },
-    { key: 'templates',    href: '/templates',     icon: FileText },
-    { key: 'deals',        href: '/deals',         icon: BriefcaseBusiness },
-    { key: 'tasks',        href: '/tasks',         icon: CheckSquare },
-    { key: 'broadcasts',   href: '/broadcasts',    icon: Send },
-    { key: 'settings',     href: '/settings',      icon: Settings },
-  ];
+  // Label visibility: hidden on the tablet rail; on lg+ shown unless collapsed.
+  const wide = !collapsed;
+  const label = cn('hidden truncate', wide && 'lg:block');
 
-  const salesNav = [
-    { key: 'leads', href: '/leads', icon: Target, liveKey: 'leadsNeedsAttention' as const },
-  ];
-
-  const adminNav = [
-    { key: 'users',       href: '/admin/users',        icon: UserCog },
-    { key: 'teams',       href: '/admin/teams',         icon: UsersRound },
-    { key: 'customerAi',  href: '/admin/customer-ai',  icon: Bot },
-    { key: 'chatbot',     href: '/admin/chatbot',       icon: Sparkles },
-  ];
-
-  function NavItem({
-    item,
-  }: {
-    item: {
-      key: string;
-      href: string;
-      icon: React.ElementType;
-      liveKey?: keyof typeof liveCounts;
-    };
-  }) {
-    const active = !!pathname?.startsWith(item.href);
-    const count = item.liveKey != null ? liveCounts[item.liveKey] : null;
-    const showBadge = typeof count === 'number' && count > 0;
-
+  function Item({ item }: { item: NavItem }) {
+    const active = isActive(pathname, item);
+    const count = item.liveKey ? counts[item.liveKey] : null;
+    const name = t(`nav.${item.key}`);
     return (
       <li>
         <Link
           href={item.href}
-          onClick={() => setOpen(false)}
           aria-current={active ? 'page' : undefined}
+          title={name}
           className={cn(
-            'group relative flex items-center gap-3 rounded-xl py-2.5 pe-3 ps-4 text-sm transition-all duration-150',
-            active
-              ? 'font-bold text-gray-900 dark:text-white'
-              : 'font-medium text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
+            'group relative flex h-9 items-center justify-center gap-3 rounded-lg px-2.5 text-[13px] font-medium outline-none transition-colors duration-fast',
+            'focus-visible:ring-2 focus-visible:ring-brand-400/60',
+            wide && 'lg:justify-start',
+            active ? 'text-nav-ink' : 'text-nav-muted hover:bg-nav-hover hover:text-nav-ink',
           )}
         >
-          {/* Active leading accent bar (flips side automatically via start-0) */}
           {active && (
-            <span
+            <motion.span
+              layoutId="nav-active"
               aria-hidden="true"
-              className="absolute inset-y-1 start-0 w-1.5 rounded-full bg-[#16A34A] dark:bg-[#25D366]"
-            />
+              className="absolute inset-0 rounded-lg bg-nav-hover ring-1 ring-inset ring-white/[0.06]"
+              transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 40 }}
+            >
+              <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-brand-400" />
+            </motion.span>
           )}
           <item.icon
-            className={cn(
-              'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
-              active
-                ? 'text-[#16A34A] dark:text-[#25D366]'
-                : 'text-gray-400 dark:text-[#8696A0] group-hover:text-gray-600 dark:group-hover:text-white',
-            )}
+            className={cn('relative h-[18px] w-[18px] shrink-0', active ? 'text-brand-400' : 'text-nav-muted group-hover:text-nav-ink')}
+            strokeWidth={active ? 2.2 : 1.9}
+            aria-hidden="true"
           />
-          <span className="flex-1 truncate">{t(`nav.${item.key}`)}</span>
-          {showBadge ? (
-            <span className="flex h-5 min-w-[22px] items-center justify-center rounded-md bg-gray-900 px-1.5 text-[10px] font-bold text-white dark:bg-white/15 dark:text-white">
-              {count > 99 ? '99+' : count}
-            </span>
-          ) : null}
+          <span className={cn('relative flex-1', label)}>{name}</span>
+          {typeof count === 'number' && count > 0 && (
+            <>
+              <span className={cn(
+                'relative hidden min-w-[20px] rounded-md bg-white/[0.08] px-1.5 py-px text-center text-2xs font-semibold tabular-nums text-nav-ink',
+                wide && 'lg:inline-block',
+              )}>
+                {count > 99 ? '99+' : count}
+              </span>
+              {/* Rail mode: the count collapses to a dot on the icon. */}
+              <span className={cn('absolute end-2 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-400', wide && 'lg:hidden')} aria-hidden="true" />
+            </>
+          )}
         </Link>
       </li>
     );
   }
 
-  const inner = (
-    <>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/logo-tight.png"
-          alt={t('appName')}
-          className="h-10 w-10 shrink-0 rounded-2xl shadow-[0_8px_20px_-6px_rgba(13,77,46,0.6)]"
-        />
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-bold leading-tight text-gray-900 dark:text-white">
-            {t('appName')}
-          </p>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-[#8696A0]">
-            {t('appSubtitle')}
-          </p>
+  return (
+    <aside
+      className={cn(
+        'relative hidden w-16 shrink-0 flex-col border-e border-nav-line bg-nav sm:flex',
+        'transition-[width] duration-base ease-out',
+        wide && 'lg:w-60',
+      )}
+    >
+      {/* Brand + notifications */}
+      <div className={cn('flex h-14 items-center justify-center gap-2.5 px-3', wide && 'lg:justify-start lg:px-4')}>
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('appName')}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/logo-tight.png" alt="" className="h-7 w-7 shrink-0" />
+          <span className={cn('min-w-0 leading-none', label)}>
+            <span className="block text-[15px] font-semibold tracking-[-0.01em] text-nav-ink">{t('appName')}</span>
+            <span className="mt-1 block text-2xs text-nav-muted">{t('appSubtitle')}</span>
+          </span>
+        </Link>
+        <div className={cn('ms-auto hidden', wide && 'lg:block')}>
+          <NotificationBell placement="nav" />
         </div>
+      </div>
+
+      {/* Search / command palette */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          title={t('search')}
+          className={cn(
+            'flex h-9 w-full items-center justify-center gap-2.5 rounded-lg border border-nav-line bg-white/[0.03] px-2.5 text-[13px] text-nav-muted',
+            'transition-colors hover:border-white/15 hover:text-nav-ink',
+            wide && 'lg:justify-start',
+          )}
+        >
+          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className={cn('flex-1 text-start', label)}>{t('search')}</span>
+          <kbd className={cn('hidden rounded border border-nav-line px-1 font-mono text-[10px] text-nav-muted', wide && 'lg:inline')}>⌘K</kbd>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => document.dispatchEvent(new CustomEvent('toggle-crm-assistant'))}
+          title={t('askAi')}
+          className={cn(
+            'mt-1 flex h-9 w-full items-center justify-center gap-3 rounded-lg px-2.5 text-[13px] font-medium text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink',
+            wide && 'lg:justify-start',
+          )}
+        >
+          <Sparkles className="h-[18px] w-[18px] shrink-0 text-brand-400" strokeWidth={1.9} aria-hidden="true" />
+          <span className={cn('flex-1 text-start', label)}>{t('askAi')}</span>
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-
-        {/* Main menu */}
-        <div>
-          <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-[#8696A0]">
-            {t('menu')}
-          </p>
-          <ul className="space-y-1">
-            {mainNav.map((item) => <NavItem key={item.key} item={item} />)}
-          </ul>
-        </div>
-
-        {/* Sales Intelligence section */}
-        <div>
-          <div className="mb-2 flex items-center gap-2 px-2">
-            <Target className="h-3.5 w-3.5 text-[#16A34A] dark:text-[#25D366]" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#16A34A] dark:text-[#25D366]">
-              {t('salesIntelligence')}
-            </p>
-          </div>
-          <ul className="space-y-1">
-            {salesNav.map((item) => <NavItem key={item.key} item={item} />)}
-          </ul>
-        </div>
-
-        {/* Admin-only section */}
-        {isAdmin && (
-          <div>
-            <div className="mb-2 flex items-center gap-2 px-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                {t('admin')}
-              </p>
-            </div>
-            <ul className="space-y-1">
-              {adminNav.map((item) => <NavItem key={item.key} item={item} />)}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 scrollbar-none" aria-label="Main">
+        {groups.map((group, gi) => (
+          <div key={group.key} className={cn(gi > 0 && 'mt-5')}>
+            {gi > 0 && (
+              <>
+                <p className={cn('mb-1.5 px-2.5 text-2xs font-medium uppercase tracking-[0.08em] text-nav-muted/80', label)}>
+                  {t(`groups.${group.key}`)}
+                </p>
+                <div className={cn('mx-auto mb-2 h-px w-6 bg-nav-line', wide && 'lg:hidden')} aria-hidden="true" />
+              </>
+            )}
+            <ul className="space-y-0.5">
+              {group.items.map((item) => <Item key={item.key} item={item} />)}
             </ul>
           </div>
-        )}
-
-        {/* Operator-only: manage every client business (multi-tenant console) */}
-        {isOperator && (
-          <div>
-            <div className="mb-2 flex items-center gap-2 px-2">
-              <Building2 className="h-3.5 w-3.5 text-[#16A34A] dark:text-[#25D366]" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#16A34A] dark:text-[#25D366]">
-                Operator
-              </p>
-            </div>
-            <ul className="space-y-1">
-              <li>
-                <Link
-                  href="/platform"
-                  onClick={() => setOpen(false)}
-                  aria-current={pathname?.startsWith('/platform') ? 'page' : undefined}
-                  className={cn(
-                    'group relative flex items-center gap-3 rounded-xl py-2.5 pe-3 ps-4 text-sm transition-all duration-150',
-                    pathname?.startsWith('/platform')
-                      ? 'font-bold text-gray-900 dark:text-white'
-                      : 'font-medium text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
-                  )}
-                >
-                  {pathname?.startsWith('/platform') && (
-                    <span aria-hidden="true" className="absolute inset-y-1 start-0 w-1.5 rounded-full bg-[#16A34A] dark:bg-[#25D366]" />
-                  )}
-                  <Building2
-                    className={cn(
-                      'h-[18px] w-[18px] shrink-0 transition-colors duration-150',
-                      pathname?.startsWith('/platform')
-                        ? 'text-[#16A34A] dark:text-[#25D366]'
-                        : 'text-gray-400 dark:text-[#8696A0] group-hover:text-gray-600 dark:group-hover:text-white',
-                    )}
-                  />
-                  <span className="flex-1 truncate">Clients</span>
-                </Link>
-              </li>
-            </ul>
-          </div>
-        )}
+        ))}
       </nav>
 
-      {/* connection */}
-      <div className="flex justify-center px-3 pb-4 pt-2">
-        {/* Live WhatsApp connection — inline QR when offline */}
-        <SidebarConnect />
-      </div>
-    </>
-  );
-
-  return (
-    <>
-      {/* Mobile: hamburger toggle — flips side in RTL */}
-      {!open && (
+      {/* Footer: connection, account, collapse */}
+      <div className="space-y-1 border-t border-nav-line p-3">
+        <SidebarConnect compact={wide ? 'below-lg' : true} />
+        {/* Notifications live up top when wide; in the rail they join the footer. */}
+        <div className={cn('flex justify-center', wide && 'lg:hidden')}>
+          <NotificationBell placement="nav" />
+        </div>
+        <AccountMenu variant="nav" compact={wide ? 'below-lg' : true} />
         <button
           type="button"
-          aria-label={t('openSidebar')}
-          onClick={() => setOpen(true)}
-          className={cn(
-            'fixed top-4 z-50 hidden sm:inline-flex items-center justify-center rounded-md p-2 text-gray-700 bg-white shadow-md lg:hidden dark:bg-[#111B21] dark:text-white',
-            isRTL ? 'right-4' : 'left-4',
-          )}
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? t('expand') : t('collapse')}
+          title={collapsed ? t('expand') : t('collapse')}
+          className="hidden h-8 w-full items-center justify-center rounded-lg text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink lg:flex"
         >
-          <Menu className="h-5 w-5" />
+          {collapsed
+            ? <PanelLeftOpen className="h-4 w-4 icon-mirror" aria-hidden="true" />
+            : <PanelLeftClose className="h-4 w-4 icon-mirror" aria-hidden="true" />}
         </button>
-      )}
-
-      {/* Mobile overlay */}
-      {open && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          aria-hidden
-          onClick={() => setOpen(false)}
-        />
-      )}
-
-      {/* Mobile sliding panel — slides from start edge (left in LTR, right in RTL) */}
-      <div
-        className={cn(
-          'fixed inset-y-0 z-40 w-64 transform transition-transform duration-200 lg:hidden',
-          isRTL
-            ? cn('right-0', open ? 'translate-x-0' : 'translate-x-full')
-            : cn('left-0',  open ? 'translate-x-0' : '-translate-x-full'),
-        )}
-        aria-hidden={!open}
-      >
-        <div className="relative h-full border-e border-gray-200 dark:border-white/5 bg-white dark:bg-[#111B21]">
-          <button
-            type="button"
-            aria-label={t('closeSidebar')}
-            onClick={() => setOpen(false)}
-            className={cn(
-              'absolute top-3 inline-flex items-center justify-center rounded-md p-1 text-gray-600 hover:bg-gray-100 dark:text-white lg:hidden',
-              isRTL ? 'left-3' : 'right-3',
-            )}
-          >
-            <X className="h-5 w-5" />
-          </button>
-          {inner}
-        </div>
       </div>
-
-      {/* Desktop sidebar — blends into the white app container */}
-      <aside className="hidden w-[248px] shrink-0 bg-transparent lg:flex lg:flex-col">
-        {inner}
-      </aside>
-    </>
+    </aside>
   );
 }

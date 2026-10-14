@@ -74,3 +74,6 @@ New XLSX Worksheet.xlsx
 # Anchored to the repo root so these never match a source dir named out/ or html/.
 /marketing/out/
 /marketing/html/
+
+# Local env backups contain real secrets
+**/.env.backup*

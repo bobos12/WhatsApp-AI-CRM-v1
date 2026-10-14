@@ -1,6 +1,6 @@
 {
-  "appName": "واتساب CRM",
-  "appSubtitle": "منصة الأعمال",
+  "appName": "Nexus",
+  "appSubtitle": "نظام واتساب لإدارة العملاء",
   "menu": "القائمة",
   "admin": "الإدارة",
   "salesIntelligence": "ذكاء المبيعات",
@@ -13,24 +13,44 @@
     "action": "احصل على التطبيق"
   },
   "nav": {
-    "dashboard": "لوحة التحكم",
-    "conversations": "المحادثات",
+    "dashboard": "الرئيسية",
+    "conversations": "صندوق الوارد",
     "contacts": "جهات الاتصال",
     "tags": "الوسوم",
     "savedReplies": "الردود المحفوظة",
     "templates": "القوالب",
     "interactive": "الرسائل التفاعلية",
     "deals": "الصفقات",
-    "leads": "إدارة العملاء المحتملين",
+    "leads": "العملاء المحتملون",
     "tasks": "المهام",
     "broadcasts": "الحملات",
     "settings": "الإعدادات",
     "users": "المستخدمون",
     "teams": "الفرق",
     "automations": "الأتمتة",
-    "chatbot": "أدوات الذكاء الاصطناعي",
+    "chatbot": "إعدادات الذكاء الاصطناعي",
     "aiConfig": "إعدادات الذكاء الاصطناعي",
-    "customerAi": "بوت العملاء الذكي",
-    "more": "المزيد"
-  }
+    "customerAi": "الوكيل الذكي",
+    "more": "المزيد",
+    "clients": "العملاء"
+  },
+  "groups": {
+    "workspace": "مساحة العمل",
+    "outreach": "التواصل",
+    "admin": "الإدارة",
+    "operator": "المشغّل"
+  },
+  "search": "ابحث أو انتقل إلى…",
+  "collapse": "طي القائمة",
+  "expand": "توسيع القائمة",
+  "account": {
+    "menu": "الحساب",
+    "theme": "الوضع الداكن",
+    "language": "English",
+    "sync": "مزامنة الآن",
+    "refresh": "إعادة تحميل التطبيق",
+    "signOut": "تسجيل الخروج",
+    "settings": "الإعدادات"
+  },
+  "askAi": "اسأل الذكاء الاصطناعي"
 }

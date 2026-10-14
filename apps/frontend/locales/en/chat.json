@@ -281,5 +281,47 @@
       "notFound": "AI assistant endpoint not found. Restart the backend server.",
       "generic": "Failed to connect to the AI assistant."
     }
+  },
+  "list": {
+    "inbox": "Inbox",
+    "all": "All",
+    "unread": "Unread",
+    "mine": "Mine",
+    "unassigned": "Unassigned",
+    "filters": "Filters",
+    "status": "Status",
+    "tags": "Tags",
+    "anyStatus": "Any status",
+    "anyTag": "Any tag",
+    "savedViews": "Saved views",
+    "saveView": "Save this view",
+    "viewName": "Name this view",
+    "clearFilters": "Clear",
+    "pin": "Pin chat",
+    "unpin": "Unpin chat",
+    "snoozeFor": "Snooze",
+    "unsnooze": "Unsnooze",
+    "snoozedUntil": "Snoozed · {{time}}",
+    "noMatch": "No chats match",
+    "noMatchSub": "Try another filter or clear the search.",
+    "chatOptions": "Chat options"
+  },
+  "header": {
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "details": "Details",
+    "aiAuto": "AI auto",
+    "aiOn": "AI on",
+    "aiOff": "AI off",
+    "aiGlobalOn": "AI replying",
+    "aiGlobalOff": "AI paused",
+    "assignedTo": "Assigned to {{name}}",
+    "more": "More"
+  },
+  "panel": {
+    "conversation": "Conversation",
+    "contact": "Contact",
+    "ai": "AI agent",
+    "lead": "Lead insight"
   }
 }

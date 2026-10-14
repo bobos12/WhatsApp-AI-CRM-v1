@@ -35,20 +35,20 @@ type Tone = 'auto' | 'dark';
 
 const TONES: Record<Tone, { panel: string; input: string; label: string; muted: string; ghost: string }> = {
   auto: {
-    panel: 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A]',
+    panel: 'border-line bg-gray-50 dark:bg-canvas',
     input:
-      'border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#8696A0]',
+      'border-line bg-white dark:bg-raised text-ink placeholder:text-ink-4',
     label: 'text-gray-700 dark:text-gray-200',
-    muted: 'text-gray-500 dark:text-[#8696A0]',
+    muted: 'text-ink-3',
     ghost:
-      'border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
+      'border-line bg-white dark:bg-white/5 text-ink-2-3 hover:bg-raised',
   },
   dark: {
-    panel: 'border-white/10 bg-[#0B141A]',
-    input: 'border-white/10 bg-[#202C33] text-white placeholder:text-[#8696A0]',
+    panel: 'border-line bg-canvas',
+    input: 'border-line bg-raised text-ink placeholder:text-ink-3',
     label: 'text-gray-200',
-    muted: 'text-[#8696A0]',
-    ghost: 'border-white/10 bg-white/5 text-[#8696A0] hover:bg-white/10',
+    muted: 'text-ink-3',
+    ghost: 'border-white/10 bg-white/5 text-ink-3 hover:bg-white/10',
   },
 };
 
@@ -138,7 +138,7 @@ export default function AudienceFilterBuilder({
           <SlidersHorizontal className="h-3.5 w-3.5" />
           {t('filters.advanced.title', { defaultValue: 'Advanced filters' })}
           {activeCount > 0 && (
-            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-slate-950">
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
               {activeCount}
             </span>
           )}
@@ -174,7 +174,7 @@ export default function AudienceFilterBuilder({
                 className={cn(
                   'rounded-md px-2.5 py-1 text-[11px] font-medium transition',
                   (value.match ?? 'all') === mode
-                    ? 'bg-[#25D366] text-slate-950'
+                    ? 'bg-brand text-brand-fg'
                     : 'text-inherit hover:opacity-80',
                 )}
               >
@@ -205,7 +205,7 @@ export default function AudienceFilterBuilder({
                 value={condition.field}
                 onChange={(event) => changeField(index, event.target.value)}
                 className={cn(
-                  'h-9 min-w-0 flex-1 rounded-lg border px-2 text-xs outline-none transition focus:border-[#25D366]/50 sm:max-w-[180px]',
+                  'h-9 min-w-0 flex-1 rounded-lg border px-2 text-xs outline-none transition focus:border-brand/50 sm:max-w-[180px]',
                   styles.input,
                 )}
               >
@@ -231,7 +231,7 @@ export default function AudienceFilterBuilder({
                 value={condition.operator}
                 onChange={(event) => changeOperator(index, event.target.value as AudienceOperator)}
                 className={cn(
-                  'h-9 min-w-0 rounded-lg border px-2 text-xs outline-none transition focus:border-[#25D366]/50 sm:w-[140px]',
+                  'h-9 min-w-0 rounded-lg border px-2 text-xs outline-none transition focus:border-brand/50 sm:w-[140px]',
                   styles.input,
                 )}
               >
@@ -277,7 +277,7 @@ export default function AudienceFilterBuilder({
         type="button"
         onClick={addCondition}
         className={cn(
-          'mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed px-3 text-xs font-medium transition hover:border-[#25D366]/40 hover:text-[#25D366]',
+          'mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed px-3 text-xs font-medium transition hover:border-brand/40 hover:text-brand',
           styles.ghost,
         )}
       >
@@ -319,7 +319,7 @@ function ValueInput({
   const { t } = useTranslation('contacts');
   const listId = useId();
   const inputClass = cn(
-    'h-9 w-full rounded-lg border px-2 text-xs outline-none transition focus:border-[#25D366]/50',
+    'h-9 w-full rounded-lg border px-2 text-xs outline-none transition focus:border-brand/50',
     styles.input,
   );
 
@@ -384,7 +384,7 @@ function ValueInput({
               className={cn(
                 'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition',
                 active
-                  ? 'border-[#25D366] bg-[#25D366]/15 text-[#25D366]'
+                  ? 'border-brand bg-brand/15 text-brand'
                   : styles.ghost,
               )}
               style={active && option.color ? { borderColor: option.color, color: option.color } : undefined}

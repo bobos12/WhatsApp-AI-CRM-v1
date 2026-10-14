@@ -8,14 +8,8 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../providers/I18nProvider';
 import { useDirection } from '../../hooks/useDirection';
 import { cn } from '@/lib/utils';
-import {
-  Bot,
-  X,
-  Send,
-  Sparkles,
-  Minimize2,
-  ChevronDown,
-} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { X, Send, Sparkles } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -77,7 +71,7 @@ function MarkdownText({ text }: { text: string }) {
         const content = parseBold(isBullet ? line.replace(/^[-•*]\s/, '') : line);
         return (
           <span key={i} className={cn('block', isBullet && 'flex gap-1')}>
-            {isBullet && <span className="mt-1 text-[#25D366] shrink-0">•</span>}
+            {isBullet && <span className="mt-1 text-brand shrink-0">•</span>}
             <span>{content}</span>
           </span>
         );
@@ -90,7 +84,7 @@ function parseBold(text: string): React.ReactNode {
   const parts = text.split(/\*\*(.*?)\*\*/g);
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      <strong key={i} className="font-semibold text-white">
+      <strong key={i} className="font-semibold text-ink">
         {part}
       </strong>
     ) : (
@@ -102,9 +96,9 @@ function parseBold(text: string): React.ReactNode {
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 px-1 py-0.5">
-      <span className="h-2 w-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:0ms] [animation-duration:900ms]" />
-      <span className="h-2 w-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:150ms] [animation-duration:900ms]" />
-      <span className="h-2 w-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:300ms] [animation-duration:900ms]" />
+      <span className="h-2 w-2 rounded-full bg-ink-3 animate-bounce [animation-delay:0ms] [animation-duration:900ms]" />
+      <span className="h-2 w-2 rounded-full bg-ink-3 animate-bounce [animation-delay:150ms] [animation-duration:900ms]" />
+      <span className="h-2 w-2 rounded-full bg-ink-3 animate-bounce [animation-delay:300ms] [animation-duration:900ms]" />
     </div>
   );
 }
@@ -264,89 +258,65 @@ export default function CrmAssistantBubble() {
 
   if (!session || !enabled) return null;
 
+  // An end-side drawer, not a floating bubble: a bubble pinned to the corner
+  // sat on top of the inbox composer's send button. Opened from the sidebar,
+  // the mobile header, or ⌘K — all of which dispatch `toggle-crm-assistant`.
   return (
-    <>
-      {/* ── Chat panel ── */}
-      <div
-        dir={isRTL ? 'rtl' : 'ltr'}
-        className={cn(
-          'fixed z-50 flex flex-col overflow-hidden bg-[#111B21]',
-          'border border-white/10',
-          'shadow-[0_20px_60px_rgba(0,0,0,0.5)]',
-          'transition-all duration-300 ease-out',
-          /* mobile: full-screen sheet from top of header */
-          'inset-x-0 bottom-0 top-[57px] rounded-none sm:inset-x-auto sm:bottom-20 sm:end-5 sm:top-auto sm:rounded-2xl',
-          open
-            ? minimized
-              ? 'sm:h-14 sm:w-80 opacity-100'
-              : 'sm:h-[540px] sm:w-80 opacity-100'
-            : 'pointer-events-none opacity-0 sm:h-0 sm:w-80',
-        )}
-      >
-        {/* ── Header ── */}
-        <div className="flex shrink-0 items-center gap-2.5 border-b border-white/10 bg-[#202C33] px-4 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] shadow-[0_2px_8px_rgba(37,211,102,0.3)]">
-            <Sparkles className="h-4 w-4 text-white" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white">{t('assistant.title')}</p>
-            {currentPage && !minimized && (
-              <p className="truncate text-[10px] text-[#8696A0]">
-                {t('assistant.subtitle', { page: currentPage })}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setMinimized((v) => !v)}
-            className="rounded-lg p-1.5 text-[#8696A0] hover:bg-white/10 hover:text-white transition-colors"
-            aria-label={minimized ? t('assistant.expand') : t('assistant.minimize')}
-          >
-            {minimized ? (
-              <ChevronDown className="h-4 w-4 rotate-180" />
-            ) : (
-              <Minimize2 className="h-4 w-4" />
-            )}
-          </button>
-          <button
-            type="button"
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="assistant-backdrop"
+            className="fixed inset-0 z-40 bg-[rgb(8_12_10/0.25)] sm:bg-transparent"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setOpen(false)}
-            className="rounded-lg p-1.5 text-[#8696A0] hover:bg-white/10 hover:text-white transition-colors"
-            aria-label={t('assistant.close')}
+            aria-hidden="true"
+          />
+          <motion.aside
+            key="assistant-panel"
+            dir={isRTL ? 'rtl' : 'ltr'}
+            role="dialog"
+            aria-label={t('assistant.title')}
+            initial={{ x: isRTL ? '-100%' : '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: isRTL ? '-100%' : '100%' }}
+            transition={{ type: 'spring', stiffness: 420, damping: 42 }}
+            className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-line bg-surface shadow-pop sm:w-[400px]"
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+            <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line px-4">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-ink">{t('assistant.title')}</p>
+                {currentPage && <p className="truncate text-2xs text-ink-3">{t('assistant.subtitle', { page: currentPage })}</p>}
+              </div>
+              {messages.length > 0 && (
+                <button type="button" onClick={clearChat} className="btn btn-ghost btn-sm">{t('assistant.clearChat')}</button>
+              )}
+              <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost btn-icon btn-sm" aria-label={t('assistant.close')}>
+                <X aria-hidden="true" />
+              </button>
+            </div>
 
-        {!minimized && (
-          <>
-            {/* ── Messages ── */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+            <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
-                <div className="space-y-3 pt-1">
-                  {/* Welcome */}
-                  <div className="flex gap-2 items-start">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#25D366]/20 mt-0.5">
-                      <Sparkles className="h-3.5 w-3.5 text-[#25D366]" />
-                    </div>
-                    <div className="rounded-2xl rounded-ss-sm bg-[#202C33] px-3 py-2.5 text-xs leading-relaxed text-[#E9EDEF]">
-                      {t('assistant.emptyHint')}
-                    </div>
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-line bg-raised px-3.5 py-3 text-[13px] leading-relaxed text-ink-2">
+                    {t('assistant.emptyHint')}
                   </div>
-
-                  {/* Quick prompts */}
-                  <div className="space-y-1.5 ps-9">
-                    {Array.isArray(quickPrompts) &&
-                      quickPrompts.map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => send(p)}
-                          className="w-full rounded-xl border border-white/10 bg-[#202C33] px-3 py-2 text-start text-[11px] text-[#8696A0] hover:border-[#25D366]/40 hover:bg-[#25D366]/10 hover:text-white transition-all"
-                        >
-                          {p}
-                        </button>
-                      ))}
+                  <div className="stagger space-y-1.5">
+                    {Array.isArray(quickPrompts) && quickPrompts.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => send(p)}
+                        className="flex w-full items-center gap-2 rounded-lg border border-line px-3 py-2 text-start text-xs text-ink-2 transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-ink"
+                      >
+                        <Sparkles className="h-3 w-3 shrink-0 text-brand" aria-hidden="true" />
+                        {p}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -354,62 +324,28 @@ export default function CrmAssistantBubble() {
                   {messages.map((msg, idx) => {
                     const isUser = msg.role === 'user';
                     const prevSame = idx > 0 && messages[idx - 1].role === msg.role;
-
                     return (
-                      <div
-                        key={msg.ts}
-                        className={cn(
-                          'flex items-end gap-1.5',
-                          isUser ? 'justify-end' : 'justify-start',
-                          prevSame ? 'mt-0.5' : 'mt-2',
-                        )}
-                      >
-                        {/* AI avatar */}
-                        {!isUser && !prevSame && (
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#25D366]/20 mb-0.5">
-                            <Sparkles className="h-3 w-3 text-[#25D366]" />
-                          </div>
-                        )}
-                        {!isUser && prevSame && <div className="w-6 shrink-0" />}
-
-                        <div className="flex max-w-[78%] flex-col gap-0.5">
-                          <div
-                            dir="auto"
-                            className={cn(
-                              'rounded-2xl px-3 py-2 text-xs leading-relaxed',
-                              isUser
-                                ? 'rounded-ee-sm bg-[#005C4B] text-white'
-                                : cn(
-                                    'rounded-ss-sm bg-[#202C33] text-[#E9EDEF]',
-                                    msg.failed && 'border border-red-500/30 bg-red-500/10',
-                                  ),
-                            )}
-                          >
-                            <MarkdownText text={msg.content} />
-                          </div>
-                          <span
-                            dir="ltr"
-                            className={cn(
-                              'text-[9px] text-[#8696A0] px-1',
-                              isUser ? 'text-end' : 'text-start',
-                            )}
-                          >
-                            {formatTime(msg.ts)}
-                          </span>
+                      <div key={msg.ts} className={cn('pop-enter flex flex-col', isUser ? 'items-end' : 'items-start', prevSame ? 'mt-0.5' : 'mt-3')}>
+                        <div
+                          dir="auto"
+                          className={cn(
+                            'max-w-[85%] rounded-xl px-3 py-2 text-[13px] leading-relaxed',
+                            isUser
+                              ? 'rounded-ee-sm bg-brand text-brand-fg'
+                              : cn('rounded-ss-sm bg-raised text-ink ring-1 ring-inset ring-line', msg.failed && 'bg-red-500/10 ring-red-500/30'),
+                          )}
+                        >
+                          <MarkdownText text={msg.content} />
                         </div>
+                        {!(idx < messages.length - 1 && messages[idx + 1].role === msg.role) && (
+                          <span dir="ltr" className="mt-1 px-1 text-[10px] tabular-nums text-ink-4">{formatTime(msg.ts)}</span>
+                        )}
                       </div>
                     );
                   })}
-
-                  {/* Typing indicator */}
                   {loading && (
-                    <div className="flex items-end gap-1.5 mt-2">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#25D366]/20 mb-0.5">
-                        <Sparkles className="h-3 w-3 text-[#25D366]" />
-                      </div>
-                      <div className="rounded-2xl rounded-ss-sm bg-[#202C33] px-3 py-2.5">
-                        <TypingDots />
-                      </div>
+                    <div className="mt-3 inline-flex rounded-xl rounded-ss-sm bg-raised px-3 py-2.5 ring-1 ring-inset ring-line">
+                      <TypingDots />
                     </div>
                   )}
                 </>
@@ -417,18 +353,8 @@ export default function CrmAssistantBubble() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* ── Input ── */}
-            <div className="shrink-0 border-t border-white/10 bg-[#111B21] px-3 pb-3 pt-2">
-              {messages.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearChat}
-                  className="mb-2 block text-[10px] text-[#8696A0] hover:text-white transition-colors"
-                >
-                  {t('assistant.clearChat')}
-                </button>
-              )}
-              <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-[#202C33] px-3 py-2 focus-within:border-[#25D366]/50 transition-colors">
+            <div className="shrink-0 border-t border-line p-3 pb-safe">
+              <div className="flex items-end gap-2 rounded-xl border border-line bg-surface px-3 py-2 transition-[border-color,box-shadow] focus-within:border-brand focus-within:ring-[3px] focus-within:ring-brand/15">
                 <textarea
                   ref={inputRef}
                   dir="auto"
@@ -438,56 +364,22 @@ export default function CrmAssistantBubble() {
                   placeholder={t('assistant.inputPlaceholder')}
                   disabled={loading}
                   rows={1}
-                  className="flex-1 resize-none overflow-hidden max-h-24 bg-transparent text-xs text-white placeholder:text-[#8696A0] outline-none disabled:opacity-50 leading-relaxed"
+                  className="max-h-24 flex-1 resize-none overflow-hidden bg-transparent py-1 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => send(input)}
                   disabled={!input.trim() || loading}
-                  className={cn(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-                    'bg-[#25D366] text-white transition-all hover:bg-[#128C7E]',
-                    'disabled:opacity-40 disabled:cursor-not-allowed',
-                  )}
+                  className="btn btn-primary btn-icon btn-sm"
                   aria-label={t('composer.sendMessage')}
                 >
-                  <Send className={cn('h-3.5 w-3.5', isRTL && 'scale-x-[-1]')} />
+                  <Send className="icon-mirror" aria-hidden="true" />
                 </button>
               </div>
-              <p className="mt-1.5 text-center text-[9px] text-[#8696A0]/60">
-                {t('assistant.title')} · AI
-              </p>
             </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Floating button (desktop only — mobile uses header Bot icon) ── */}
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((v) => !v);
-          setMinimized(false);
-        }}
-        className={cn(
-          'fixed bottom-5 end-5 z-50 hidden sm:flex h-14 w-14 items-center justify-center rounded-full',
-          'bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white',
-          'shadow-[0_4px_20px_rgba(37,211,102,0.4)]',
-          'transition-all duration-200 hover:scale-105 active:scale-95',
-          open && 'shadow-[0_4px_20px_rgba(37,211,102,0.6)] scale-105',
-        )}
-        aria-label={t('assistant.toggle')}
-      >
-        <div className={cn('transition-transform duration-200', open && 'rotate-90')}>
-          {open ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
-        </div>
-        {/* Unread badge */}
-        {!open && messages.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] font-bold text-[#128C7E]">
-            {messages.length > 9 ? '9+' : messages.length}
-          </span>
-        )}
-      </button>
-    </>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

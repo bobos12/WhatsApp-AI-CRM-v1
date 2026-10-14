@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Plus, ChevronDown } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { X, Plus, ChevronDown, Check, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/page';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reusable form primitives for the AI Configuration screen. Styled to match the
-// existing admin/chatbot page (WhatsApp dark theme).
+// Form primitives for the AI configuration screens. The bot's rules are strict
+// and numerous; these exist so each one reads as a plain sentence with a
+// control beside it, not as a technical field in a box inside a box.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function Toggle({
@@ -19,31 +22,10 @@ export function Toggle({
   onChange: () => void;
   disabled?: boolean;
 }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onChange}
-      className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50',
-        checked ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/20',
-        disabled && 'opacity-50 cursor-not-allowed',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-          // Direction-aware: in RTL the track is mirrored, so flip the slide.
-          checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1',
-        )}
-      />
-    </button>
-  );
+  return <Switch checked={checked} onChange={() => onChange()} disabled={disabled} />;
 }
 
+/** One setting: what it does on the start side, the control on the end side. */
 export function SettingRow({
   label,
   description,
@@ -54,22 +36,27 @@ export function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4">
+    <div className="flex items-center justify-between gap-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-black dark:text-white">{label}</p>
-        {description && <p className="mt-0.5 text-xs text-gray-600 dark:text-[#8696A0]">{description}</p>}
+        <p className="text-[13px] font-medium text-ink">{label}</p>
+        {description && <p className="mt-0.5 text-xs leading-5 text-ink-3">{description}</p>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
   );
 }
 
+/** A bordered list of SettingRows with hairlines between them. */
+export function SettingsGroup({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('divide-y divide-line rounded-lg border border-line px-3.5', className)}>{children}</div>;
+}
+
 export function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
-    <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-[#8696A0]">
-      {children}
-      {hint && <span className="text-[10px] text-gray-500 dark:text-[#8696A0]/60">{hint}</span>}
-    </label>
+    <div>
+      <label className="block text-[13px] font-medium text-ink">{children}</label>
+      {hint && <p className="mt-0.5 text-xs leading-5 text-ink-3">{hint}</p>}
+    </div>
   );
 }
 
@@ -95,34 +82,51 @@ export function TextInput({
       dir={dir}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={cn(
-        'w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:outline-none focus:ring-2 focus:ring-[#25D366]/30',
-        className,
-      )}
+      className={cn('field', type === 'number' && 'tabular-nums', className)}
     />
   );
 }
 
+/**
+ * Multi-line text. Long instructions show their size — characters and a rough
+ * token count — because a prompt that silently grows past the model's budget is
+ * one of the few ways to break the bot without touching a single toggle.
+ */
 export function TextArea({
   value,
   onChange,
   placeholder,
   rows = 3,
+  showCount,
+  softLimit,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  showCount?: boolean;
+  /** Characters after which the counter turns amber. */
+  softLimit?: number;
 }) {
+  const chars = value?.length ?? 0;
+  const tokens = Math.ceil(chars / 4);
+  const over = softLimit != null && chars > softLimit;
   return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      rows={rows}
-      dir="auto"
-      placeholder={placeholder}
-      className="w-full min-h-[88px] rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2.5 text-sm leading-relaxed text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] resize-y focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
-    />
+    <div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        dir="auto"
+        placeholder={placeholder}
+        className="field min-h-[76px] resize-y"
+      />
+      {showCount && chars > 0 && (
+        <p className={cn('mt-1 text-end text-2xs tabular-nums', over ? 'text-amber-700 dark:text-amber-400' : 'text-ink-4')}>
+          {chars.toLocaleString()} chars · ≈{tokens.toLocaleString()} tokens
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -136,7 +140,7 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <FieldLabel hint={hint}>{label}</FieldLabel>
       {children}
     </div>
@@ -168,18 +172,19 @@ export function Slider({
   minLabel?: string;
   maxLabel?: string;
 }) {
+  const pct = ((value - min) / (max - min || 1)) * 100;
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {icon}
-          <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{label}</label>
+          <label className="text-[13px] font-medium text-ink">{label}</label>
         </div>
-        <span className="rounded-lg bg-gray-100 dark:bg-[#111B21] px-2 py-0.5 text-xs font-mono text-[#25D366]">
+        <span className="rounded-md bg-raised px-1.5 py-0.5 font-mono text-xs tabular-nums text-ink-2 ring-1 ring-inset ring-line">
           {display ?? value}
         </span>
       </div>
-      {hint && <p className="text-[11px] leading-4 text-gray-600 dark:text-[#8696A0]">{hint}</p>}
+      {hint && <p className="text-xs leading-5 text-ink-3">{hint}</p>}
       <input
         type="range"
         min={min}
@@ -187,10 +192,11 @@ export function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-[#25D366]"
+        className="nx-range w-full"
+        style={{ '--range-pct': `${pct}%` } as React.CSSProperties}
       />
       {(minLabel || maxLabel) && (
-        <div className="flex justify-between text-[10px] text-gray-600 dark:text-[#8696A0]">
+        <div className="flex justify-between text-2xs text-ink-4">
           <span>{minLabel}</span>
           <span>{maxLabel}</span>
         </div>
@@ -209,18 +215,14 @@ export function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="seg max-w-full flex-wrap">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
+          data-active={value === o.value}
           onClick={() => onChange(o.value)}
-          className={cn(
-            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
-            value === o.value
-              ? 'border-[#25D366] bg-[#25D366]/10 text-[#25D366]'
-              : 'border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] text-gray-700 dark:text-[#8696A0] hover:border-gray-400 dark:hover:border-white/20 hover:text-black dark:hover:text-white',
-          )}
+          className="seg-item"
         >
           {o.label}
         </button>
@@ -235,11 +237,13 @@ export function TagListEditor({
   onChange,
   placeholder,
   multiline,
+  numbered = true,
 }: {
   items: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
   multiline?: boolean;
+  numbered?: boolean;
 }) {
   const { t } = useTranslation('aiconfig');
   const [draft, setDraft] = useState('');
@@ -253,36 +257,38 @@ export function TagListEditor({
 
   return (
     <div className="space-y-2">
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div key={i} className="flex items-start gap-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] p-2.5">
-            <textarea
-              value={item}
-              dir="auto"
-              rows={multiline ? 2 : 1}
-              onChange={(e) => {
-                const next = [...items];
-                next[i] = e.target.value;
-                onChange(next);
-              }}
-              className="flex-1 resize-none bg-transparent text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => onChange(items.filter((_, idx) => idx !== i))}
-              className="mt-0.5 shrink-0 rounded-md p-1 text-gray-500 dark:text-[#8696A0] hover:bg-gray-200 dark:hover:bg-white/5 hover:text-red-600 dark:hover:text-red-400"
-              aria-label="Remove"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-        {items.length === 0 && (
-          <p className="rounded-lg border border-dashed border-gray-300 dark:border-white/10 px-3 py-2 text-xs text-gray-600 dark:text-[#8696A0]">
-            {t('common.noneYet')}
-          </p>
-        )}
-      </div>
+      {items.length > 0 ? (
+        <ol className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+          {items.map((item, i) => (
+            <li key={i} className="group flex items-start gap-2.5 bg-surface px-3 py-2 transition-colors focus-within:bg-raised/50">
+              {numbered && <span className="mt-[3px] w-4 shrink-0 text-end text-2xs font-medium tabular-nums text-ink-4">{i + 1}</span>}
+              <textarea
+                value={item}
+                dir="auto"
+                rows={multiline ? 2 : 1}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[i] = e.target.value;
+                  onChange(next);
+                }}
+                className="min-h-[22px] flex-1 resize-none bg-transparent text-[13px] leading-[22px] text-ink outline-none placeholder:text-ink-4"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(items.filter((_, idx) => idx !== i))}
+                className="mt-0.5 shrink-0 rounded p-0.5 text-ink-4 opacity-60 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-500/10"
+                aria-label="Remove"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs text-ink-3">
+          {t('common.noneYet')}
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <input
           value={draft}
@@ -295,14 +301,10 @@ export function TagListEditor({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
+          className="field flex-1"
         />
-        <button
-          type="button"
-          onClick={add}
-          className="inline-flex items-center gap-1 rounded-lg bg-[#25D366]/15 px-3 py-2 text-xs font-medium text-[#25D366] hover:bg-[#25D366]/25"
-        >
-          <Plus className="h-3.5 w-3.5" /> {t('common.add')}
+        <button type="button" onClick={add} disabled={!draft.trim()} className="btn btn-secondary">
+          <Plus aria-hidden="true" /> {t('common.add')}
         </button>
       </div>
     </div>
@@ -324,13 +326,14 @@ export function KeyValueEditor({
         <div key={i} className="flex items-center gap-2">
           <input
             value={item.key}
+            dir="ltr"
             onChange={(e) => {
               const next = [...items];
               next[i] = { ...next[i], key: e.target.value };
               onChange(next);
             }}
             placeholder={t('common.variableName')}
-            className="w-40 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
+            className="field w-40 font-mono text-xs"
           />
           <input
             value={item.value}
@@ -341,24 +344,20 @@ export function KeyValueEditor({
               onChange(next);
             }}
             placeholder={t('common.value')}
-            className="flex-1 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
+            className="field flex-1"
           />
           <button
             type="button"
             onClick={() => onChange(items.filter((_, idx) => idx !== i))}
-            className="shrink-0 rounded-md p-1.5 text-gray-500 dark:text-[#8696A0] hover:bg-gray-200 dark:hover:bg-white/5 hover:text-red-600 dark:hover:text-red-400"
+            className="btn btn-ghost btn-icon btn-sm hover:text-red-600"
             aria-label="Remove"
           >
-            <X className="h-3.5 w-3.5" />
+            <X aria-hidden="true" />
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => onChange([...items, { key: '', value: '' }])}
-        className="inline-flex items-center gap-1 rounded-lg bg-[#25D366]/15 px-3 py-2 text-xs font-medium text-[#25D366] hover:bg-[#25D366]/25"
-      >
-        <Plus className="h-3.5 w-3.5" /> {t('common.addVariable')}
+      <button type="button" onClick={() => onChange([...items, { key: '', value: '' }])} className="btn btn-secondary btn-sm">
+        <Plus aria-hidden="true" /> {t('common.addVariable')}
       </button>
     </div>
   );
@@ -366,9 +365,8 @@ export function KeyValueEditor({
 
 /**
  * Toggle a set of values on/off from a known list of options (e.g. tags or
- * lifecycle stages). Selected values are highlighted. `selected` may contain
- * values not present in `options` (e.g. a tag that was deleted) — those still
- * render as removable chips so the admin can clear them.
+ * lifecycle stages). `selected` may contain values not present in `options`
+ * (e.g. a tag that was deleted) — those still render so they can be cleared.
  */
 export function ChipMultiSelect({
   options,
@@ -384,20 +382,19 @@ export function ChipMultiSelect({
   const toggle = (v: string) => {
     onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   };
-  // Values selected but no longer in the options list.
   const orphans = selected.filter((v) => !options.includes(v));
   const all = [...options, ...orphans];
 
   if (all.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 dark:border-white/10 px-3 py-2 text-xs text-gray-600 dark:text-[#8696A0]">
+      <p className="rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs text-ink-3">
         {emptyLabel ?? 'No options available.'}
       </p>
     );
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {all.map((v) => {
         const active = selected.includes(v);
         return (
@@ -405,14 +402,13 @@ export function ChipMultiSelect({
             key={v}
             type="button"
             onClick={() => toggle(v)}
+            aria-pressed={active}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
-              active
-                ? 'border-[#25D366] bg-[#25D366]/15 text-[#25D366]'
-                : 'border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] text-gray-700 dark:text-[#8696A0] hover:border-gray-400 dark:hover:border-white/20 hover:text-black dark:hover:text-white',
+              'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+              active ? 'border-brand/40 bg-brand/10 text-brand' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink',
             )}
           >
-            {active && <X className="h-3 w-3" />}
+            {active && <Check className="h-3 w-3" aria-hidden="true" />}
             {v}
           </button>
         );
@@ -422,58 +418,60 @@ export function ChipMultiSelect({
 }
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{children}</p>
-  );
+  return <p className="eyebrow mb-2">{children}</p>;
 }
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-4', className)}>
+    <div className={cn('space-y-4 rounded-lg border border-line bg-raised/40 p-4', className)}>
       {children}
     </div>
   );
 }
 
 /**
- * Top-level "card" for the easy/single-page builder: an emoji + plain-language
- * title + subtitle, with the body below. Mobile-first (full width, generous
- * spacing). Use one per topic the business owner cares about.
+ * A topic of the configuration — one per thing a business owner cares about.
+ * `emoji` is accepted for compatibility but no longer drawn; sections carry a
+ * line icon so the page reads as one system rather than a sticker sheet.
  */
 export function SectionCard({
-  emoji,
   title,
   subtitle,
   badge,
+  icon: Icon,
   children,
 }: {
-  emoji: string;
+  emoji?: string;
+  icon?: LucideIcon;
   title: string;
   subtitle?: string;
   badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-4 sm:p-6 space-y-5">
-      <header className="flex items-start gap-3">
-        <span aria-hidden className="text-2xl leading-none shrink-0">{emoji}</span>
+    <section className="panel">
+      <header className="flex items-start gap-3 border-b border-line px-5 py-4">
+        {Icon && (
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-raised text-ink-2 ring-1 ring-inset ring-line">
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base sm:text-lg font-semibold text-black dark:text-white">{title}</h2>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>
             {badge}
           </div>
-          {subtitle && <p className="mt-1 text-xs sm:text-sm leading-5 text-gray-600 dark:text-[#8696A0]">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 text-[13px] leading-5 text-ink-3">{subtitle}</p>}
         </div>
       </header>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-5 px-5 py-5">{children}</div>
     </section>
   );
 }
 
 /**
- * Collapsible "More options" disclosure for the rarely-used / technical settings
- * inside a SectionCard. Closed by default so the page stays simple, but nothing
- * is lost — power users expand it to reach everything.
+ * Collapsible "More options" for rarely-used or technical settings. Closed by
+ * default so the page stays simple; nothing is lost — it is one click away.
  */
 export function MoreOptions({
   label,
@@ -487,17 +485,29 @@ export function MoreOptions({
   const { t } = useTranslation('aiconfig');
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100/50 dark:bg-[#0B141A]/40">
+    <div className="rounded-lg border border-line">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0] hover:text-black dark:hover:text-white"
+        className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
       >
         <span>{label ?? t('common.moreOptions')}</span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-ink-4 transition-transform duration-base ease-out', open && 'rotate-180')} />
       </button>
-      {open && <div className="space-y-4 border-t border-gray-200 dark:border-white/10 p-3">{children}</div>}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-4 border-t border-line p-3.5">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

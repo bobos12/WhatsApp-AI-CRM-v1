@@ -73,7 +73,20 @@ export function ensureFlowWorker() {
       try {
         await providerManager.sendMessage({ phone, text: step.message });
       } catch (err) {
-        logger.warn('flow.step.send_failed', { executionId, stepIndex, error: String(err) });
+        // On the Cloud API a delayed step is the classic way to fall outside the
+        // 24h window: the flow was triggered by an inbound message, but a step
+        // scheduled hours or days later is free-form content Meta will refuse.
+        // Logged with its code so this is diagnosable as a policy limit rather
+        // than an unexplained "automation didn't fire" — the remedy is a
+        // template step, not a retry.
+        const code = (err as { code?: string })?.code;
+        logger.warn('flow.step.send_failed', {
+          executionId,
+          stepIndex,
+          code: code ?? null,
+          windowClosed: code === 'TEMPLATE_REQUIRED' || code === 'META_TEMPLATE_REQUIRED',
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

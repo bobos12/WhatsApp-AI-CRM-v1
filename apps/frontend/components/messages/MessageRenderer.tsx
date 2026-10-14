@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ChevronDown, Copy, Forward, Reply, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Forward, Reply, Smile, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type {
   MessageDTO,
@@ -239,20 +239,20 @@ function StatusTick({ status }: { status: MessageStatus }) {
   }
   if (status === 'provider_accepted') {
     return (
-      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-gray-400" fill="currentColor" aria-label="Sent">
+      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-ink-4" fill="currentColor" aria-label="Sent">
         <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
       </svg>
     );
   }
   if (status === 'server_confirmed') {
     return (
-      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-gray-500" fill="currentColor" aria-label="Confirmed">
+      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-ink-3" fill="currentColor" aria-label="Confirmed">
         <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
       </svg>
     );
   }
   const isRead = status === 'read';
-  const color = isRead ? '#53BDEB' : 'currentColor';
+  const color = isRead ? '#34B7F1' : 'currentColor';
   return (
     <svg viewBox="0 0 20 11" className="h-3 w-auto shrink-0" fill={color} aria-label={isRead ? 'Read' : 'Delivered'}>
       <path d="M15.071.653a.75.75 0 0 1 .025 1.06L9.196 8.1 7.12 6.079a.75.75 0 1 0-1.06 1.072L8.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
@@ -301,39 +301,25 @@ function VoiceNotePlayer({ src, duration, isFromMe }: { src: string; duration?: 
   };
 
   return (
-    <div className={`w-full rounded-2xl border px-3 py-3 ${isFromMe ? 'border-[#25D366]/25 bg-[#DCF8C6] dark:bg-[#005C4B]/60' : 'border-gray-200 bg-white dark:border-white/10 dark:bg-[#202C33]'}`}>
+    <div className="flex w-[260px] max-w-full items-center gap-2.5 py-0.5 sm:w-[300px]">
       <audio ref={audioRef} preload="metadata" className="hidden"><source src={src} /></audio>
-      <div className="flex items-start gap-3">
-        <button type="button" onClick={toggle}
-          className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white transition hover:bg-[#25D366]/90"
-          aria-label={playing ? t('message.pauseAudio') : t('message.playAudio')}>
-          {playing
-            ? <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
-            : <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M8 5v14l11-7z" /></svg>}
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900 dark:text-[#E9EDEF]">{t('message.voiceNote')}</p>
-              <p className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{t('message.audioSubtitle')}</p>
-            </div>
-            <span dir="ltr" className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isFromMe ? 'bg-black/10 text-gray-800 dark:bg-white/15 dark:text-[#E9EDEF]' : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white'}`}>
-              {formatClock(total || 0)}
-            </span>
-          </div>
-          {/* Force LTR: an audio scrubber always fills left→right (elapsed on the
-              left, remaining on the right), even in the Arabic/RTL layout. */}
-          <div className="mt-3 space-y-2" dir="ltr">
-            <input type="range" min={0} max={Math.max(0, total || 0)} step="0.1" value={current}
-              onChange={(e) => seek(Number(e.target.value))}
-              style={{ '--vn-progress': `${progress}%` } as CSSProperties}
-              className={`vn-range ${isFromMe ? 'vn-light' : 'vn-dark'}`}
-              aria-label={t('message.seekAudio')} />
-            <div className="flex items-center justify-between text-xs font-medium text-gray-500 dark:text-[#8696A0]">
-              <span>{formatClock(current)}</span>
-              <span>{formatClock(remaining)}</span>
-            </div>
-          </div>
+      <button type="button" onClick={toggle}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg transition-transform active:scale-95"
+        aria-label={playing ? t('message.pauseAudio') : t('message.playAudio')}>
+        {playing
+          ? <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+          : <svg viewBox="0 0 24 24" className="ms-0.5 h-4 w-4 fill-current"><path d="M8 5v14l11-7z" /></svg>}
+      </button>
+      {/* Force LTR: an audio scrubber always fills left→right, Arabic included. */}
+      <div className="min-w-0 flex-1" dir="ltr">
+        <input type="range" min={0} max={Math.max(0, total || 0)} step="0.1" value={current}
+          onChange={(e) => seek(Number(e.target.value))}
+          style={{ '--vn-progress': `${progress}%` } as CSSProperties}
+          className={`vn-range ${isFromMe ? 'vn-light' : 'vn-dark'}`}
+          aria-label={t('message.seekAudio')} />
+        <div className="mt-1 flex justify-between text-[11px] tabular-nums text-ink-3">
+          <span>{formatClock(playing || current > 0 ? current : total || 0)}</span>
+          {playing && <span>-{formatClock(remaining)}</span>}
         </div>
       </div>
     </div>
@@ -344,8 +330,8 @@ function VoiceNotePlayer({ src, duration, isFromMe }: { src: string; duration?: 
 
 function ReplyQuoteView({ block, isFromMe }: { block: { preview: string; kind: MessageKind }; isFromMe: boolean }) {
   return (
-    <div className={`mb-1 rounded-lg border-l-4 px-2 py-1 text-xs ${isFromMe ? 'border-white/40 bg-black/10' : 'border-[#25D366] bg-black/10'}`}>
-      <p className="opacity-80 truncate">{block.preview || '(message)'}</p>
+    <div className={`mb-1 rounded-md border-s-[3px] px-2 py-1 text-xs ${isFromMe ? 'border-brand/60 bg-black/[0.05] dark:bg-black/20' : 'border-brand bg-black/[0.04] dark:bg-white/[0.05]'}`}>
+      <p className="truncate text-ink-2">{block.preview || '(message)'}</p>
     </div>
   );
 }
@@ -381,9 +367,9 @@ function FileTypeIcon({ ext, isFromMe }: { ext: string; isFromMe: boolean }) {
     XLS: 'text-green-400', XLSX: 'text-green-400', PPT: 'text-orange-400',
     ZIP: 'text-yellow-400', TXT: 'text-gray-400',
   };
-  const color = colorMap[ext] ?? 'text-gray-500 dark:text-[#8696A0]';
+  const color = colorMap[ext] ?? 'text-ink-3';
   return (
-    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isFromMe ? 'bg-black/10 dark:bg-white/10' : 'bg-gray-100 dark:bg-white/10'}`}>
+    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isFromMe ? 'bg-black/10 dark:bg-white/10' : 'bg-raised'}`}>
       <svg viewBox="0 0 24 24" className={`h-6 w-6 fill-current ${color}`} aria-hidden>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z"/>
       </svg>
@@ -460,9 +446,9 @@ function MediaBlockView({ media, caption, isFromMe }: { media: Media; caption?: 
         <div className={`flex h-48 w-full items-center justify-center rounded-xl overflow-hidden ${isFromMe ? 'bg-gradient-to-br from-black/20 to-black/10' : 'bg-gradient-to-br from-gray-100 to-gray-50 dark:from-white/20 dark:to-white/10'}`}>
           <div className="flex flex-col items-center gap-2.5 text-center px-4">
             <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${isFromMe ? 'bg-black/10' : 'bg-gray-200 dark:bg-white/15'}`}>
-              <svg viewBox="0 0 24 24" className="h-6 w-6 text-gray-500 dark:text-[#8696A0]" fill="currentColor" opacity="0.6"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+              <svg viewBox="0 0 24 24" className="h-6 w-6 text-ink-3" fill="currentColor" opacity="0.6"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
             </div>
-            <p className="text-xs font-medium text-gray-600 dark:text-[#AEBAC1]">{t('message.imageUnavailable')}</p>
+            <p className="text-xs font-medium text-ink-2">{t('message.imageUnavailable')}</p>
           </div>
         </div>
       );
@@ -509,9 +495,9 @@ function MediaBlockView({ media, caption, isFromMe }: { media: Media; caption?: 
     return src
       ? <VoiceNotePlayer src={src} duration={media.durationSec} isFromMe={isFromMe} />
       : (
-        <div className={`flex items-center gap-2 rounded-2xl px-3 py-2 ${isFromMe ? 'bg-black/10' : 'bg-gray-100 dark:bg-white/10'}`}>
+        <div className={`flex items-center gap-2 rounded-2xl px-3 py-2 ${isFromMe ? 'bg-black/10' : 'bg-raised'}`}>
           <svg viewBox="0 0 24 24" className="h-5 w-5 opacity-50 fill-current"><path d="M12 3a9 9 0 0 0-9 9h2a7 7 0 0 1 7-7V3z"/></svg>
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('message.audioUnavailable')}</p>
+          <p className="text-xs text-ink-3">{t('message.audioUnavailable')}</p>
         </div>
       );
   }
@@ -522,10 +508,10 @@ function MediaBlockView({ media, caption, isFromMe }: { media: Media; caption?: 
       <div className={`flex items-center gap-3 rounded-xl px-3 py-3 ${isFromMe ? 'bg-black/10' : 'bg-gray-50 dark:bg-white/10'}`}>
         <FileTypeIcon ext={fileExtension(media.fileName, media.mime)} isFromMe={isFromMe} />
         <div className="min-w-0 max-w-[55vw] flex-1 sm:max-w-[240px]">
-          <p className="truncate text-sm font-medium text-gray-900 dark:text-[#E9EDEF]">
+          <p className="truncate text-sm font-medium text-ink">
             {media.fileName ?? t('message.attachmentUnavailable')}
           </p>
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('message.fileUnavailable')}</p>
+          <p className="text-xs text-ink-3">{t('message.fileUnavailable')}</p>
         </div>
       </div>
     );
@@ -539,44 +525,44 @@ function MediaBlockView({ media, caption, isFromMe }: { media: Media; caption?: 
       <div className="flex items-center gap-3 px-3 py-3">
         <FileTypeIcon ext={ext} isFromMe={isFromMe} />
         <div className="min-w-0 max-w-[55vw] flex-1 sm:max-w-[240px]">
-          <p className="truncate text-sm font-medium text-gray-900 dark:text-[#E9EDEF]">
+          <p className="truncate text-sm font-medium text-ink">
             {media.fileName ?? `Attachment.${ext.toLowerCase()}`}
           </p>
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+          <p className="text-xs text-ink-3">
             {[ext, sizeLabel].filter(Boolean).join(' · ')}
           </p>
         </div>
       </div>
-      <div className={`flex items-center gap-1 border-t px-3 py-1.5 ${isFromMe ? 'border-black/10' : 'border-gray-200 dark:border-white/10'}`}>
+      <div className={`flex items-center gap-1 border-t px-3 py-1.5 ${isFromMe ? 'border-black/10' : 'border-line'}`}>
         <a
           href={src}
           download={media.fileName ?? true}
-          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium transition-colors text-[#1D9BF0] hover:text-[#1a91e0]"
+          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300"
         >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           {t('message.downloadFile')}
         </a>
-        <div className={`h-4 w-px ${isFromMe ? 'bg-black/10' : 'bg-gray-200 dark:bg-white/10'}`} />
+        <div className={`h-4 w-px ${isFromMe ? 'bg-black/10' : 'bg-overlay'}`} />
         <a
           href={src}
           target="_blank"
           rel="noreferrer"
-          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium transition-colors text-[#1D9BF0] hover:text-[#1a91e0]"
+          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300"
         >
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
           {t('message.openFile')}
         </a>
       </div>
       {caption && (
-        <div className={`px-3 pb-2 pt-0 border-t ${isFromMe ? 'border-black/10' : 'border-gray-200 dark:border-white/10'}`}>
-          <p className="text-xs text-gray-600 dark:text-[#AEBAC1] break-words">{caption}</p>
+        <div className={`px-3 pb-2 pt-0 border-t ${isFromMe ? 'border-black/10' : 'border-line'}`}>
+          <p className="text-xs text-ink-2 break-words">{caption}</p>
         </div>
       )}
     </div>
   );
 }
 
-function BodyTextView({ text, isFromMe }: { text: string; isFromMe: boolean }) {
+function BodyTextView({ text, isFromMe, trailing }: { text: string; isFromMe: boolean; trailing?: React.ReactNode }) {
   const { t } = useTranslation('chat');
   const ref = useRef<HTMLDivElement | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -595,7 +581,7 @@ function BodyTextView({ text, isFromMe }: { text: string; isFromMe: boolean }) {
 
   return (
     <div>
-      <div ref={ref} className={`text-sm leading-6 break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-5'}`}>
+      <div ref={ref} dir="auto" className={`text-[14px] leading-[1.45] break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-[12]'}`}>
         {parts.map((part, i) => {
           if (typeof part === 'string') {
             return <span key={i}>{part}</span>;
@@ -606,15 +592,16 @@ function BodyTextView({ text, isFromMe }: { text: string; isFromMe: boolean }) {
               href={part.url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`font-semibold underline transition-colors ${isFromMe ? 'text-[#1D9BF0] hover:text-[#1a91e0]' : 'text-[#53BDEB] hover:text-[#7ec8ef]'}`}
+              className="text-sky-700 underline decoration-sky-700/30 underline-offset-2 transition-colors hover:decoration-sky-700 dark:text-sky-300 dark:decoration-sky-300/30"
             >
               {part.text}
             </a>
           );
         })}
+        {trailing}
       </div>
       {clamped && (
-        <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 text-xs font-semibold text-[#25D366]">
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 text-xs font-semibold text-brand">
           {expanded ? t('message.showLess') : t('message.readMore')}
         </button>
       )}
@@ -626,7 +613,7 @@ function ButtonsView({ blocks, isFromMe }: { blocks: Array<{ type: 'reply_button
   return (
     <div className={`mt-2 divide-y border-t ${isFromMe ? 'divide-black/10 border-black/10' : 'divide-gray-200 border-gray-200 dark:divide-white/10 dark:border-white/10'}`}>
       {blocks.map((b, i) => {
-        const base = `w-full py-2 px-1 text-sm font-medium text-center transition text-[#1D9BF0] hover:bg-black/5 dark:text-[#53BDEB] dark:hover:bg-white/5`;
+        const base = `w-full py-2 px-1 text-sm font-medium text-center transition text-sky-700 hover:bg-black/[0.04] dark:text-sky-300 dark:hover:bg-white/5`;
         if (b.type === 'url_button' && b.url) {
           return (
             <a key={i} href={b.url} target="_blank" rel="noreferrer" className={`${base} flex items-center justify-center gap-1`}>
@@ -659,28 +646,28 @@ function ListButtonView({ block, isFromMe }: { block: { buttonText: string; sect
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className={`mt-2 border-t ${isFromMe ? 'border-black/10' : 'border-gray-200 dark:border-white/10'}`}>
+      <div className={`mt-2 border-t ${isFromMe ? 'border-black/10' : 'border-line'}`}>
         <button type="button" onClick={() => setOpen(true)}
-          className="w-full py-2 text-sm font-medium text-center flex items-center justify-center gap-1.5 transition text-[#1D9BF0] hover:bg-black/5 dark:text-[#53BDEB] dark:hover:bg-white/5">
+          className="w-full py-2 text-sm font-medium text-center flex items-center justify-center gap-1.5 transition text-sky-700 hover:bg-black/[0.04] dark:text-sky-300 dark:hover:bg-white/5">
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
           {block.buttonText}
         </button>
       </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-white dark:bg-[#202C33] max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-4 py-3">
-              <span className="font-semibold text-gray-900 dark:text-white">{t('message.selectOption')}</span>
+          <div className="w-full max-w-md rounded-t-2xl bg-white dark:bg-raised max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 flex items-center justify-between border-b border-line bg-white dark:bg-raised px-4 py-3">
+              <span className="font-semibold text-ink">{t('message.selectOption')}</span>
               <button type="button" onClick={() => setOpen(false)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700">✕</button>
             </div>
             {block.sections.map((sec: any, si: number) => (
               <div key={si}>
-                {sec.title && <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{sec.title}</p>}
+                {sec.title && <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-ink-3">{sec.title}</p>}
                 {(sec.rows ?? []).map((row: any, ri: number) => (
                   <button key={ri} type="button" onClick={() => setOpen(false)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-white/5 border-b border-gray-100 dark:border-white/5 last:border-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{row.title}</p>
-                    {row.description && <p className="text-xs text-gray-500 dark:text-[#8696A0]">{row.description}</p>}
+                    className="w-full px-4 py-3 text-left hover:bg-raised border-b border-line last:border-0">
+                    <p className="text-sm font-medium text-ink">{row.title}</p>
+                    {row.description && <p className="text-xs text-ink-3">{row.description}</p>}
                   </button>
                 ))}
               </div>
@@ -694,8 +681,8 @@ function ListButtonView({ block, isFromMe }: { block: { buttonText: string; sect
 
 function NumberedOptionsView({ block, isFromMe }: { block: { intro?: string; options: Array<{ number: number; label: string }> }; isFromMe: boolean }) {
   const { t } = useTranslation('chat');
-  const textColor = 'text-gray-900 dark:text-[#E9EDEF]';
-  const mutedColor = 'text-gray-500 dark:text-[#8696A0]';
+  const textColor = 'text-ink';
+  const mutedColor = 'text-ink-3';
   return (
     <div className="space-y-1.5">
       {block.intro && <p className={`text-sm ${textColor}`}>{block.intro}</p>}
@@ -716,7 +703,7 @@ function LocationView({ block }: { block: { latitude: number; longitude: number;
   return (
     <a href={mapsUrl} target="_blank" rel="noreferrer"
       className="flex items-center gap-2 rounded-xl bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition">
-      <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 fill-[#25D366]" aria-hidden><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 fill-brand" aria-hidden><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
       <div className="min-w-0">
         {block.name && <p className="font-medium truncate">{block.name}</p>}
         {block.address && <p className="text-xs opacity-70 truncate">{block.address}</p>}
@@ -729,7 +716,7 @@ function LocationView({ block }: { block: { latitude: number; longitude: number;
 function TemplateMarkerView({ block, isFromMe }: { block: { templateName: string; language: string }; isFromMe: boolean }) {
   const { t } = useTranslation('chat');
   return (
-    <div className="mb-1 flex items-center gap-1 text-xs text-gray-500 dark:text-[#8696A0]">
+    <div className="mb-1 flex items-center gap-1 text-xs text-ink-3">
       <svg viewBox="0 0 24 24" className="h-3 w-3 fill-current shrink-0" aria-hidden><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
       <span className="truncate">{t('message.templateLabel', { name: block.templateName, lang: block.language })}</span>
     </div>
@@ -738,11 +725,10 @@ function TemplateMarkerView({ block, isFromMe }: { block: { templateName: string
 
 // ── Block dispatcher ──────────────────────────────────────────────────────────
 
-function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
+function BlockRenderer({ block, isFromMe, trailing }: {
   block: RenderableBlock;
   isFromMe: boolean;
-  buttonBuffer: RenderableBlock[];
-  onFlush: (blocks: RenderableBlock[]) => void;
+  trailing?: React.ReactNode;
 }) {
   const { t } = useTranslation('chat');
   switch (block.type) {
@@ -750,19 +736,19 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
       return <ReplyQuoteView block={block} isFromMe={isFromMe} />;
 
     case 'header_text':
-      return <p className="text-sm font-bold leading-snug text-gray-900 dark:text-[#E9EDEF]">{block.text}</p>;
+      return <p className="text-sm font-bold leading-snug text-ink">{block.text}</p>;
 
     case 'header_media':
       return <MediaBlockView media={block.media} isFromMe={isFromMe} />;
 
     case 'body_text':
-      return <BodyTextView text={block.text} isFromMe={isFromMe} />;
+      return <BodyTextView text={block.text} isFromMe={isFromMe} trailing={trailing} />;
 
     case 'media':
       return <MediaBlockView media={block.media} caption={block.caption} isFromMe={isFromMe} />;
 
     case 'footer':
-      return <p className="text-xs text-gray-500 dark:text-[#8696A0]">{block.text}</p>;
+      return <p className="text-xs text-ink-3">{block.text}</p>;
 
     case 'reply_button':
     case 'url_button':
@@ -775,9 +761,9 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
 
     case 'cta_card':
       return (
-        <div className={`mt-2 border-t ${isFromMe ? 'border-black/10' : 'border-gray-200 dark:border-white/10'}`}>
+        <div className={`mt-2 border-t ${isFromMe ? 'border-black/10' : 'border-line'}`}>
           <a href={block.url} target="_blank" rel="noreferrer"
-            className="w-full py-2 text-sm font-medium text-center flex items-center justify-center gap-1.5 transition text-[#1D9BF0] hover:bg-black/5 dark:text-[#53BDEB] dark:hover:bg-white/5">
+            className="w-full py-2 text-sm font-medium text-center flex items-center justify-center gap-1.5 transition text-sky-700 hover:bg-black/[0.04] dark:text-sky-300 dark:hover:bg-white/5">
             {block.displayText}
             <svg viewBox="0 0 24 24" className="h-3 w-3 fill-current opacity-60" aria-hidden><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
           </a>
@@ -792,7 +778,7 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
 
     case 'contact_card':
       return (
-        <div className="flex items-center gap-2 rounded-xl bg-black/10 px-3 py-2 text-sm text-gray-900 dark:text-[#E9EDEF]">
+        <div className="flex items-center gap-2 rounded-xl bg-black/10 px-3 py-2 text-sm text-ink">
           <svg viewBox="0 0 24 24" className="h-8 w-8 shrink-0 fill-gray-400" aria-hidden><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           <div className="min-w-0">
             {block.contacts.slice(0, 2).map((c, i) => (
@@ -808,8 +794,8 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
         <div className="rounded-xl bg-black/10 overflow-hidden">
           {block.image && <MediaBlockView media={block.image} isFromMe={isFromMe} />}
           <div className="px-3 py-2">
-            {block.title && <p className="text-sm font-medium text-gray-900 dark:text-[#E9EDEF]">{block.title}</p>}
-            {block.price && <p className="text-xs text-gray-500 dark:text-[#8696A0]">{block.price}</p>}
+            {block.title && <p className="text-sm font-medium text-ink">{block.title}</p>}
+            {block.price && <p className="text-xs text-ink-3">{block.price}</p>}
           </div>
         </div>
       );
@@ -819,7 +805,7 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
 
     case 'unsupported':
       return (
-        <p className="text-xs italic text-gray-500 dark:text-[#8696A0]">
+        <p className="text-xs italic text-ink-3">
           {block.reason || t('message.unknownType')}
           {block.providerKind && ` (${block.providerKind})`}
         </p>
@@ -830,31 +816,40 @@ function BlockRenderer({ block, isFromMe, buttonBuffer, onFlush }: {
   }
 }
 
+/** Direction of the first strong character, so a bubble lays out like its text. */
+function textDirection(text: string): 'rtl' | 'ltr' | undefined {
+  const m = text.match(/[A-Za-zÀ-ɏ]|[֐-ࣿיִ-﷿ﹰ-﻿]/);
+  if (!m) return undefined;
+  return /[A-Za-zÀ-ɏ]/.test(m[0]) ? 'ltr' : 'rtl';
+}
+
 // ── Bubble footer ─────────────────────────────────────────────────────────────
 
-function BubbleFooter({ timestamp, status, compatibility, isFromMe }: {
+function BubbleFooter({ timestamp, status, compatibility, isFromMe, overlay }: {
   timestamp: string;
   status: MessageStatus;
   compatibility: { downgraded: boolean; mode: string };
   isFromMe: boolean;
+  /** Sit on top of an image/video rather than below the content. */
+  overlay?: boolean;
 }) {
-  const color = 'text-gray-500 dark:text-[#8696A0]';
   // Only show the downgrade badge for true fallback_text (not baileys_native, which is intentional rich rendering)
   const showDowngradeBadge = compatibility.downgraded && compatibility.mode === 'fallback_text';
   return (
-    <div className={`flex items-center justify-end gap-1 text-xs ${color} mt-1`}>
-      {showDowngradeBadge && (
-        <span className="mr-0.5 text-[10px] opacity-60" title="Sent as text fallback">📝</span>
-      )}
-      <span dir="ltr">{formatTime(timestamp)}</span>
+    <span
+      dir="ltr"
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] leading-none tabular-nums ${
+        overlay ? 'rounded-full bg-black/40 px-1.5 py-1 text-white' : 'text-ink-3'
+      }`}
+    >
+      {showDowngradeBadge && <span className="opacity-60" title="Sent as text fallback">📝</span>}
+      {formatTime(timestamp)}
       {isFromMe && <StatusTick status={status} />}
-    </div>
+    </span>
   );
 }
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-
-// ── Main renderer ─────────────────────────────────────────────────────────────
 
 // ── Reaction pills ────────────────────────────────────────────────────────────
 
@@ -866,17 +861,17 @@ function ReactionPills({ grouped, isFromMe, onReact }: {
   const { t } = useTranslation('chat');
   if (!Object.keys(grouped).length) return null;
   return (
-    <div className={`flex flex-wrap gap-1 mt-1 ${isFromMe ? 'justify-end' : 'justify-start'}`}>
+    <div className={`relative z-[1] -mt-1.5 flex flex-wrap gap-1 px-2 ${isFromMe ? 'justify-end' : 'justify-start'}`}>
       {Object.entries(grouped).map(([emoji, count]) => (
         <button
           key={emoji}
           type="button"
           onClick={() => onReact(emoji)}
-          className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-2 py-0.5 text-xs shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+          className="pop-enter flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-xs shadow-soft ring-1 ring-line transition-transform hover:scale-105"
           title={t('message.reactWith', { emoji })}
         >
           <span>{emoji}</span>
-          {count > 1 && <span className="ml-0.5 font-semibold text-gray-600 dark:text-[#AEBAC1]">{count}</span>}
+          {count > 1 && <span className="font-semibold tabular-nums text-ink-2">{count}</span>}
         </button>
       ))}
     </div>
@@ -892,9 +887,11 @@ export interface MessageRendererProps {
   onDelete?: (messageId: string) => void;
   onForward?: (message: MessageDTO) => void;
   variant?: 'chat' | 'preview';
+  /** First bubble of a run from the same sender — gets the tail corner. */
+  first?: boolean;
 }
 
-export function MessageRenderer({ message, reactions: reactionsProp = [], conversationId, onReactionUpdate, onReply, onDelete, onForward, variant = 'chat' }: MessageRendererProps) {
+export function MessageRenderer({ message, reactions: reactionsProp = [], conversationId, onReactionUpdate, onReply, onDelete, onForward, variant = 'chat', first = true }: MessageRendererProps) {
   const { t } = useTranslation('chat');
   const isFromMe = message.direction === 'outbound';
   const { renderable, status, timestamp } = message;
@@ -917,8 +914,10 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
         setPickerOpen(false);
       }
     };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowMenu(false); setPickerOpen(false); } };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [showMenu, pickerOpen]);
 
   async function toggleReaction(emoji: string) {
@@ -964,12 +963,10 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
     setShowMenu(false);
   }
 
-  const menuItemCls = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#E9EDEF] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-start';
+  const menuItemCls = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-raised hover:text-ink text-start';
 
   const grouped = reactions.reduce<Record<string, number>>((acc, r) => { acc[r.emoji] = (acc[r.emoji] ?? 0) + 1; return acc; }, {});
-  const bubbleTone = isFromMe
-    ? 'bg-[#DCF8C6] dark:bg-[#005C4B] text-gray-900 dark:text-[#E9EDEF] shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
-    : 'bg-white dark:bg-[#202C33] text-gray-900 dark:text-[#E9EDEF] shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.15)]';
+  const bubbleTone = isFromMe ? 'bg-bubble-out text-ink' : 'bg-bubble-in text-ink';
 
   // Collect consecutive action buttons into a single group
   const buttonTypes = new Set<RenderableBlock['type']>(['reply_button', 'url_button', 'phone_button']);
@@ -984,97 +981,139 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
     }
   }
 
+  // WhatsApp's layout trick: when the bubble ends in text, the timestamp sits on
+  // the last line if it fits (an invisible spacer reserves its width) and only
+  // wraps to its own line when it doesn't — instead of always costing a line.
+  const lastSeg = segments[segments.length - 1];
+  const endsInText = lastSeg?.kind === 'single' && lastSeg.block.type === 'body_text' && !(status === 'failed' && isFromMe);
+  const mediaOnly = segments.length === 1 && lastSeg?.kind === 'single' && lastSeg.block.type === 'media'
+    && (lastSeg.block.media.mediaType === 'image' || lastSeg.block.media.mediaType === 'video') && !lastSeg.block.caption;
+  const footer = <BubbleFooter timestamp={timestamp} status={status} compatibility={renderable.compatibility} isFromMe={isFromMe} overlay={mediaOnly} />;
+  const spacer = <span aria-hidden="true" className={`inline-block h-3 align-baseline ${isFromMe ? 'w-[74px]' : 'w-[50px]'}`} />;
+
+  // The bubble takes its text's direction: the inline timestamp then sits at the
+  // end of the last line in Arabic and English alike. The tail corner is
+  // physical (it points at the sender's side of the screen), so it is set in
+  // left/right terms against the page direction, not the bubble's.
+  const bubbleDir = textDirection(messageText);
+  const pageRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const tailRight = isFromMe !== pageRtl;
+  const tail = first ? (tailRight ? 'rounded-tr-[4px]' : 'rounded-tl-[4px]') : '';
+  const actionBtn = 'flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-3 shadow-soft ring-1 ring-line transition-colors hover:text-ink';
+
   return (
-    <div className={`w-full min-w-0 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
-      <div ref={containerRef} className="relative group max-w-[85%] sm:max-w-[72%] min-w-0">
-
-        {/* Quick reaction picker — floats above bubble, within bounds */}
-        {pickerOpen && (
-          <div className={`absolute bottom-full mb-1.5 z-30 flex gap-1.5 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-2.5 py-1.5 shadow-xl ${isFromMe ? 'end-0' : 'start-0'}`}>
-            {QUICK_REACTIONS.map((e) => (
-              <button key={e} type="button" onClick={() => toggleReaction(e)}
-                className="text-lg leading-none hover:scale-125 transition-transform">{e}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Chevron — always visible, anchored toward the center */}
-        {variant === 'chat' && (
-          <div className={`absolute top-0 z-10 ${isFromMe ? 'end-0' : 'start-0'}`}>
-            <button
-              type="button"
-              onClick={() => { setShowMenu(v => !v); setPickerOpen(false); }}
-              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${isFromMe ? 'text-gray-600 bg-black/5 hover:bg-black/10' : 'text-[#53BDEB] bg-white/10 hover:bg-white/20'}`}
-              title={t('message.moreOptions')}
-            >
-              <ChevronDown className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {variant === 'chat' && showMenu && (
-          <div className={`absolute top-6 z-30 min-w-[170px] rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#233038] shadow-2xl py-1 overflow-hidden ${isFromMe ? 'end-0' : 'start-0'}`}>
-            {conversationId && (
-              <button type="button" onClick={() => { setShowMenu(false); setPickerOpen(true); }} className={menuItemCls}>
-                <span className="text-base leading-none">😊</span>
-                <span>{t('message.reactMessage')}</span>
-              </button>
-            )}
-            {onReply && (
-              <button type="button" onClick={() => { setShowMenu(false); onReply(message); }} className={menuItemCls}>
-                <Reply className="h-4 w-4 shrink-0" />
-                <span>{t('message.replyMessage')}</span>
-              </button>
-            )}
-            {onForward && (
-              <button type="button" onClick={() => { setShowMenu(false); onForward(message); }} className={menuItemCls}>
-                <Forward className="h-4 w-4 shrink-0" />
-                <span>{t('message.forwardMessage')}</span>
-              </button>
-            )}
-            {messageText && (
-              <button type="button" onClick={handleCopy} className={menuItemCls}>
-                <Copy className="h-4 w-4 shrink-0" />
-                <span>{t('message.copyMessage')}</span>
-              </button>
-            )}
-            {isFromMe && onDelete && message.id && (
-              <>
-                <div className="my-1 h-px bg-gray-100 dark:bg-white/10" />
-                <button type="button" onClick={() => { setShowMenu(false); if (message.id) onDelete(message.id); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-start">
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  <span>{t('message.deleteMessage')}</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Bubble */}
-        <div className={`inline-block w-fit max-w-full overflow-hidden px-3 py-2 ${bubbleTone} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[200px]' : ''} ${isFromMe ? 'rounded-xl rounded-se-sm' : 'rounded-xl rounded-ss-sm'}`}>
-
-          <div className="space-y-1.5">
-            {segments.map((seg, i) => {
-              if (seg.kind === 'buttons') {
-                return <ButtonsView key={i} blocks={seg.blocks as any} isFromMe={isFromMe} />;
-              }
-              return <BlockRenderer key={i} block={seg.block} isFromMe={isFromMe} buttonBuffer={[]} onFlush={() => {}} />;
-            })}
-          </div>
-
-          {status === 'failed' && isFromMe && (
-            <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2 py-1 text-xs text-red-500">
-              <span>⚠</span>
-              <span>{t('message.failedToSend')}</span>
+    <div className={`group/msg w-full min-w-0 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
+      <div
+        ref={containerRef}
+        className={`relative flex min-w-0 max-w-[88%] items-center gap-1.5 sm:max-w-[70%] ${isFromMe ? 'flex-row-reverse' : ''}`}
+        onContextMenu={variant === 'chat' ? (e) => { e.preventDefault(); setShowMenu(true); setPickerOpen(false); } : undefined}
+      >
+        <div className="relative min-w-0">
+          {/* Quick reaction picker — floats above bubble, within bounds */}
+          {pickerOpen && (
+            <div className={`pop-enter absolute bottom-full z-30 mb-1.5 flex gap-0.5 rounded-full bg-surface px-1.5 py-1 shadow-pop ${isFromMe ? 'end-0' : 'start-0'}`}>
+              {QUICK_REACTIONS.map((e) => (
+                <button key={e} type="button" onClick={() => toggleReaction(e)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none transition-transform hover:scale-125 hover:bg-raised">{e}</button>
+              ))}
             </div>
           )}
 
-          <BubbleFooter timestamp={timestamp} status={status} compatibility={renderable.compatibility} isFromMe={isFromMe} />
+          {variant === 'chat' && showMenu && (
+            <div className={`pop-enter absolute top-7 z-30 min-w-[180px] rounded-lg bg-surface p-1 shadow-pop ${isFromMe ? 'end-0' : 'start-0'}`}>
+              {conversationId && (
+                <button type="button" onClick={() => { setShowMenu(false); setPickerOpen(true); }} className={menuItemCls}>
+                  <Smile className="h-4 w-4 shrink-0 text-ink-3" />
+                  <span>{t('message.reactMessage')}</span>
+                </button>
+              )}
+              {onReply && (
+                <button type="button" onClick={() => { setShowMenu(false); onReply(message); }} className={menuItemCls}>
+                  <Reply className="h-4 w-4 shrink-0 text-ink-3" />
+                  <span>{t('message.replyMessage')}</span>
+                </button>
+              )}
+              {onForward && (
+                <button type="button" onClick={() => { setShowMenu(false); onForward(message); }} className={menuItemCls}>
+                  <Forward className="h-4 w-4 shrink-0 text-ink-3" />
+                  <span>{t('message.forwardMessage')}</span>
+                </button>
+              )}
+              {messageText && (
+                <button type="button" onClick={handleCopy} className={menuItemCls}>
+                  <Copy className="h-4 w-4 shrink-0 text-ink-3" />
+                  <span>{t('message.copyMessage')}</span>
+                </button>
+              )}
+              {isFromMe && onDelete && message.id && (
+                <>
+                  <div className="my-1 h-px bg-line" />
+                  <button type="button" onClick={() => { setShowMenu(false); if (message.id) onDelete(message.id); }}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">
+                    <Trash2 className="h-4 w-4 shrink-0" />
+                    <span>{t('message.deleteMessage')}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Bubble */}
+          <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-lg shadow-[0_1px_0.5px_rgb(11_20_16/0.10)] ${mediaOnly ? 'p-1' : 'px-2.5 pb-1.5 pt-1.5'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
+            {/* Menu chevron: appears on hover where hovering exists; always reachable on touch. */}
+            {variant === 'chat' && (
+              <button
+                type="button"
+                onClick={() => { setShowMenu(v => !v); setPickerOpen(false); }}
+                className={`absolute end-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-ink-3 transition-opacity hover:text-ink [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 ${isFromMe ? 'bg-bubble-out/90' : 'bg-bubble-in/90'} ${showMenu ? '!opacity-100' : ''}`}
+                title={t('message.moreOptions')}
+                aria-label={t('message.moreOptions')}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            )}
+
+            <div className="space-y-1.5">
+              {segments.map((seg, i) => {
+                if (seg.kind === 'buttons') {
+                  return <ButtonsView key={i} blocks={seg.blocks as any} isFromMe={isFromMe} />;
+                }
+                const isLast = i === segments.length - 1;
+                return <BlockRenderer key={i} block={seg.block} isFromMe={isFromMe} trailing={isLast && endsInText ? spacer : undefined} />;
+              })}
+            </div>
+
+            {status === 'failed' && isFromMe && (
+              <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400">
+                <span aria-hidden="true">!</span>
+                <span>{t('message.failedToSend')}</span>
+              </div>
+            )}
+
+            {endsInText || mediaOnly
+              ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-1.5 end-2.5'}`}>{footer}</span>
+              : <div className="mt-1 flex justify-end">{footer}</div>}
+          </div>
+
+          {/* Reaction pills — hang off the bottom edge, as on WhatsApp */}
+          <ReactionPills grouped={grouped} isFromMe={isFromMe} onReact={toggleReaction} />
         </div>
 
-        {/* Reaction pills — outside bubble for clean layout */}
-        <ReactionPills grouped={grouped} isFromMe={isFromMe} onReact={toggleReaction} />
+        {/* Hover actions beside the bubble: the two things people do most. */}
+        {variant === 'chat' && (
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-fast group-hover/msg:opacity-100 max-sm:hidden">
+            {conversationId && (
+              <button type="button" onClick={() => { setPickerOpen(v => !v); setShowMenu(false); }} className={actionBtn} aria-label={t('message.reactMessage')} title={t('message.reactMessage')}>
+                <Smile className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onReply && (
+              <button type="button" onClick={() => onReply(message)} className={actionBtn} aria-label={t('message.replyMessage')} title={t('message.replyMessage')}>
+                <Reply className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1089,9 +1128,10 @@ interface LegacyMessageBubbleProps {
   onReply?: (message: LegacyMessage) => void;
   onDelete?: (messageId: string) => void;
   onForward?: (message: any) => void;
+  first?: boolean;
 }
 
-export function LegacyMessageBubble({ message, conversationId, onReactionUpdate, onReply, onDelete, onForward }: LegacyMessageBubbleProps) {
+export function LegacyMessageBubble({ message, conversationId, onReactionUpdate, onReply, onDelete, onForward, first }: LegacyMessageBubbleProps) {
   const dto = legacyToDto(message);
   return (
     <MessageRenderer
@@ -1102,6 +1142,7 @@ export function LegacyMessageBubble({ message, conversationId, onReactionUpdate,
       onReply={onReply ? () => onReply(message) : undefined}
       onDelete={onDelete}
       onForward={onForward ? (msg) => onForward(message) : undefined}
+      first={first}
     />
   );
 }

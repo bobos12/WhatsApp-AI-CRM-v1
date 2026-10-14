@@ -123,11 +123,13 @@ function ConversationsPageContent() {
     }
   }, [targetConversationId, router, buildUrl]);
 
+  // Full-bleed, follows the document direction: in Arabic the list sits on the
+  // right and the chat on the left, exactly as WhatsApp does it.
   return (
-    <div dir="ltr" className="absolute inset-0 flex sm:relative sm:inset-auto sm:mx-0 sm:my-0 sm:h-full overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+    <div className="flex h-full min-h-0 overflow-hidden bg-surface">
       {/* Conversation list — full-width on mobile, hidden once a chat is open */}
       <div
-        className={`${selectedConversationId ? 'hidden md:flex' : 'flex'} w-full md:w-[300px] lg:w-[340px] xl:w-[360px] shrink-0 flex-col border-r border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#0B141A]`}
+        className={`${selectedConversationId ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-e border-line md:w-[320px] lg:w-[360px]`}
       >
         <ConversationList
           ref={conversationListRef}
@@ -149,8 +151,6 @@ function ConversationsPageContent() {
           }}
         />
       </div>
-      {/* Mobile bottom-nav spacer */}
-      <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />
     </div>
   );
 }
@@ -158,7 +158,7 @@ function ConversationsPageContent() {
 export default function ConversationsPage() {
   const { t } = useTranslation('common');
   return (
-    <Suspense fallback={<div className="rounded-2xl border border-white/10 bg-[#111B21]/50 p-6 text-[#8696A0]">{t('loading')}</div>}>
+    <Suspense fallback={<div className="p-6 text-[13px] text-ink-3">{t('loading')}</div>}>
       <ConversationsPageContent />
     </Suspense>
   );

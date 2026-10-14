@@ -34,7 +34,8 @@ export interface ValidationResult {
   warnings: number;
 }
 
-type Provider = 'baileys';
+/** The only transport this CRM sends through. */
+type Provider = 'meta';
 
 function result(issues: ValidationIssue[]): ValidationResult {
   const errors   = issues.filter(i => i.level === 'error').length;

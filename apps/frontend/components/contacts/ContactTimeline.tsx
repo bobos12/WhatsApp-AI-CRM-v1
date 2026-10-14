@@ -60,7 +60,7 @@ export default function ContactTimeline({ contactId }: Props) {
     return (
       <div className="space-y-3 py-2">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-14 rounded-xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+          <div key={i} className="h-14 rounded-xl bg-raised animate-pulse" />
         ))}
       </div>
     );
@@ -68,7 +68,7 @@ export default function ContactTimeline({ contactId }: Props) {
 
   if (!events.length) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 dark:border-white/10 p-6 text-center text-sm text-gray-400 dark:text-[#8696A0]">
+      <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-4">
         {t('timeline.noActivityContact')}
       </div>
     );
@@ -76,7 +76,7 @@ export default function ContactTimeline({ contactId }: Props) {
 
   return (
     <div className="relative space-y-3">
-      <div className="absolute left-5 top-0 bottom-0 w-px bg-gray-200 dark:bg-white/10" />
+      <div className="absolute left-5 top-0 bottom-0 w-px bg-overlay" />
       {events.map((event, i) => {
         const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.note;
         const Icon = cfg.icon;
@@ -88,12 +88,12 @@ export default function ContactTimeline({ contactId }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{cfg.label}</span>
-                <span className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-[#8696A0]">
+                <span className="flex items-center gap-1 text-[11px] text-ink-4">
                   <Clock className="h-3 w-3" />
                   {formatRelative(event.at)}
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-gray-600 dark:text-[#8696A0] truncate">{eventSummary(event)}</p>
+              <p className="mt-0.5 text-xs text-ink-3 truncate">{eventSummary(event)}</p>
             </div>
           </div>
         );

@@ -83,30 +83,30 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
       closeOnBackdrop={false}
       aria-label={initial ? t('flow.editTitle') : t('flow.createTitle')}
       overlayClassName="bg-black/50"
-      className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#1C2B33] p-6 shadow-xl"
+      className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-raised p-6 shadow-xl"
     >
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <h2 className="text-lg font-semibold text-ink mb-4">
           {initial ? t('flow.editTitle') : t('flow.createTitle')}
         </h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-[#8696A0] mb-1">{t('flow.name')}</label>
+            <label className="block text-xs font-medium text-ink-3 mb-1">{t('flow.name')}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('flow.namePlaceholder')}
-              className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/50"
+              className="field w-full"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8696A0] mb-1">{t('flow.trigger')}</label>
+              <label className="block text-xs font-medium text-ink-3 mb-1">{t('flow.trigger')}</label>
               <select
                 value={trigger}
                 onChange={(e) => setTrigger(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                className="field w-full"
               >
                 {TRIGGERS.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -115,12 +115,12 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
             </div>
             {trigger === 'KEYWORD' && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-[#8696A0] mb-1">{t('flow.keyword')}</label>
+                <label className="block text-xs font-medium text-ink-3 mb-1">{t('flow.keyword')}</label>
                 <input
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder={t('flow.keywordPlaceholder')}
-                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none"
+                  className="field w-full"
                 />
               </div>
             )}
@@ -138,19 +138,19 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
 
           {/* Steps */}
           <div>
-            <p className="text-xs font-medium text-gray-600 dark:text-[#8696A0] mb-2">{t('flow.steps')}</p>
+            <p className="text-xs font-medium text-ink-3 mb-2">{t('flow.steps')}</p>
             <div className="space-y-2">
               {steps.map((step, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] p-3"
+                  className="flex items-start gap-3 rounded-xl border border-line bg-gray-50 dark:bg-surface p-3"
                 >
                   <div className="mt-1 text-gray-400">
                     {step.type === 'WAIT' ? <Clock className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
                   </div>
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500 dark:text-[#8696A0]">
+                      <span className="text-xs font-medium text-ink-3">
                         {idx + 1}. {step.type === 'WAIT' ? t('flow.stepWait') : t('flow.stepSendMessage')}
                       </span>
                     </div>
@@ -160,7 +160,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
                         onChange={(e) => updateStep(idx, { message: e.target.value })}
                         rows={2}
                         placeholder={t('flow.messagePlaceholder')}
-                        className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C2B33] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none resize-none"
+                        className="field w-full resize-none"
                       />
                     )}
                     {step.type === 'WAIT' && (
@@ -172,8 +172,8 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
                             onClick={() => updateStep(idx, { delayMs: p.ms })}
                             className={`rounded-lg px-3 py-1 text-xs font-medium border transition-colors ${
                               step.delayMs === p.ms
-                                ? 'bg-[#25D366] text-white border-[#25D366]'
-                                : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-[#25D366]/50'
+                                ? 'bg-brand text-brand-fg border-brand'
+                                : 'border-line text-gray-600 dark:text-gray-400 hover:border-brand/50'
                             }`}
                           >
                             {p.label}
@@ -183,7 +183,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
                           type="number"
                           value={Math.round((step.delayMs ?? 60000) / 1000)}
                           onChange={(e) => updateStep(idx, { delayMs: Number(e.target.value) * 1000 })}
-                          className="w-20 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C2B33] px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none"
+                          className="field field-sm w-20"
                           placeholder={t('flow.sec')}
                         />
                         <span className="self-center text-xs text-gray-500">{t('flow.sec')}</span>
@@ -205,7 +205,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
               <button
                 type="button"
                 onClick={() => addStep('SEND_MESSAGE')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-raised transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t('flow.addMessage')}
@@ -213,7 +213,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
               <button
                 type="button"
                 onClick={() => addStep('WAIT')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-raised transition-colors"
               >
                 <Clock className="h-3.5 w-3.5" />
                 {t('flow.addDelay')}
@@ -226,7 +226,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-gray-200 dark:border-white/10 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+            className="rounded-xl border border-line px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-raised transition-colors"
           >
             {t('flow.cancel')}
           </button>
@@ -234,7 +234,7 @@ export default function FlowBuilder({ initial, onSave, onCancel }: Props) {
             type="button"
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white hover:bg-[#25D366]/90 disabled:opacity-50 transition-colors"
+            className="btn btn-primary disabled:opacity-50"
           >
             {saving ? t('flow.saving') : t('flow.save')}
           </button>

@@ -54,7 +54,7 @@ export function DataTableToolbar<TData>({
     <div className="flex items-center justify-between gap-4 border-b border-white/5 px-6 py-4">
       <div className="flex flex-1 items-center gap-2">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8696A0]" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
           <Input
             placeholder={searchPlaceholder}
             value={(table.getState().globalFilter as string) ?? ''}

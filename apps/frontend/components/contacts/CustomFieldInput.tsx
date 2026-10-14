@@ -12,9 +12,9 @@ import type { CustomFieldDefinition } from '../../lib/custom-fields';
  */
 
 const inputCls =
-  'block w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-sm ' +
-  'text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#8696A0] outline-none transition ' +
-  'focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]/30';
+  'block w-full rounded-xl border border-line bg-white dark:bg-raised px-3 py-2 text-sm ' +
+  'text-ink placeholder:text-ink-4 outline-none transition ' +
+  'focus:border-brand focus:ring-1 focus:ring-brand/30';
 
 interface Props {
   definition: CustomFieldDefinition;
@@ -44,7 +44,7 @@ function MultiSelect({ definition, value, onChange }: Omit<Props, 'error' | 'den
         onClick={() => setOpen((current) => !current)}
         className={cn(inputCls, 'flex items-center justify-between gap-2 text-left')}
       >
-        <span className={cn('truncate', !selected.length && 'text-gray-400 dark:text-[#8696A0]')}>
+        <span className={cn('truncate', !selected.length && 'text-ink-4')}>
           {selected.length
             ? options.filter((option) => selected.includes(option.value)).map((option) => option.label).join(', ')
             : definition.placeholder || 'Select…'}
@@ -56,9 +56,9 @@ function MultiSelect({ definition, value, onChange }: Omit<Props, 'error' | 'den
         <>
           {/* Click-away layer, so the popover closes without a global listener. */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-1 shadow-lg">
+          <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lg">
             {options.length === 0 && (
-              <p className="px-3 py-2 text-xs text-gray-500 dark:text-[#8696A0]">No options defined.</p>
+              <p className="px-3 py-2 text-xs text-ink-3">No options defined.</p>
             )}
             {options.map((option) => {
               const active = selected.includes(option.value);
@@ -70,14 +70,14 @@ function MultiSelect({ definition, value, onChange }: Omit<Props, 'error' | 'den
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition',
                     active
-                      ? 'bg-[#25D366]/10 text-[#25D366]'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5',
+                      ? 'bg-brand/10 text-brand'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-raised',
                   )}
                 >
                   <span
                     className={cn(
                       'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                      active ? 'border-[#25D366] bg-[#25D366] text-slate-950' : 'border-gray-300 dark:border-white/25',
+                      active ? 'border-brand bg-brand text-brand-fg' : 'border-gray-300 dark:border-white/25',
                     )}
                   >
                     {active && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -118,7 +118,7 @@ function FieldControl({ definition, value, onChange }: Omit<Props, 'error' | 'de
             type="checkbox"
             checked={Boolean(value)}
             onChange={(event) => onChange(event.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-[#25D366] focus:ring-[#25D366]"
+            className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
           />
           <span className="text-sm text-gray-700 dark:text-gray-200">
             {definition.placeholder || 'Yes'}
@@ -180,7 +180,7 @@ function FieldControl({ definition, value, onChange }: Omit<Props, 'error' | 'de
             className={cn(inputCls, definition.currency && 'pe-14')}
           />
           {definition.currency && (
-            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 dark:text-[#8696A0]">
+            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink-4">
               {definition.currency}
             </span>
           )}
@@ -245,7 +245,7 @@ function FieldControl({ definition, value, onChange }: Omit<Props, 'error' | 'de
 export default function CustomFieldInput({ definition, value, onChange, error, dense }: Props) {
   return (
     <div className={dense ? '' : 'space-y-1.5'}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-white">
+      <label className="block text-sm font-medium text-ink-2">
         {definition.label}
         {definition.required && <span className="ms-1 text-red-400">*</span>}
       </label>
@@ -255,7 +255,7 @@ export default function CustomFieldInput({ definition, value, onChange, error, d
       {error ? (
         <p className="text-xs text-red-400">{error}</p>
       ) : definition.helpText ? (
-        <p className="text-xs text-gray-500 dark:text-[#8696A0]">{definition.helpText}</p>
+        <p className="text-xs text-ink-3">{definition.helpText}</p>
       ) : null}
     </div>
   );

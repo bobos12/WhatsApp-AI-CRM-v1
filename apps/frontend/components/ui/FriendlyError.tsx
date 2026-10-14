@@ -128,7 +128,7 @@ export default function FriendlyError({
     <div
       role="alert"
       className={cn(
-        'rounded-2xl border',
+        'rounded-xl border',
         compact ? 'p-3' : 'p-4',
         s.panel,
         className,

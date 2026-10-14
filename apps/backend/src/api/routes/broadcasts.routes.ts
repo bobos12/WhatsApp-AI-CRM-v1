@@ -60,29 +60,34 @@ const broadcastFields = z.object({
   smartSending: z.boolean().optional(),
   batchSize: z.coerce.number().int().min(1).max(5000).nullish(),
   batchIntervalMinutes: z.coerce.number().int().min(1).max(1440).nullish(),
-  // ── Deliverability controls ────────────────────────────────────────────────
-  // The server clamps `pacingProfile` to whatever account health allows, so a
-  // client asking for STEADY on a three-day-old number gets CAREFUL and is told
-  // why in the pre-flight report. Accepting the field is not the same as
-  // honouring it.
-  pacingProfile: z.enum(['CAREFUL', 'BALANCED', 'STEADY']).nullish(),
-  quietHoursEnabled: z.boolean().nullish(),
-  quietHoursStart: z.coerce.number().int().min(0).max(23).nullish(),
-  quietHoursEnd: z.coerce.number().int().min(0).max(23).nullish(),
-  pilotSize: z.coerce.number().int().min(1).max(1000).nullish(),
-  ignoreCooldown: z.boolean().optional(),
-  // Audience exclusions applied by the safety report's one-tap fixes. Resolved
-  // server-side because only the server knows which numbers are cold.
-  excludeCold: z.boolean().optional(),
+  // ── Cloud API delivery ─────────────────────────────────────────────────────
+  /**
+   * The approved Meta template this campaign sends, and the mapping from each of
+   * its variable NAMES to a contact field (`{"first_name": "name"}` — not
+   * positional; see BroadcastInput.templateVariables).
+   *
+   * These MUST be declared here. `validateBody` replaces `req.body` with Zod's
+   * output, and an object schema strips keys it does not declare — so a field
+   * missing from this list is not "passed through untouched", it is silently
+   * deleted before the service ever sees it. That is what made every campaign
+   * unsendable: the composer's template choice was dropped in the middleware,
+   * the row was written with `templateId: null`, and the worker then parked the
+   * run as TEMPLATE_MISSING with nothing in the UI to explain why.
+   */
+  templateId: z.string().trim().min(1).max(64).nullish(),
+  templateVariables: z.record(z.string(), z.string().max(512)).nullish(),
   excludeReceivedFrom: z.string().trim().max(64).nullish(),
 });
 
 const broadcastSchema = broadcastFields
-  // A broadcast with neither text nor an attachment has nothing to deliver.
-  .refine((body) => body.message.trim().length > 0 || Boolean(body.mediaUrl), {
-    message: 'Add a message or an attachment.',
-    path: ['message'],
-  })
+  // A broadcast with nothing to deliver. A template counts as content — on the
+  // Cloud API it is the *only* content that reaches a broadcast audience, and
+  // its body lives on the template rather than in `message`, so requiring free
+  // text here would reject exactly the campaigns that can actually be sent.
+  .refine(
+    (body) => body.message.trim().length > 0 || Boolean(body.mediaUrl) || Boolean(body.templateId),
+    { message: 'Choose a template, or add a message or attachment.', path: ['message'] },
+  )
   // Storing a wall clock without its zone is exactly the bug this replaces.
   .refine((body) => !body.scheduledAtLocal || Boolean(body.timezone), {
     message: 'A scheduled broadcast must include the time zone it was scheduled in.',

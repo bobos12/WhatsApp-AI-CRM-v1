@@ -2,7 +2,6 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { emitRealtime } from '../realtime/socket';
 import { broadcastQueue, ensureBroadcastWorker } from './broadcast.queue';
-import { nextAllowedTime } from './safety/quiet-hours';
 import { reconcileBroadcastEngagement } from './engagement.service';
 
 /**
@@ -146,31 +145,6 @@ async function expireMissedBroadcast(broadcast: { id: string; teamId: string | n
  * the instant it booted. Every recipient got a marketing message in the middle of
  * the night, and the campaign's block rate reflected it.
  */
-async function deferForQuietHours(broadcast: {
-  id: string;
-  quietHoursEnabled: boolean;
-  quietHoursStart: number;
-  quietHoursEnd: number;
-  timezone: string;
-}, now: Date): Promise<boolean> {
-  const window = {
-    enabled: broadcast.quietHoursEnabled,
-    start: broadcast.quietHoursStart,
-    end: broadcast.quietHoursEnd,
-  };
-  const allowedAt = nextAllowedTime(window, broadcast.timezone || 'UTC', now);
-  if (allowedAt.getTime() <= now.getTime() + 60_000) return false;
-
-  await prisma.broadcast.updateMany({
-    where: { id: broadcast.id, status: 'SCHEDULED' },
-    data: { scheduledAt: allowedAt },
-  });
-  logger.info('broadcast.deferred_quiet_hours', {
-    broadcastId: broadcast.id,
-    resumesAt: allowedAt.toISOString(),
-  });
-  return true;
-}
 
 async function tick(): Promise<void> {
   if (ticking) return; // a slow tick must not overlap the next one
@@ -199,8 +173,6 @@ async function tick(): Promise<void> {
         await expireMissedBroadcast(broadcast);
         continue;
       }
-
-      if (await deferForQuietHours(broadcast, now)) continue;
 
       try {
         const claimed = await claimAndEnqueue(broadcast.id, ['SCHEDULED']);

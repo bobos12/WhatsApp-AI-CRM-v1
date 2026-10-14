@@ -57,7 +57,7 @@ const STRATEGIES: Array<{ id: DuplicateStrategy; title: string; description: str
 ];
 
 const OUTCOME_STYLES: Record<ValidationRowResult['outcome'], { label: string; className: string }> = {
-  create: { label: 'New', className: 'bg-[#25D366]/15 text-[#25D366]' },
+  create: { label: 'New', className: 'bg-brand/15 text-brand' },
   update: { label: 'Update', className: 'bg-sky-500/15 text-sky-400' },
   merge: { label: 'Merge', className: 'bg-violet-500/15 text-violet-400' },
   skip: { label: 'Skip', className: 'bg-gray-500/15 text-gray-400' },
@@ -74,7 +74,7 @@ function StepDots({ step }: { step: Step }) {
           key={index}
           className={cn(
             'h-1.5 rounded-full transition-all',
-            index === current ? 'w-6 bg-[#25D366]' : index < current ? 'w-1.5 bg-[#25D366]/50' : 'w-1.5 bg-white/15',
+            index === current ? 'w-6 bg-brand' : index < current ? 'w-1.5 bg-brand/50' : 'w-1.5 bg-white/15',
           )}
         />
       ))}
@@ -320,8 +320,8 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
         if (dropped) void loadFile(dropped, hasHeaderRow);
       }}
       className={cn(
-        'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition',
-        dragging ? 'border-[#25D366] bg-[#25D366]/5' : 'border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-[#0B141A]',
+        'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 text-center transition',
+        dragging ? 'border-brand bg-brand/5' : 'border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-canvas',
       )}
     >
       <input
@@ -338,20 +338,20 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
 
       {busy ? (
         <>
-          <Loader2 className="h-8 w-8 animate-spin text-[#25D366]" />
-          <p className="text-sm font-medium text-gray-900 dark:text-white">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" />
+          <p className="text-sm font-medium text-ink">
             {t('import.reading', { defaultValue: 'Reading your file…' })}
           </p>
         </>
       ) : (
         <>
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#25D366]/10 text-[#25D366]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
             <FileSpreadsheet className="h-7 w-7" />
           </div>
-          <p className="text-base font-semibold text-gray-900 dark:text-white">
+          <p className="text-base font-semibold text-ink">
             {t('import.dropTitle', { defaultValue: 'Drop your contact file here' })}
           </p>
-          <p className="max-w-sm text-xs text-gray-500 dark:text-[#8696A0]">
+          <p className="max-w-sm text-xs text-ink-3">
             {t('import.dropBody', {
               defaultValue: 'CSV, TSV, or Excel (.xlsx, .xls). Columns are detected automatically — you can correct anything on the next step.',
             })}
@@ -359,7 +359,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-1 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
+            className="btn btn-primary mt-1 inline-flex"
           >
             <Upload className="h-4 w-4" />
             {t('import.choose', { defaultValue: 'Choose a file' })}
@@ -373,7 +373,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
     <div className="space-y-4">
       {parsed && parsed.sheets.length > 1 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-[#8696A0]">
+          <span className="text-xs font-medium text-ink-3">
             {t('import.sheet', { defaultValue: 'Sheet' })}:
           </span>
           {parsed.sheets.map((entry, index) => (
@@ -384,8 +384,8 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-medium transition',
                 index === sheetIndex
-                  ? 'border-[#25D366] bg-[#25D366]/10 text-[#25D366]'
-                  : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/5',
+                  ? 'border-brand bg-brand/10 text-brand'
+                  : 'border-line text-ink-3 hover:bg-raised',
               )}
             >
               {entry.name}
@@ -395,16 +395,16 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+        <p className="text-xs text-ink-3">
           {t('import.rowsFound', { count: totalRows, defaultValue: '{{count}} rows found' })}
           {sheet.truncated > 0 && ` · ${t('import.truncated', { count: sheet.truncated, defaultValue: '{{count}} rows beyond the 50,000 limit were dropped' })}`}
         </p>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-[#8696A0]">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-ink-3">
           <input
             type="checkbox"
             checked={hasHeaderRow}
             onChange={(event) => void toggleHeaderRow(event.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-[#25D366] focus:ring-[#25D366]"
+            className="h-3.5 w-3.5 rounded border-gray-300 text-brand focus:ring-brand"
           />
           {t('import.hasHeader', { defaultValue: 'First row contains column names' })}
         </label>
@@ -419,10 +419,10 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+      <div className="overflow-hidden rounded-xl border border-line">
         <div className="max-h-[45vh] overflow-y-auto">
           <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-[#202C33] text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+            <thead className="sticky top-0 bg-raised text-[10px] uppercase tracking-wider text-ink-3">
               <tr>
                 <th className="px-3 py-2 font-medium">{t('import.column', { defaultValue: 'Column in your file' })}</th>
                 <th className="px-3 py-2 font-medium">{t('import.sample', { defaultValue: 'Sample' })}</th>
@@ -434,12 +434,12 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
                 const selected = mapping[column] ?? SKIP;
                 const samples = sheet.rows.slice(0, 3).map((row) => row[column]).filter(Boolean);
                 return (
-                  <tr key={column} className="border-t border-gray-100 dark:border-white/5">
+                  <tr key={column} className="border-t border-line">
                     <td className="max-w-[10rem] px-3 py-2">
-                      <p className="truncate font-medium text-gray-900 dark:text-white">{header}</p>
+                      <p className="truncate font-medium text-ink">{header}</p>
                     </td>
                     <td className="max-w-[12rem] px-3 py-2">
-                      <p className="truncate text-xs text-gray-500 dark:text-[#8696A0]" dir="auto">
+                      <p className="truncate text-xs text-ink-3" dir="auto">
                         {samples.length ? samples.join(', ') : '—'}
                       </p>
                     </td>
@@ -463,7 +463,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
                             return next;
                           });
                         }}
-                        className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-2 py-1.5 text-xs text-gray-900 dark:text-white outline-none focus:border-[#25D366]"
+                        className="w-full rounded-lg border border-line bg-white dark:bg-raised px-2 py-1.5 text-xs text-ink outline-none focus:border-brand"
                       >
                         <option value={SKIP}>{t('import.dontImport', { defaultValue: "Don't import" })}</option>
                         {targets.map((target) => (
@@ -487,7 +487,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
   const reviewScreen = (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
           {t('import.duplicates', { defaultValue: 'When a contact already exists' })}
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -499,23 +499,23 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
               className={cn(
                 'flex items-start gap-2.5 rounded-xl border p-3 text-left transition',
                 strategy === entry.id
-                  ? 'border-[#25D366]/50 bg-[#25D366]/10'
-                  : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] hover:border-gray-300 dark:hover:border-white/20',
+                  ? 'border-brand/50 bg-brand/10'
+                  : 'border-line bg-white dark:bg-raised hover:border-gray-300 dark:hover:border-white/20',
               )}
             >
               <span
                 className={cn(
                   'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                  strategy === entry.id ? 'border-[#25D366] bg-[#25D366] text-slate-950' : 'border-gray-300 dark:border-white/25',
+                  strategy === entry.id ? 'border-brand bg-brand text-brand-fg' : 'border-gray-300 dark:border-white/25',
                 )}
               >
                 {strategy === entry.id && <Check className="h-2.5 w-2.5" strokeWidth={4} />}
               </span>
               <span className="min-w-0">
-                <span className={cn('block text-sm font-semibold', strategy === entry.id ? 'text-[#25D366]' : 'text-gray-900 dark:text-white')}>
+                <span className={cn('block text-sm font-semibold', strategy === entry.id ? 'text-brand' : 'text-ink')}>
                   {entry.title}
                 </span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-[#8696A0]">
+                <span className="mt-0.5 block text-[11px] leading-snug text-ink-3">
                   {entry.description}
                 </span>
               </span>
@@ -529,11 +529,11 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
           ['create', stats.create], ['update', stats.update], ['merge', stats.merge],
           ['skip', stats.skip], ['error', stats.error],
         ] as const).map(([key, value]) => (
-          <div key={key} className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0B141A] p-3 text-center">
-            <p className={cn('text-xl font-bold', value > 0 && key === 'error' ? 'text-red-400' : 'text-gray-900 dark:text-white')}>
+          <div key={key} className="rounded-xl border border-line bg-white dark:bg-canvas p-3 text-center">
+            <p className={cn('text-xl font-bold', value > 0 && key === 'error' ? 'text-red-400' : 'text-ink')}>
               {value}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+            <p className="text-[10px] uppercase tracking-wider text-ink-3">
               {OUTCOME_STYLES[key].label}
             </p>
           </div>
@@ -541,7 +541,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
       </div>
 
       {validationIsSample && (
-        <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">
+        <p className="text-[11px] text-ink-3">
           {t('import.sampleNote', {
             count: previewedRows,
             total: totalRows,
@@ -550,10 +550,10 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
         </p>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+      <div className="overflow-hidden rounded-xl border border-line">
         <div className="max-h-[35vh] overflow-y-auto">
           <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-[#202C33] text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+            <thead className="sticky top-0 bg-raised text-[10px] uppercase tracking-wider text-ink-3">
               <tr>
                 <th className="px-3 py-2 font-medium">{t('import.row', { defaultValue: 'Row' })}</th>
                 <th className="px-3 py-2 font-medium">{t('form.phone')}</th>
@@ -563,15 +563,15 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
             </thead>
             <tbody>
               {(validation ?? []).slice(0, 200).map((row) => (
-                <tr key={row.row} className="border-t border-gray-100 dark:border-white/5">
-                  <td className="px-3 py-2 text-xs tabular-nums text-gray-500 dark:text-[#8696A0]">{row.row}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white" dir="ltr">{row.phone ?? '—'}</td>
+                <tr key={row.row} className="border-t border-line">
+                  <td className="px-3 py-2 text-xs tabular-nums text-ink-3">{row.row}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-ink" dir="ltr">{row.phone ?? '—'}</td>
                   <td className="px-3 py-2">
                     <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', OUTCOME_STYLES[row.outcome].className)}>
                       {OUTCOME_STYLES[row.outcome].label}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-gray-500 dark:text-[#8696A0]">
+                  <td className="px-3 py-2 text-xs text-ink-3">
                     {row.errors.length
                       ? <span className="text-red-400">{row.errors.join(' ')}</span>
                       : row.duplicateOf === 'database'
@@ -591,21 +591,21 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
 
   const runningScreen = (
     <div className="flex flex-col items-center justify-center gap-4 py-12">
-      <Loader2 className="h-10 w-10 animate-spin text-[#25D366]" />
-      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+      <Loader2 className="h-10 w-10 animate-spin text-brand" />
+      <p className="text-sm font-semibold text-ink">
         {t('import.importing', { defaultValue: 'Importing contacts…' })}
       </p>
-      <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+      <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-overlay">
         <div
-          className="h-2 rounded-full bg-[#25D366] transition-all duration-300"
+          className="h-2 rounded-full bg-brand transition-all duration-300"
           style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
         />
       </div>
-      <p className="text-xs tabular-nums text-gray-500 dark:text-[#8696A0]">
+      <p className="text-xs tabular-nums text-ink-3">
         {progress.done} / {progress.total}
       </p>
-      <div className="flex flex-wrap justify-center gap-3 text-[11px] text-gray-500 dark:text-[#8696A0]">
-        <span className="text-[#25D366]">{summary.created} new</span>
+      <div className="flex flex-wrap justify-center gap-3 text-[11px] text-ink-3">
+        <span className="text-brand">{summary.created} new</span>
         <span>{summary.updated + summary.merged} updated</span>
         <span>{summary.skipped} skipped</span>
         {summary.failed > 0 && <span className="text-red-400">{summary.failed} failed</span>}
@@ -616,15 +616,15 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
   const doneScreen = (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
       {summary.failed === 0 ? (
-        <CheckCircle2 className="h-12 w-12 text-[#25D366]" />
+        <CheckCircle2 className="h-12 w-12 text-brand" />
       ) : (
         <XCircle className="h-12 w-12 text-amber-400" />
       )}
       <div>
-        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+        <p className="text-lg font-semibold text-ink">
           {t('import.doneTitle', { defaultValue: 'Import finished' })}
         </p>
-        <p className="mt-1 text-sm text-gray-500 dark:text-[#8696A0]">
+        <p className="mt-1 text-sm text-ink-3">
           {t('import.doneBody', {
             created: summary.created,
             updated: summary.updated + summary.merged,
@@ -661,7 +661,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
         <button
           type="button"
           onClick={onClose}
-          className="rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
+          className="btn btn-primary"
         >
           {t('import.close', { defaultValue: 'Done' })}
         </button>
@@ -682,7 +682,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
         <button
           type="button"
           onClick={back}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 dark:border-white/10 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-white transition hover:bg-gray-50 dark:hover:bg-white/5"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink-2 transition hover:bg-raised"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('import.back', { defaultValue: 'Back' })}
@@ -691,7 +691,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
           type="button"
           onClick={next}
           disabled={!canAdvance}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {step === 'map'
@@ -711,15 +711,15 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
       onClose={step === 'running' ? () => {} : onClose}
       aria-label={t('import.title', { defaultValue: 'Import contacts' })}
       overlayClassName="items-start overflow-y-auto bg-black/70 p-4"
-      className="relative mx-auto my-8 w-full max-w-3xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-xl"
+      className="relative mx-auto my-8 w-full max-w-3xl rounded-xl border border-line bg-surface shadow-xl"
     >
-      <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-ink">
             {t('import.title', { defaultValue: 'Import contacts' })}
           </h2>
           {parsed && step !== 'upload' && (
-            <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-[#8696A0]">{parsed.fileName}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-3">{parsed.fileName}</p>
           )}
         </div>
         <div className="flex items-center gap-4">
@@ -729,7 +729,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
               type="button"
               onClick={onClose}
               aria-label={t('import.close', { defaultValue: 'Close' })}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-raised hover:text-ink"
             >
               <X className="h-4 w-4" />
             </button>
@@ -753,7 +753,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
       </div>
 
       {footer() && (
-        <div className="flex justify-end border-t border-gray-200 dark:border-white/10 px-5 py-4">{footer()}</div>
+        <div className="flex justify-end border-t border-line px-5 py-4">{footer()}</div>
       )}
     </Modal>
   );

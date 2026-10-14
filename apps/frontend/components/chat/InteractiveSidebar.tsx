@@ -300,17 +300,17 @@ function CustomBuilder({ onSend }: { onSend: (msg: SidebarMessage) => void }) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1.5 block text-xs font-semibold text-[#8696A0] uppercase tracking-wider">Message</label>
+        <label className="mb-1.5 block text-xs font-semibold text-ink-3 uppercase tracking-wider">Message</label>
         <textarea
           value={body}
           onChange={e => setBody(e.target.value)}
           placeholder="Type your message…"
           rows={3}
-          className="w-full resize-none rounded-xl border border-white/10 bg-[#111B21] px-3 py-2.5 text-sm text-white placeholder:text-[#8696A0] focus:border-[#25D366] focus:outline-none transition-colors"
+          className="field w-full resize-none transition-colors"
         />
       </div>
       <div>
-        <label className="mb-1.5 block text-xs font-semibold text-[#8696A0] uppercase tracking-wider">
+        <label className="mb-1.5 block text-xs font-semibold text-ink-3 uppercase tracking-wider">
           Options <span className="normal-case font-normal">(one per line, optional)</span>
         </label>
         <textarea
@@ -318,13 +318,13 @@ function CustomBuilder({ onSend }: { onSend: (msg: SidebarMessage) => void }) {
           onChange={e => setOptionsRaw(e.target.value)}
           placeholder={'Track Order\nContact Support\nTalk to Agent'}
           rows={4}
-          className="w-full resize-none rounded-xl border border-white/10 bg-[#111B21] px-3 py-2.5 text-sm text-white placeholder:text-[#8696A0] focus:border-[#25D366] focus:outline-none transition-colors"
+          className="field w-full resize-none transition-colors"
         />
       </div>
       {body.trim() && (
-        <div className="rounded-xl border border-white/10 bg-[#111B21] px-3 py-2.5">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8696A0]">Preview</p>
-          <p className="whitespace-pre-wrap text-xs text-[#E9EDEF]">
+        <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-3">Preview</p>
+          <p className="whitespace-pre-wrap text-xs text-ink">
             {body.trim()}
             {optionsRaw.trim() && (
               <>
@@ -340,7 +340,7 @@ function CustomBuilder({ onSend }: { onSend: (msg: SidebarMessage) => void }) {
         type="button"
         disabled={!body.trim()}
         onClick={handleSend}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1FAA5C] disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-sm font-semibold text-brand-fg transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Send className="h-4 w-4" />
         Send Message
@@ -356,27 +356,27 @@ function PresetCard({ preset, onSend }: { preset: InteractivePreset; onSend: (ms
   const [preview, setPreview] = useState<SidebarMessage | null>(null);
 
   return (
-    <div className="group rounded-xl border border-white/8 bg-[#111B21] transition-all hover:border-[#25D366]/30 hover:shadow-[0_0_0_1px_rgba(37,211,102,0.15)]">
+    <div className="group rounded-xl border border-line bg-surface transition-all hover:border-brand/30 hover:shadow-[0_0_0_1px_rgba(37,211,102,0.15)]">
       <div className="flex items-start gap-3 p-3">
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${preset.color}`}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white">{preset.label}</p>
-          <p className="mt-0.5 text-xs text-[#8696A0]">{preset.description}</p>
+          <p className="mt-0.5 text-xs text-ink-3">{preset.description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => setPreview(prev => prev ? null : preset.build())}
-            className="rounded-lg px-2.5 py-1 text-xs font-medium text-[#8696A0] hover:bg-white/5 hover:text-white transition-colors"
+            className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink-3 hover:bg-white/5 hover:text-white transition-colors"
           >
             {preview ? 'Hide' : 'Preview'}
           </button>
           <button
             type="button"
             onClick={() => { onSend(preset.build()); }}
-            className="flex items-center gap-1.5 rounded-lg bg-[#25D366]/10 px-2.5 py-1 text-xs font-semibold text-[#25D366] hover:bg-[#25D366]/20 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/20 transition-colors"
           >
             <Send className="h-3 w-3" />
             Send
@@ -386,10 +386,10 @@ function PresetCard({ preset, onSend }: { preset: InteractivePreset; onSend: (ms
 
       {preview && (
         <div className="mx-3 mb-3 overflow-hidden rounded-lg border border-white/10 bg-[#0B1419]">
-          <p className="border-b border-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8696A0]">
+          <p className="border-b border-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-3">
             WhatsApp Preview
           </p>
-          <pre className="whitespace-pre-wrap px-3 py-2.5 text-xs leading-relaxed text-[#E9EDEF] font-sans">
+          <pre className="whitespace-pre-wrap px-3 py-2.5 text-xs leading-relaxed text-ink font-sans">
             {preview.text}
           </pre>
         </div>
@@ -418,12 +418,12 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
       <div className="flex items-center justify-between border-b border-white/8 px-4 py-4 gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-white">Interactive Messages</h2>
-          {contactName && <p className="text-xs text-[#8696A0] truncate">To: {contactName}</p>}
+          {contactName && <p className="text-xs text-ink-3 truncate">To: {contactName}</p>}
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[#8696A0] hover:bg-white/15 hover:text-white transition-colors"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-ink-3 hover:bg-white/15 hover:text-white transition-colors"
           aria-label="Close interactive messages"
           title="Close"
         >
@@ -434,7 +434,7 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
       {/* Search */}
       <div className="px-4 py-3">
         <div className="relative">
-          <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 fill-[#8696A0]" aria-hidden>
+          <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 fill-ink-3" aria-hidden>
             <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
           </svg>
           <input
@@ -442,7 +442,7 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search presets…"
-            className="w-full rounded-xl border border-white/10 bg-[#111B21] py-2 pl-8 pr-3 text-sm text-white placeholder:text-[#8696A0] focus:border-[#25D366]/50 focus:outline-none transition-colors"
+            className="field w-full pl-8 pr-3 transition-colors"
           />
         </div>
       </div>
@@ -454,8 +454,8 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
           onClick={() => setActiveCategory('all')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
             activeCategory === 'all'
-              ? 'bg-[#25D366] text-white'
-              : 'bg-white/8 text-[#8696A0] hover:bg-white/12 hover:text-white'
+              ? 'bg-brand text-brand-fg'
+              : 'bg-white/8 text-ink-3 hover:bg-white/12 hover:text-white'
           }`}
         >
           All
@@ -469,8 +469,8 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
               onClick={() => setActiveCategory(cat)}
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                 activeCategory === cat
-                  ? 'bg-[#25D366] text-white'
-                  : 'bg-white/8 text-[#8696A0] hover:bg-white/12 hover:text-white'
+                  ? 'bg-brand text-brand-fg'
+                  : 'bg-white/8 text-ink-3 hover:bg-white/12 hover:text-white'
               }`}
             >
               {meta.label}
@@ -485,10 +485,10 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
           <CustomBuilder onSend={onSend} />
         ) : filteredPresets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <svg viewBox="0 0 24 24" className="h-10 w-10 fill-[#8696A0] opacity-40" aria-hidden>
+            <svg viewBox="0 0 24 24" className="h-10 w-10 fill-ink-3 opacity-40" aria-hidden>
               <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
             </svg>
-            <p className="mt-3 text-sm text-[#8696A0]">No presets match your search</p>
+            <p className="mt-3 text-sm text-ink-3">No presets match your search</p>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -497,14 +497,14 @@ export default function InteractiveSidebar({ onSend, onClose, contactName }: Int
             ))}
 
             {/* Custom builder at the bottom */}
-            <div className="mt-4 rounded-xl border border-dashed border-white/15 bg-[#111B21] p-3">
+            <div className="mt-4 rounded-xl border border-dashed border-white/15 bg-surface p-3">
               <div className="mb-3 flex items-center gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-500 to-gray-600">
                   <Zap className="h-4 w-4 text-white" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white">Custom Message</p>
-                  <p className="text-xs text-[#8696A0]">Build your own numbered menu</p>
+                  <p className="text-xs text-ink-3">Build your own numbered menu</p>
                 </div>
               </div>
               <CustomBuilder onSend={onSend} />

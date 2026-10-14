@@ -4,20 +4,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { AnimatePresence, motion } from 'motion/react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useDirection } from '@/hooks/useDirection';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Eye, EyeOff, Save, RotateCcw, CheckCircle2,
-  ShieldCheck, Info, AlertCircle, MessageSquare, Brain,
-  Thermometer, FileText, ChevronRight,
-  Zap, Target,
-  LayoutDashboard, Cpu, KeyRound, CheckCircle, XCircle, Timer, Layers,
+  Eye, EyeOff, Save, RotateCcw, CheckCircle2, AlertCircle, MessageSquare, Brain,
+  Thermometer, ChevronRight, Target, KeyRound, CheckCircle, XCircle, Timer, Layers, Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 import { isManager } from '@/lib/roles';
+import { PageHeader } from '@/components/ui/page';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Toggle, SettingRow, SettingsGroup, Field, TextArea, Slider, TextInput } from '@/components/ai-config/primitives';
 
 type Section = 'overview' | 'crmAssistant' | 'leadQualification';
 type Provider = 'groq' | 'openai' | 'anthropic';
@@ -108,41 +107,6 @@ const PROVIDER_KEY_URLS: Record<Provider, string> = {
   anthropic: 'console.anthropic.com',
 };
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onChange}
-      className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50',
-        checked ? 'bg-[#25D366]' : 'bg-gray-300 dark:bg-white/20',
-        disabled && 'opacity-50 cursor-not-allowed',
-      )}
-    >
-      <span className={cn(
-        'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-        checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1',
-      )} />
-    </button>
-  );
-}
-
-function SettingRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-black dark:text-white">{label}</p>
-        {description && <p className="mt-0.5 text-xs text-gray-600 dark:text-[#8696A0]">{description}</p>}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  );
-}
-
 // Compact number: 14400 → "14.4k", 1200000 → "1.2M".
 function fmtQuota(n: number | null): string {
   if (n == null) return '—';
@@ -162,34 +126,37 @@ function QuotaStat({ label, remaining, limit, reset, resetLabel }: {
   const pct = remaining != null && limit ? Math.max(0, Math.min(1, remaining / limit)) : null;
   const low = pct != null && pct <= 0.15;
   const mid = pct != null && pct > 0.15 && pct <= 0.4;
-  const barColor = low ? 'bg-red-500' : mid ? 'bg-amber-400' : 'bg-[#25D366]';
-  const numColor = low ? 'text-red-600 dark:text-red-400' : mid ? 'text-amber-600 dark:text-amber-400' : 'text-black dark:text-white';
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-white/5 bg-white dark:bg-[#202C33] px-2.5 py-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-[#8696A0]">{label}</span>
-        {reset && <span dir="ltr" className="text-[9px] text-gray-400 dark:text-[#8696A0]/70" title={`${resetLabel} ${reset}`}>{reset}</span>}
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2 text-2xs text-ink-3">
+        <span className="truncate">{label}</span>
+        {reset && <span dir="ltr" className="tabular-nums text-ink-4" title={`${resetLabel} ${reset}`}>{reset}</span>}
       </div>
-      <div className="mt-0.5 flex items-baseline gap-1">
-        <span dir="ltr" className={cn('text-sm font-bold tabular-nums', numColor)}>{fmtQuota(remaining)}</span>
-        <span dir="ltr" className="text-[10px] text-gray-400 dark:text-[#8696A0]/70">/ {fmtQuota(limit)}</span>
-      </div>
+      <p className="mt-0.5 text-xs">
+        <span dir="ltr" className={cn('font-semibold tabular-nums', low ? 'text-red-600 dark:text-red-400' : mid ? 'text-amber-700 dark:text-amber-400' : 'text-ink')}>{fmtQuota(remaining)}</span>
+        <span dir="ltr" className="tabular-nums text-ink-4"> / {fmtQuota(limit)}</span>
+      </p>
       {pct != null && (
-        <div className="mt-1 h-1 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
-          <div className={cn('h-1 rounded-full transition-all', barColor)} style={{ width: `${Math.round(pct * 100)}%` }} />
+        <div className="mt-1 h-1 overflow-hidden rounded-full bg-raised ring-1 ring-inset ring-line">
+          <div className={cn('grow-x h-1 rounded-full', low ? 'bg-red-500' : mid ? 'bg-amber-400' : 'bg-brand')} style={{ width: `${Math.round(pct * 100)}%` }} />
         </div>
       )}
     </div>
   );
 }
 
+/**
+ * AI settings shared by every AI feature: the provider and key, the CRM
+ * assistant, and lead qualification. The customer-facing bot has its own
+ * screen (AI Agent); this page links there instead of duplicating it.
+ */
 export default function ChatbotAdminPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const { t } = useTranslation('admin');
   const { isRTL } = useDirection();
 
-  const role    = (session?.user as any)?.role ?? 'AGENT';
+  const role    = (session?.user as { role?: string } | undefined)?.role ?? 'AGENT';
   const isAdmin = isManager(role);
 
   const [activeSection, setActiveSection] = useState<Section>('overview');
@@ -198,6 +165,7 @@ export default function ChatbotAdminPage() {
   const [loading, setLoading]             = useState(true);
   const [saving, setSaving]               = useState(false);
   const [saved, setSaved]                 = useState(false);
+  const [dirty, setDirty]                 = useState(false);
   const [error, setError]                 = useState('');
   const [showApiKey, setShowApiKey]       = useState(false);
   const [showCrmApiKey, setShowCrmApiKey] = useState(false);
@@ -210,6 +178,7 @@ export default function ChatbotAdminPage() {
     try {
       const data = await api.get('/api/chatbot/settings');
       setSettings(data);
+      setDirty(false);
       void fetchStatus();
     } catch {
       setError(t('chatbot.accessDenied'));
@@ -238,9 +207,10 @@ export default function ChatbotAdminPage() {
     try {
       const data = await api.put('/api/chatbot/settings', settings);
       setSettings(data);
+      setDirty(false);
       void fetchStatus();
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 2200);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('chatbot.accessDenied'));
     } finally {
@@ -248,574 +218,391 @@ export default function ChatbotAdminPage() {
     }
   };
 
-  const update = (patch: Partial<ChatbotSettings>) =>
+  const update = (patch: Partial<ChatbotSettings>) => {
     setSettings((s) => (s ? { ...s, ...patch } : s));
+    setDirty(true);
+  };
 
   if (sessionStatus === 'loading' || loading) {
     return (
-      <div className="space-y-4 animate-fade-in" role="status" aria-label="Loading chatbot settings">
-        <div className="space-y-2">
-          <div className="skeleton h-7 w-52" />
-          <div className="skeleton h-3.5 w-72 max-w-full" />
-        </div>
-        <div className="flex gap-2 overflow-hidden">
-          {[...Array(5)].map((_, i) => <div key={i} className="skeleton h-9 w-28 shrink-0 rounded-full" />)}
-        </div>
-        <div className="skeleton h-44 rounded-2xl" />
-        <div className="skeleton h-64 rounded-2xl" />
+      <div className="space-y-5" role="status" aria-label="Loading AI settings">
+        <div className="space-y-2"><Skeleton className="h-6 w-44 rounded" /><Skeleton className="h-3.5 w-80 max-w-full rounded" /></div>
+        <Skeleton className="h-9 w-80 rounded-lg" />
+        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }
   if (!isAdmin) return null;
 
-  const navItems: { id: Section; icon: React.ElementType; label: string; dotClass: string }[] = [
-    {
-      id: 'overview',
-      icon: LayoutDashboard,
-      label: t('chatbot.tabs.overview'),
-      dotClass: 'bg-[#25D366]',
-    },
-    {
-      id: 'crmAssistant',
-      icon: Brain,
-      label: t('chatbot.tabs.crmAssistant'),
-      dotClass: settings?.crmAssistantEnabled ? 'bg-purple-400' : 'bg-gray-400 dark:bg-[#8696A0]',
-    },
-    {
-      id: 'leadQualification',
-      icon: Target,
-      label: t('chatbot.tabs.leadQualification'),
-      dotClass: settings?.qualificationEnabled ? 'bg-[#25D366]' : 'bg-gray-400 dark:bg-[#8696A0]',
-    },
+  const tabs: { id: Section; icon: React.ElementType; label: string; on?: boolean }[] = [
+    { id: 'overview', icon: Cpu, label: t('chatbot.tabs.overview') },
+    { id: 'crmAssistant', icon: Brain, label: t('chatbot.tabs.crmAssistant'), on: settings?.crmAssistantEnabled },
+    { id: 'leadQualification', icon: Target, label: t('chatbot.tabs.leadQualification'), on: settings?.qualificationEnabled },
   ];
 
-  // ── Shared AI connection (provider + API key) ─────────────────────────────
-  // The customer bot's behavior, audience, and gating live on the dedicated
-  // /admin/customer-ai page (the single source of truth). This card only holds
-  // the shared credentials used by the bot, the CRM assistant, and lead qualification.
-  function CustomerBotConnection() {
-    if (!settings) return null;
-    return (
-      <div className="space-y-4">
-        <div className="flex items-start gap-2 rounded-xl border border-[#25D366]/20 bg-[#25D366]/5 p-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#25D366]" />
-          <p className="text-xs leading-5 text-gray-600 dark:text-[#8696A0]">
-            {t('chatbot.connection.note')}
-          </p>
-        </div>
+  const selectCls = 'field appearance-none';
 
-        {/* Provider */}
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.provider.title')}</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(['groq', 'openai', 'anthropic'] as Provider[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => update({ provider: p, model: MODEL_OPTIONS[p][0].value })}
-                className={cn(
-                  'flex flex-col items-start gap-1.5 rounded-xl border p-4 text-start transition-all',
-                  settings.provider === p
-                    ? 'border-[#25D366] bg-[#25D366]/8 ring-1 ring-[#25D366]/30'
-                    : 'border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] hover:border-gray-400 dark:hover:border-white/20',
-                )}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <span className="text-sm font-semibold text-black dark:text-white">{t(`chatbot.provider.${p}`)}</span>
-                  {settings.provider === p && <CheckCircle2 className="h-4 w-4 text-[#25D366]" />}
-                </div>
-                <span className="text-[11px] text-gray-600 dark:text-[#8696A0]">{t(`chatbot.provider.${p}Desc`)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+  const keyField = (value: string, onChange: (v: string) => void, shown: boolean, toggle: () => void, placeholder: string) => (
+    <div className="relative">
+      <input
+        type={shown ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        dir="ltr"
+        autoComplete="off"
+        className="field pe-10 font-mono text-xs"
+      />
+      <button type="button" onClick={toggle} className="absolute end-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-3 hover:bg-raised hover:text-ink" aria-label={shown ? 'Hide key' : 'Show key'}>
+        {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
 
-        {/* API Key */}
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-2">
-          <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.apiKey')}</label>
-          <div className="relative">
-            <Input
-              type={showApiKey ? 'text' : 'password'}
-              value={settings.apiKey}
-              onChange={(e) => update({ apiKey: e.target.value })}
-              placeholder={`${settings.provider} API key`}
-              className={isRTL ? 'pl-10' : 'pr-10'}
-            />
-            <button
-              type="button"
-              onClick={() => setShowApiKey((v) => !v)}
-              className={cn('absolute top-1/2 -translate-y-1/2 text-gray-600 dark:text-[#8696A0] hover:text-black dark:hover:text-white', isRTL ? 'left-3' : 'right-3')}
-            >
-              {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          <p className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-[#8696A0]">
-            <Info className="h-3 w-3 shrink-0" />
-            {t('chatbot.apiKeyLink', { url: PROVIDER_KEY_URLS[settings.provider] })}
-          </p>
-          <div className="flex items-center justify-end gap-3 pt-1">
-            {saved && (
-              <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-[#25D366]">
-                <CheckCircle2 className="h-4 w-4" /> {t('chatbot.saved')}
-              </span>
-            )}
-            <Button onClick={handleSave} disabled={saving} className="gap-2 bg-[#25D366] text-black hover:bg-[#128C7E] hover:text-white">
-              {saving ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? t('chatbot.saving') : t('chatbot.connection.save')}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── CRM Assistant Section ──────────────────────────────────────────────────
-  function CrmAssistantSection() {
-    if (!settings) return null;
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.status.enabled')}</p>
-          <div className="space-y-2">
-            <SettingRow label={t('chatbot.crmAssistant.enable')} description={t('chatbot.crmAssistant.enableDesc')}>
-              <Toggle checked={settings.crmAssistantEnabled} onChange={() => update({ crmAssistantEnabled: !settings.crmAssistantEnabled })} />
-            </SettingRow>
-            <SettingRow label={t('chatbot.crmAssistant.sameProvider')} description={t('chatbot.crmAssistant.sameProviderDesc')}>
-              <Toggle checked={settings.crmAssistantUseSameProvider} onChange={() => update({ crmAssistantUseSameProvider: !settings.crmAssistantUseSameProvider })} />
-            </SettingRow>
-          </div>
-        </div>
-
-        {!settings.crmAssistantUseSameProvider && (
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.separateConfig')}</p>
-            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-4">
-              <p className="text-xs text-gray-600 dark:text-[#8696A0]">{t('chatbot.separateConfigDesc')}</p>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.model')}</label>
-                <select
-                  value={settings.crmAssistantModel}
-                  onChange={(e) => update({ crmAssistantModel: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
-                >
-                  {MODEL_OPTIONS[settings.provider].map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}{m.badge ? ` — ${m.badge}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.apiKey')}</label>
-                <div className="relative">
-                  <Input
-                    type={showCrmApiKey ? 'text' : 'password'}
-                    value={settings.crmAssistantApiKey}
-                    onChange={(e) => update({ crmAssistantApiKey: e.target.value })}
-                    placeholder={t('chatbot.crmApiKeyPlaceholder')}
-                    className={isRTL ? 'pl-10' : 'pr-10'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCrmApiKey((v) => !v)}
-                    className={cn('absolute top-1/2 -translate-y-1/2 text-gray-600 dark:text-[#8696A0] hover:text-black dark:hover:text-white', isRTL ? 'left-3' : 'right-3')}
-                  >
-                    {showCrmApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.systemPrompt')}</p>
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-2">
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-[#8696A0]">
-              <FileText className="h-3.5 w-3.5" />
-              {t('chatbot.crmSystemPromptDesc')}
-            </div>
-            <textarea
-              value={settings.crmAssistantSystemPrompt}
-              onChange={(e) => update({ crmAssistantSystemPrompt: e.target.value })}
-              rows={12}
-              dir="auto"
-              className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2.5 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] resize-y focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
-              placeholder={t('chatbot.crmSystemPromptPlaceholder')}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Lead Qualification Section ─────────────────────────────────────────────
-  function LeadQualificationSection() {
-    if (!settings) return null;
-    const debounceSeconds = Math.round((settings.qualificationDebounceMs || 45000) / 1000);
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.status.enabled')}</p>
-          <SettingRow label={t('chatbot.leadQualification.enable')} description={t('chatbot.leadQualification.enableDesc')}>
-            <Toggle checked={settings.qualificationEnabled} onChange={() => update({ qualificationEnabled: !settings.qualificationEnabled })} />
-          </SettingRow>
-        </div>
-
-        <div className="flex items-start gap-2 rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#111B21] p-3">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-[#8696A0]" />
-          <p className="text-xs text-gray-600 dark:text-[#8696A0]">{t('chatbot.leadQualification.providerNote')}</p>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.tuning')}</p>
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.leadQualification.model')}</label>
-              <select
-                value={settings.qualificationModel}
-                onChange={(e) => update({ qualificationModel: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2 text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
-              >
-                {MODEL_OPTIONS[settings.provider].map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}{m.badge ? ` — ${m.badge}` : ''}</option>
-                ))}
-              </select>
-              <p className="text-[10px] text-gray-600 dark:text-[#8696A0]">{t('chatbot.leadQualification.modelDesc')}</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Thermometer className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-                  <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.leadQualification.temperature')}</label>
-                </div>
-                <span className="rounded-lg bg-gray-100 dark:bg-[#111B21] px-2 py-0.5 text-xs font-mono text-[#25D366]">
-                  {settings.qualificationTemperature.toFixed(1)}
-                </span>
-              </div>
-              <input
-                type="range" min="0" max="1" step="0.1"
-                value={settings.qualificationTemperature}
-                onChange={(e) => update({ qualificationTemperature: parseFloat(e.target.value) })}
-                className="w-full accent-[#25D366]"
-              />
-              <p className="text-[10px] text-gray-600 dark:text-[#8696A0]">{t('chatbot.leadQualification.temperatureDesc')}</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Timer className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-                <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.leadQualification.debounce')}</label>
-              </div>
-              <Input
-                type="number" min={3} max={600}
-                value={debounceSeconds}
-                onChange={(e) => update({ qualificationDebounceMs: (parseInt(e.target.value) || 45) * 1000 })}
-                className="max-w-[120px]"
-              />
-              <p className="text-[10px] text-gray-600 dark:text-[#8696A0]">{t('chatbot.leadQualification.debounceDesc')}</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-                  <label className="text-xs font-medium text-gray-700 dark:text-[#8696A0]">{t('chatbot.leadQualification.contextWindow')}</label>
-                </div>
-                <span className="rounded-lg bg-gray-100 dark:bg-[#111B21] px-2 py-0.5 text-xs font-mono text-[#25D366]">
-                  {settings.qualificationContextWindow}
-                </span>
-              </div>
-              <input
-                type="range" min={4} max={30} step={1}
-                value={settings.qualificationContextWindow}
-                onChange={(e) => update({ qualificationContextWindow: parseInt(e.target.value) })}
-                className="w-full accent-[#25D366]"
-              />
-              <p className="text-[10px] text-gray-600 dark:text-[#8696A0]">{t('chatbot.leadQualification.contextWindowDesc')}</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.leadQualification.systemPrompt')}</p>
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 space-y-2">
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-[#8696A0]">
-              <FileText className="h-3.5 w-3.5" />
-              {t('chatbot.leadQualification.systemPromptDesc')}
-            </div>
-            <textarea
-              value={settings.qualificationSystemPrompt}
-              onChange={(e) => update({ qualificationSystemPrompt: e.target.value })}
-              rows={12}
-              dir="auto"
-              className="w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] px-3 py-2.5 text-sm text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] resize-y focus:outline-none focus:ring-2 focus:ring-[#25D366]/30"
-              placeholder={t('chatbot.leadQualification.systemPromptPlaceholder')}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Overview Section (at-a-glance status) ──────────────────────────────────
+  // ── Overview ───────────────────────────────────────────────────────────────
   function OverviewSection() {
     if (!settings) return null;
     const botEnabled = status?.customerBot.enabled ?? false;
     const features = [
       {
-        key: 'leadQualification' as const, icon: Target, label: t('chatbot.tabs.leadQualification'),
-        on: settings.qualificationEnabled, dot: settings.qualificationEnabled ? 'bg-[#25D366]' : 'bg-[#8696A0]', tone: 'text-[#25D366]',
-        lines: [
-          `${t('chatbot.overview.model')}: ${settings.qualificationModel}`,
-          `${t('chatbot.leadQualification.debounce')}: ${Math.round((settings.qualificationDebounceMs || 45000) / 1000)}s`,
-        ],
+        key: 'leadQualification' as const, icon: Target, label: t('chatbot.tabs.leadQualification'), on: settings.qualificationEnabled,
+        meta: `${settings.qualificationModel} · ${Math.round((settings.qualificationDebounceMs || 45000) / 1000)}s`,
       },
       {
-        key: 'crmAssistant' as const, icon: Brain, label: t('chatbot.tabs.crmAssistant'),
-        on: settings.crmAssistantEnabled, dot: settings.crmAssistantEnabled ? 'bg-purple-400' : 'bg-[#8696A0]', tone: 'text-purple-400',
-        lines: [`${t('chatbot.overview.model')}: ${settings.crmAssistantUseSameProvider ? settings.model : settings.crmAssistantModel}`],
+        key: 'crmAssistant' as const, icon: Brain, label: t('chatbot.tabs.crmAssistant'), on: settings.crmAssistantEnabled,
+        meta: settings.crmAssistantUseSameProvider ? settings.model : settings.crmAssistantModel,
       },
     ];
     return (
-      <div className="space-y-6">
-        {/* Customer Bot lives on its own dedicated page — link out, don't duplicate. */}
-        <Link
-          href="/admin/customer-ai"
-          className="group flex items-center gap-4 rounded-2xl border border-[#25D366]/25 bg-[#25D366]/[0.06] p-4 transition-all hover:border-[#25D366]/50 hover:bg-[#25D366]/[0.1]"
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#25D366]">
-            <MessageSquare className="h-5 w-5" />
+      <div className="space-y-5">
+        {/* The customer bot has its own screen — link out, don't duplicate. */}
+        <Link href="/admin/customer-ai" className="panel lift group flex items-center gap-4 p-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+            <MessageSquare className="h-5 w-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-black dark:text-white">{t('chatbot.tabs.customerBot')}</p>
-              <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                botEnabled ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-[#8696A0]')}>
-                <span className={cn('h-1.5 w-1.5 rounded-full', botEnabled ? 'bg-[#25D366]' : 'bg-[#8696A0]')} />
+              <p className="text-[13px] font-semibold text-ink">{t('chatbot.tabs.customerBot')}</p>
+              <span className={cn('chip', botEnabled ? 'chip-brand' : 'chip-neutral')}>
                 {botEnabled ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}
               </span>
             </div>
-            <p className="mt-0.5 truncate text-xs text-gray-600 dark:text-[#8696A0]">{t('chatbot.customerBot.description')}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-3">{t('chatbot.customerBot.description')}</p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[#25D366]">
-            {t('chatbot.overview.manage')} <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-ink-2 group-hover:text-ink">
+            {t('chatbot.overview.manage')} <ChevronRight className="h-3.5 w-3.5 icon-mirror" />
           </span>
         </Link>
 
-        {/* Shared AI connection (provider + key) used by the bot and the tools below. */}
-        <CustomerBotConnection />
+        {/* Shared connection */}
+        <section className="panel">
+          <header className="border-b border-line px-5 py-4">
+            <h2 className="text-[15px] font-semibold text-ink">{t('chatbot.provider.title')}</h2>
+            <p className="mt-0.5 text-[13px] text-ink-3">{t('chatbot.connection.note')}</p>
+          </header>
+          <div className="space-y-5 p-5">
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t('chatbot.provider.title')}>
+              {(['groq', 'openai', 'anthropic'] as Provider[]).map((p) => {
+                const on = settings.provider === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => update({ provider: p, model: MODEL_OPTIONS[p][0].value })}
+                    className={cn(
+                      'flex items-start justify-between gap-2 rounded-lg border p-3 text-start transition-colors',
+                      on ? 'border-brand bg-brand/[0.05] ring-1 ring-inset ring-brand/40' : 'border-line hover:border-line-strong hover:bg-raised/50',
+                    )}
+                  >
+                    <span>
+                      <span className="block text-[13px] font-semibold text-ink">{t(`chatbot.provider.${p}`)}</span>
+                      <span className="mt-0.5 block text-xs text-ink-3">{t(`chatbot.provider.${p}Desc`)}</span>
+                    </span>
+                    <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-brand bg-brand' : 'border-line-strong')}>
+                      {on && <span className="h-1.5 w-1.5 rounded-full bg-brand-fg" />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <Field label={t('chatbot.apiKey')} hint={t('chatbot.apiKeyLink', { url: PROVIDER_KEY_URLS[settings.provider] })}>
+              {keyField(settings.apiKey, (v) => update({ apiKey: v }), showApiKey, () => setShowApiKey((v) => !v), `${settings.provider} API key`)}
+              <p className={cn('flex items-center gap-1.5 text-2xs font-medium', status?.hasApiKey ? 'text-brand' : 'text-amber-700 dark:text-amber-400')}>
+                {status?.hasApiKey ? <CheckCircle className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                {status?.hasApiKey ? t('chatbot.overview.keySet') : t('chatbot.overview.keyMissing')}
+              </p>
+            </Field>
+          </div>
+        </section>
 
+        {/* Features */}
         <div className="grid gap-3 sm:grid-cols-2">
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <button key={f.key} type="button" onClick={() => setActiveSection(f.key)}
-                className="group rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4 text-start transition-all hover:border-white/20">
-                <div className="flex items-center justify-between">
-                  <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl bg-white/5', f.tone)}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                    f.on ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-[#8696A0]')}>
-                    <span className={cn('h-1.5 w-1.5 rounded-full', f.dot)} />
-                    {f.on ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm font-semibold text-black dark:text-white">{f.label}</p>
-                <div className="mt-1 space-y-0.5">
-                  {f.lines.map((l, i) => <p key={i} className="truncate text-[11px] text-gray-600 dark:text-[#8696A0]">{l}</p>)}
-                </div>
-                <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-[#25D366] opacity-0 transition-opacity group-hover:opacity-100">
-                  {t('chatbot.overview.manage')} <ChevronRight className="h-3 w-3" />
+              <button key={f.key} type="button" onClick={() => setActiveSection(f.key)} className="panel lift group flex items-center gap-3 p-4 text-start">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-raised text-ink-2 ring-1 ring-inset ring-line">
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-[13px] font-semibold text-ink">{f.label}</span>
+                    <span className={cn('chip', f.on ? 'chip-brand' : 'chip-neutral')}>{f.on ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}</span>
+                  </span>
+                  <span dir="ltr" className="mt-0.5 block truncate text-start font-mono text-2xs text-ink-3">{f.meta}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-ink-4 transition-transform group-hover:translate-x-0.5 icon-mirror" aria-hidden="true" />
               </button>
             );
           })}
         </div>
 
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-              <span className="text-xs text-gray-600 dark:text-[#8696A0]">{t('chatbot.provider.title')}:</span>
-              <span className="rounded-md bg-[#25D366]/15 px-1.5 py-0.5 text-[11px] font-semibold text-[#25D366]">{settings.provider}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-              <span className="text-xs text-gray-600 dark:text-[#8696A0]">{t('chatbot.apiKey')}:</span>
-              {status?.hasApiKey
-                ? <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#25D366]"><CheckCircle className="h-3.5 w-3.5" /> {t('chatbot.overview.keySet')}</span>
-                : <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400"><XCircle className="h-3.5 w-3.5" /> {t('chatbot.overview.keyMissing')}</span>}
-            </div>
-          </div>
-        </div>
-
+        {/* Failover quota */}
         {status && status.provider === 'groq' && status.models.length > 0 && (
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Cpu className="h-4 w-4 text-gray-600 dark:text-[#8696A0]" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">{t('chatbot.overview.failover')}</p>
-            </div>
-            <div className="space-y-2">
+          <section className="panel">
+            <header className="flex items-center gap-2 border-b border-line px-5 py-3.5">
+              <Cpu className="h-4 w-4 text-ink-4" aria-hidden="true" />
+              <h2 className="text-[13px] font-semibold text-ink">{t('chatbot.overview.failover')}</h2>
+            </header>
+            <ul className="divide-y divide-line">
               {status.models.map((m) => {
                 const q = m.quota;
                 return (
-                  <div key={m.model} className="rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#111B21] px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span dir="ltr" className="truncate font-mono text-xs text-black dark:text-white">{m.model}</span>
-                        {m.primary && <span className="shrink-0 rounded bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-gray-600 dark:text-[#8696A0]">{t('chatbot.overview.primary')}</span>}
-                      </div>
+                  <li key={m.model} className="grid gap-3 px-5 py-3 sm:grid-cols-[1fr_160px_160px] sm:items-center">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span dir="ltr" className="truncate font-mono text-xs text-ink">{m.model}</span>
+                      {m.primary && <span className="chip chip-neutral">{t('chatbot.overview.primary')}</span>}
                       {!m.available
-                        ? <span dir="ltr" className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-amber-500 dark:text-amber-400"><Timer className="h-3.5 w-3.5" /> {Math.floor(m.secondsLeft / 60)}:{String(m.secondsLeft % 60).padStart(2, '0')}</span>
-                        : <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-[#25D366]"><CheckCircle className="h-3.5 w-3.5" /> {t('chatbot.overview.ready')}</span>}
+                        ? <span dir="ltr" className="chip chip-warn"><Timer className="h-3 w-3" /> {Math.floor(m.secondsLeft / 60)}:{String(m.secondsLeft % 60).padStart(2, '0')}</span>
+                        : <span className="chip chip-brand">{t('chatbot.overview.ready')}</span>}
                     </div>
                     {q ? (
-                      <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <>
                         <QuotaStat label={t('chatbot.overview.requests')} resetLabel={t('chatbot.overview.resetsIn')} remaining={q.remainingRequests} limit={q.limitRequests} reset={q.resetRequests} />
                         <QuotaStat label={t('chatbot.overview.tokens')} resetLabel={t('chatbot.overview.resetsIn')} remaining={q.remainingTokens} limit={q.limitTokens} reset={q.resetTokens} />
-                      </div>
+                      </>
                     ) : (
-                      <p className="mt-1.5 text-[10px] text-gray-500 dark:text-[#8696A0]/70">{t('chatbot.overview.noQuotaData')}</p>
+                      <p className="text-2xs text-ink-4 sm:col-span-2">{t('chatbot.overview.noQuotaData')}</p>
                     )}
-                  </div>
+                  </li>
                 );
               })}
-            </div>
-            <p className="mt-2 text-[10px] text-gray-600 dark:text-[#8696A0]">{t('chatbot.overview.failoverHint')}</p>
-          </div>
+            </ul>
+            <p className="border-t border-line px-5 py-2.5 text-2xs leading-4 text-ink-3">{t('chatbot.overview.failoverHint')}</p>
+          </section>
         )}
       </div>
     );
   }
 
-  const sectionTitles: Record<Section, string> = {
-    overview:      t('chatbot.overview.title'),
-    crmAssistant:  t('chatbot.crmAssistant.title'),
-    leadQualification: t('chatbot.leadQualification.title'),
-  };
-  const sectionDesc: Record<Section, string> = {
-    overview:      t('chatbot.overview.description'),
-    crmAssistant:  t('chatbot.crmAssistant.description'),
-    leadQualification: t('chatbot.leadQualification.description'),
-  };
+  // ── CRM Assistant ──────────────────────────────────────────────────────────
+  function CrmAssistantSection() {
+    if (!settings) return null;
+    return (
+      <div className="space-y-5">
+        <SettingsGroup className="bg-surface">
+          <SettingRow label={t('chatbot.crmAssistant.enable')} description={t('chatbot.crmAssistant.enableDesc')}>
+            <Toggle checked={settings.crmAssistantEnabled} onChange={() => update({ crmAssistantEnabled: !settings.crmAssistantEnabled })} />
+          </SettingRow>
+          <SettingRow label={t('chatbot.crmAssistant.sameProvider')} description={t('chatbot.crmAssistant.sameProviderDesc')}>
+            <Toggle checked={settings.crmAssistantUseSameProvider} onChange={() => update({ crmAssistantUseSameProvider: !settings.crmAssistantUseSameProvider })} />
+          </SettingRow>
+        </SettingsGroup>
+
+        {!settings.crmAssistantUseSameProvider && (
+          <section className="panel space-y-5 p-5">
+            <div>
+              <h3 className="text-[13px] font-semibold text-ink">{t('chatbot.separateConfig')}</h3>
+              <p className="mt-0.5 text-xs text-ink-3">{t('chatbot.separateConfigDesc')}</p>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label={t('chatbot.model')}>
+                <select value={settings.crmAssistantModel} onChange={(e) => update({ crmAssistantModel: e.target.value })} className={selectCls}>
+                  {MODEL_OPTIONS[settings.provider].map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}{m.badge ? ` — ${m.badge}` : ''}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={t('chatbot.apiKey')}>
+                {keyField(settings.crmAssistantApiKey, (v) => update({ crmAssistantApiKey: v }), showCrmApiKey, () => setShowCrmApiKey((v) => !v), t('chatbot.crmApiKeyPlaceholder'))}
+              </Field>
+            </div>
+          </section>
+        )}
+
+        <section className="panel space-y-2 p-5">
+          <Field label={t('chatbot.systemPrompt')} hint={t('chatbot.crmSystemPromptDesc')}>
+            <TextArea value={settings.crmAssistantSystemPrompt} onChange={(v) => update({ crmAssistantSystemPrompt: v })} rows={12} showCount softLimit={6000} placeholder={t('chatbot.crmSystemPromptPlaceholder')} />
+          </Field>
+        </section>
+      </div>
+    );
+  }
+
+  // ── Lead Qualification ─────────────────────────────────────────────────────
+  function LeadQualificationSection() {
+    if (!settings) return null;
+    const debounceSeconds = Math.round((settings.qualificationDebounceMs || 45000) / 1000);
+    return (
+      <div className="space-y-5">
+        <SettingsGroup className="bg-surface">
+          <SettingRow label={t('chatbot.leadQualification.enable')} description={t('chatbot.leadQualification.enableDesc')}>
+            <Toggle checked={settings.qualificationEnabled} onChange={() => update({ qualificationEnabled: !settings.qualificationEnabled })} />
+          </SettingRow>
+        </SettingsGroup>
+
+        <p className="flex items-start gap-2 px-1 text-xs leading-5 text-ink-3">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {t('chatbot.leadQualification.providerNote')}
+        </p>
+
+        <section className="panel space-y-6 p-5">
+          <h3 className="text-[13px] font-semibold text-ink">{t('chatbot.tuning')}</h3>
+          <Field label={t('chatbot.leadQualification.model')} hint={t('chatbot.leadQualification.modelDesc')}>
+            <select value={settings.qualificationModel} onChange={(e) => update({ qualificationModel: e.target.value })} className={cn(selectCls, 'max-w-sm')}>
+              {MODEL_OPTIONS[settings.provider].map((m) => (
+                <option key={m.value} value={m.value}>{m.label}{m.badge ? ` — ${m.badge}` : ''}</option>
+              ))}
+            </select>
+          </Field>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Slider
+              label={t('chatbot.leadQualification.temperature')}
+              hint={t('chatbot.leadQualification.temperatureDesc')}
+              icon={<Thermometer className="h-4 w-4 text-ink-4" />}
+              value={settings.qualificationTemperature} min={0} max={1} step={0.1}
+              display={settings.qualificationTemperature.toFixed(1)}
+              onChange={(v) => update({ qualificationTemperature: v })}
+            />
+            <Slider
+              label={t('chatbot.leadQualification.contextWindow')}
+              hint={t('chatbot.leadQualification.contextWindowDesc')}
+              icon={<Layers className="h-4 w-4 text-ink-4" />}
+              value={settings.qualificationContextWindow} min={4} max={30} step={1}
+              display={String(settings.qualificationContextWindow)}
+              onChange={(v) => update({ qualificationContextWindow: Math.round(v) })}
+            />
+          </div>
+          <Field label={t('chatbot.leadQualification.debounce')} hint={t('chatbot.leadQualification.debounceDesc')}>
+            <TextInput type="number" value={debounceSeconds} className="max-w-[140px]" onChange={(v) => update({ qualificationDebounceMs: (parseInt(v) || 45) * 1000 })} />
+          </Field>
+        </section>
+
+        <section className="panel p-5">
+          <Field label={t('chatbot.leadQualification.systemPrompt')} hint={t('chatbot.leadQualification.systemPromptDesc')}>
+            <TextArea value={settings.qualificationSystemPrompt} onChange={(v) => update({ qualificationSystemPrompt: v })} rows={12} showCount softLimit={6000} placeholder={t('chatbot.leadQualification.systemPromptPlaceholder')} />
+          </Field>
+        </section>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* ── Header ── */}
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              {t('badge')} — {t('chatbot.badge')}
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold text-black dark:text-white">{t('chatbot.title')}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-[#8696A0]">{t('chatbot.subtitle')}</p>
-          </div>
-
-          {settings && (
-            <div className="flex flex-wrap gap-2 self-end">
-              <span className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
-                status?.customerBot.enabled ? 'bg-[#25D366]/15 text-[#25D366]' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-[#8696A0]',
-              )}>
-                <span className={cn('h-1.5 w-1.5 rounded-full', status?.customerBot.enabled ? 'bg-[#25D366]' : 'bg-[#8696A0]')} />
-                {t('chatbot.tabs.customerBot')}: {status?.customerBot.enabled ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}
-              </span>
-              <span className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
-                settings.crmAssistantEnabled ? 'bg-purple-500/15 text-purple-400' : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-[#8696A0]',
-              )}>
-                <span className={cn('h-1.5 w-1.5 rounded-full', settings.crmAssistantEnabled ? 'bg-purple-400' : 'bg-[#8696A0]')} />
-                {t('chatbot.tabs.crmAssistant')}: {settings.crmAssistantEnabled ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}
-              </span>
-            </div>
-          )}
-        </div>
-      </section>
+    <div dir={isRTL ? 'rtl' : 'ltr'}>
+      <PageHeader
+        title={t('chatbot.title')}
+        description={t('chatbot.subtitle')}
+        meta={settings && (
+          <span className={cn('chip', status?.customerBot.enabled ? 'chip-brand' : 'chip-neutral')}>
+            {t('chatbot.tabs.customerBot')} · {status?.customerBot.enabled ? t('chatbot.status.enabled') : t('chatbot.status.disabled')}
+          </span>
+        )}
+      />
 
       {!settings && !loading && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-          <AlertCircle className="h-5 w-5 text-red-400 shrink-0" />
-          <p className="text-sm text-red-400">{t('chatbot.accessDenied')}</p>
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-500/25 dark:bg-red-500/10">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+          <p className="text-[13px] text-red-700 dark:text-red-300">{t('chatbot.accessDenied')}</p>
         </div>
       )}
 
       {settings && (
         <>
-          {/* ── Top tabs ── */}
-          <div className="flex flex-wrap gap-1.5 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] p-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = activeSection === item.id;
+          {/* Tabs — the underline glides between them */}
+          <div className="mb-5 flex gap-1 overflow-x-auto border-b border-line scrollbar-none" role="tablist">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeSection === tab.id;
               return (
                 <button
-                  key={item.id}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setActiveSection(item.id)}
-                  className={cn(
-                    'flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
-                    active
-                      ? 'bg-[#25D366]/10 text-[#25D366]'
-                      : 'text-gray-600 dark:text-[#8696A0] hover:bg-gray-200 dark:hover:bg-white/5 hover:text-black dark:hover:text-white',
-                  )}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveSection(tab.id)}
+                  className={cn('relative flex shrink-0 items-center gap-2 px-3 py-2.5 text-[13px] font-medium transition-colors', active ? 'text-ink' : 'text-ink-3 hover:text-ink')}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                  <span className={cn('h-2 w-2 rounded-full shrink-0', item.dotClass)} />
+                  <Icon className={cn('h-4 w-4', active ? 'text-brand' : 'text-ink-4')} aria-hidden="true" />
+                  {tab.label}
+                  {tab.on !== undefined && <span className={cn('h-1.5 w-1.5 rounded-full', tab.on ? 'bg-brand' : 'bg-line-strong')} aria-hidden="true" />}
+                  {active && <motion.span layoutId="ai-settings-tab" className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
                 </button>
               );
             })}
           </div>
 
-          {/* ── Content panel ── */}
-          <div className="min-w-0 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200 dark:border-white/10 pb-5">
-              <div>
-                <h2 className="text-lg font-semibold text-black dark:text-white">{sectionTitles[activeSection]}</h2>
-                <p className="mt-1 text-sm text-gray-600 dark:text-[#8696A0]">{sectionDesc[activeSection]}</p>
-              </div>
-            </div>
-
-            {activeSection === 'overview' && <OverviewSection />}
-            {activeSection === 'crmAssistant' && <CrmAssistantSection />}
-            {activeSection === 'leadQualification' && <LeadQualificationSection />}
+          <div className="max-w-4xl">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {/* Called, not mounted: as <Component/> these would remount on every
+                    keystroke (they are re-declared each render) and drop input focus. */}
+                {activeSection === 'overview' && OverviewSection()}
+                {activeSection === 'crmAssistant' && CrmAssistantSection()}
+                {activeSection === 'leadQualification' && LeadQualificationSection()}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          {/* ── Save bar — only for the settings-backed sections (CRM, Lead). The
-               Customer Bot connection card and the embedded builder each save
-               themselves, and Overview is read-only. ── */}
-          {(activeSection === 'crmAssistant' || activeSection === 'leadQualification') && (
-            <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] px-4 py-3 shadow-sm">
-              {error && (
-                <p className="flex flex-1 items-center gap-1.5 text-sm text-red-400">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
-                </p>
-              )}
-              <div className="flex flex-1 items-center justify-end gap-3">
-                {saved && (
-                  <span className="flex items-center gap-1.5 text-sm text-[#25D366]">
-                    <CheckCircle2 className="h-4 w-4" />
-                    {t('chatbot.saved')}
-                  </span>
+          {/* One save bar for every setting on this page */}
+          <AnimatePresence>
+            {(dirty || saving || saved || error) && (
+              <motion.div
+                initial={{ y: 24, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 24, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+                className="sticky bottom-[calc(var(--bottom-nav-space)+12px)] z-30 mx-auto mt-6 flex max-w-xl items-center gap-3 rounded-xl bg-nav px-4 py-2.5 text-nav-ink shadow-pop sm:bottom-5"
+                role="status"
+              >
+                {error ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
+                    <p className="min-w-0 flex-1 truncate text-[13px]">{error}</p>
+                  </>
+                ) : saved && !dirty ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-400" aria-hidden="true" />
+                    <p className="flex-1 text-[13px] font-medium">{t('chatbot.saved')}</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-hidden="true" />
+                    <p className="flex-1 text-[13px] font-medium">{t('chatbot.unsaved', { defaultValue: 'Unsaved changes' })}</p>
+                    <button type="button" onClick={() => { setLoading(true); void fetchSettings(); }} disabled={saving} className="btn btn-sm text-nav-muted hover:bg-nav-hover hover:text-nav-ink">
+                      {t('chatbot.discard', { defaultValue: 'Discard' })}
+                    </button>
+                  </>
                 )}
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="gap-2 bg-[#25D366] text-black hover:bg-[#128C7E] hover:text-white"
-                >
-                  {saving ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {saving ? t('chatbot.saving') : t('chatbot.save')}
-                </Button>
-              </div>
-            </div>
-          )}
+                {(dirty || error) && (
+                  <button type="button" onClick={handleSave} disabled={saving} className="btn btn-primary btn-sm">
+                    {saving ? <RotateCcw className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                    {saving ? t('chatbot.saving') : t('chatbot.save')}
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
-      {/* Mobile bottom-nav spacer */}
-      <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />
     </div>
   );
 }

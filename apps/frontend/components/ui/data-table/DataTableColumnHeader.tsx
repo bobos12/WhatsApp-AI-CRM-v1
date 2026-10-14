@@ -27,9 +27,9 @@ export function DataTableColumnHeader<TData, TValue>({
       >
         <span>{title}</span>
         {column.getIsSorted() === 'desc' ? (
-          <ChevronDown className="ml-2 h-4 w-4 text-[#25D366]" />
+          <ChevronDown className="ml-2 h-4 w-4 text-brand" />
         ) : column.getIsSorted() === 'asc' ? (
-          <ChevronUp className="ml-2 h-4 w-4 text-[#25D366]" />
+          <ChevronUp className="ml-2 h-4 w-4 text-brand" />
         ) : (
           <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
         )}

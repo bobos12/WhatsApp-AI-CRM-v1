@@ -1,7 +1,7 @@
 {
   "badge": "Admin Control",
   "chatbot": {
-    "title": "AI Chatbot",
+    "title": "AI Settings",
     "subtitle": "Configure AI-powered bots for customer messaging and internal team assistance.",
     "badge": "AI Configuration",
     "tabs": {
@@ -140,7 +140,9 @@
     "connection": {
       "note": "Provider and API key are shared by the customer bot, the CRM assistant, and lead qualification. Everything else about the customer bot — behavior, audience, and when it answers — lives in the builder below.",
       "save": "Save Connection"
-    }
+    },
+    "unsaved": "Unsaved changes",
+    "discard": "Discard"
   },
   "users": {
     "title": "User Management",

@@ -17,7 +17,7 @@ interface Conversation {
 
 // Circular avatar background/text colors — one per slot
 const AVATAR_COLORS = [
-  'bg-[#16A34A]/15 text-[#15803D] dark:bg-[#25D366]/15 dark:text-[#25D366]',
+  'bg-brand/15 text-brand-strong dark:bg-brand/15 dark:text-brand',
   'bg-blue-500/15 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400',
   'bg-pink-500/15 text-pink-600 dark:bg-pink-400/15 dark:text-pink-400',
   'bg-orange-500/15 text-orange-600 dark:bg-orange-400/15 dark:text-orange-400',
@@ -90,13 +90,13 @@ export default function RecentConversations() {
   useSocket('conversation:updated', onConversationUpdated);
 
   return (
-    <section className="flex h-full flex-col rounded-[20px] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-[0_2px_20px_rgba(0,0,0,0.05)] p-5 dark:bg-[#182229] dark:border-transparent dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
+    <section className="flex h-full flex-col rounded-xl bg-white/80 backdrop-blur-xl border border-gray-100 shadow-[0_2px_20px_rgba(0,0,0,0.05)] p-5 dark:bg-raised dark:border-transparent dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">{t('recentConversations.title')}</h2>
+        <h2 className="text-[15px] font-bold text-ink">{t('recentConversations.title')}</h2>
         <Link
           href="/conversations"
-          className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:border-[#16A34A]/40 hover:bg-[#16A34A]/5 hover:text-[#16A34A] dark:border-white/10 dark:text-[#8696A0] dark:hover:border-[#25D366]/40 dark:hover:bg-[#25D366]/10 dark:hover:text-[#25D366]"
+          className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand dark:border-white/10 dark:text-ink-3 dark:hover:border-brand/40 dark:hover:bg-brand/10 dark:hover:text-brand"
         >
           {t('recentConversations.viewAll')}
           <ArrowRight className="h-3.5 w-3.5 icon-mirror" aria-hidden="true" />
@@ -120,10 +120,10 @@ export default function RecentConversations() {
           ))
         ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
-              <MessageSquare className="h-5 w-5 text-gray-400 dark:text-[#8696A0]" aria-hidden="true" />
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-raised">
+              <MessageSquare className="h-5 w-5 text-ink-4" aria-hidden="true" />
             </span>
-            <p className="text-sm text-gray-500 dark:text-[#8696A0]">{t('recentConversations.noConversations')}</p>
+            <p className="text-sm text-ink-3">{t('recentConversations.noConversations')}</p>
           </div>
         ) : (
           conversations.map((conv, i) => {
@@ -134,7 +134,7 @@ export default function RecentConversations() {
               <Link
                 key={conv.id}
                 href={`/conversations?phone=${encodeURIComponent(conv.contact.phone)}`}
-                className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/40 dark:hover:bg-white/5"
+                className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:hover:bg-white/5"
               >
                 {/* Avatar — circular with initial, no icon */}
                 <span
@@ -147,16 +147,16 @@ export default function RecentConversations() {
                 {/* Text block */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-[13px] font-semibold text-gray-900 dark:text-[#E9EDEF]">
+                    <p className="truncate text-[13px] font-semibold text-ink">
                       {display.startsWith('+')
                         ? <span dir="ltr">{'‎'}{display}</span>
                         : <bdi>{display}</bdi>}
                     </p>
                     {time && (
-                      <span className="shrink-0 text-[11px] text-gray-400 dark:text-[#8696A0]">{time}</span>
+                      <span className="shrink-0 text-[11px] text-ink-4">{time}</span>
                     )}
                   </div>
-                  <p className="truncate text-[12px] text-gray-500 dark:text-[#8696A0]">
+                  <p className="truncate text-[12px] text-ink-3">
                     {conv.lastMessage || t('recentConversations.noMessages')}
                   </p>
                 </div>

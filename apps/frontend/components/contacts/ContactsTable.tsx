@@ -1,9 +1,14 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Edit, MessageSquare, PlusCircle, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  Edit, MessageSquare, Trash2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, CheckSquare, BriefcaseBusiness,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatPhone } from '../../lib/phone';
+import { localeFor } from '../../lib/format';
 import { cn } from '../../lib/utils';
 import Avatar from '../ui/Avatar';
 import { formatFieldValue, type CustomFieldDefinition, type CustomFieldValues } from '../../lib/custom-fields';
@@ -44,8 +49,63 @@ interface ContactsTableProps {
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
   return dir === 'asc'
-    ? <ArrowUp className="h-3 w-3 text-[#25D366]" />
-    : <ArrowDown className="h-3 w-3 text-[#25D366]" />;
+    ? <ArrowUp className="h-3 w-3 text-brand" />
+    : <ArrowDown className="h-3 w-3 text-brand" />;
+}
+
+/** A tag as a quiet chip — its colour is a dot, so a row of tags isn't a row of loud pills. */
+export function TagChip({ name, color }: { name: string; color: string }) {
+  return (
+    <span className="inline-flex h-5 items-center gap-1.5 rounded-md bg-raised px-1.5 text-2xs font-medium text-ink-2 ring-1 ring-inset ring-line">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+      {name}
+    </span>
+  );
+}
+
+/** Secondary row actions, one menu instead of five icons on every line. */
+function RowMenu({ contact, onOpenDetails, onConfirmDelete }: {
+  contact: Contact;
+  onOpenDetails: (c: Contact) => void;
+  onConfirmDelete: (id: string | null) => void;
+}) {
+  const { t } = useTranslation('contacts');
+  const { t: tChat } = useTranslation('chat');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', down);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
+  }, [open]);
+  const item = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-ink-2 hover:bg-raised hover:text-ink';
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t('table.actions')} className="btn btn-ghost btn-icon btn-sm">
+        <MoreHorizontal aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="pop-enter absolute end-0 top-full z-30 mt-1 w-48 rounded-lg bg-surface p-1 shadow-pop">
+          <button type="button" className={item} onClick={() => { setOpen(false); onOpenDetails(contact); }}>
+            <Eye className="h-4 w-4 text-ink-3" /> {t('tabs.overview')}
+          </button>
+          <Link href={`/tasks?contactId=${encodeURIComponent(contact.id)}`} className={item}>
+            <CheckSquare className="h-4 w-4 text-ink-3" /> {tChat('details.createTask')}
+          </Link>
+          <Link href={`/deals?contactId=${encodeURIComponent(contact.id)}`} className={item}>
+            <BriefcaseBusiness className="h-4 w-4 text-ink-3" /> {tChat('details.createDeal')}
+          </Link>
+          <div className="my-1 h-px bg-line" />
+          <button type="button" className={cn(item, 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10')} onClick={() => { setOpen(false); onConfirmDelete(contact.id); }}>
+            <Trash2 className="h-4 w-4" /> {t('deleteConfirm.title')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ContactsTable({
@@ -63,107 +123,78 @@ export default function ContactsTable({
   onConfirmDelete,
   customFieldDefs = [],
 }: ContactsTableProps) {
-  const { t } = useTranslation('contacts');
+  const { t, i18n } = useTranslation('contacts');
+  const router = useRouter();
+  const locale = localeFor(i18n.language);
   const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
   const someSelected = !allSelected && contacts.some((c) => selectedIds.has(c.id));
+  const chat = (c: Contact) => router.push(`/conversations?phone=${encodeURIComponent(c.phone)}`);
 
   const SortTh = ({ k, label }: { k: ContactSortKey; label: string }) => (
-    <th
-      scope="col"
-      aria-label={label}
-      onClick={() => onSort(k)}
-      className={cn(
-        'cursor-pointer select-none px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider transition-colors',
-        sortKey === k
-          ? 'text-[#25D366]'
-          : 'text-gray-700 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
-      )}
-    >
-      <span className="flex items-center gap-1.5">
+    <th scope="col" aria-sort={sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-3 py-2.5">
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={cn('inline-flex select-none items-center gap-1.5 text-2xs font-medium transition-colors', sortKey === k ? 'text-ink' : 'text-ink-3 hover:text-ink')}
+      >
         {label}
         <SortIcon active={sortKey === k} dir={sortDir} />
-      </span>
+      </button>
     </th>
   );
 
+  const deleteConfirm = (contact: Contact) => (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-medium text-red-600 dark:text-red-400">{t('deleteConfirm.title')}?</span>
+      <button type="button" onClick={() => onDelete(contact.id)} className="btn btn-sm h-7 bg-red-600 px-2.5 text-white hover:bg-red-700">
+        {t('yesDelete')}
+      </button>
+      <button type="button" onClick={() => onConfirmDelete(null)} className="btn btn-secondary btn-sm h-7 px-2.5">
+        {t('deleteConfirm.cancel')}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-      {/* ── Mobile card list (no horizontal scroll) ── */}
-      <ul className="divide-y divide-gray-200 dark:divide-white/5 md:hidden">
+    <div className="border-t border-line">
+      {/* ── Phone: a list, no horizontal scroll ── */}
+      <ul className="divide-y divide-line md:hidden">
         {contacts.map((contact) => {
           const selected = selectedIds.has(contact.id);
           return (
-            <li key={contact.id} className={cn('p-3.5', selected && 'bg-[#25D366]/5 dark:bg-[#25D366]/8')}>
-              <div className="flex items-start gap-3">
+            <li key={contact.id} className={cn('px-3 py-3', selected && 'bg-brand/[0.05]')}>
+              <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
                   checked={selected}
                   onChange={() => onToggleSelect(contact.id)}
-                  aria-label={t('table.name')}
-                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                  aria-label={contact.name || contact.phone}
+                  className="h-4 w-4 shrink-0 cursor-pointer rounded border-line-strong accent-brand"
                 />
                 <Link href={`/contacts/${contact.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
                   <Avatar src={contact.customFields?.avatarUrl} name={contact.name || contact.phone} size={40} />
                   <div className="min-w-0">
-                    <p dir={contact.name ? undefined : 'ltr'} className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                    <p dir={contact.name ? undefined : 'ltr'} className="truncate text-sm font-medium text-ink">
                       {contact.name || <>{'‎'}{formatPhone(contact.phone)}</>}
                     </p>
-                    <p dir="ltr" className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{'‎'}{formatPhone(contact.phone)}</p>
+                    <p dir="ltr" className="truncate text-start text-xs tabular-nums text-ink-3">{'‎'}{formatPhone(contact.phone)}</p>
                   </div>
                 </Link>
-              </div>
-
-              {(contact.contactTags ?? []).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1 ps-7">
-                  {(contact.contactTags ?? []).map(({ tag }) => (
-                    <span key={tag.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium text-white" style={{ backgroundColor: tag.color }}>
-                      {tag.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {customFieldDefs.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 ps-7">
-                  {customFieldDefs
-                    .filter((definition) => contact.customFields?.[definition.key] != null && contact.customFields?.[definition.key] !== '')
-                    .map((definition) => (
-                      <p key={definition.id} className="break-words text-[11px] text-gray-500 dark:text-[#8696A0]">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{definition.label}:</span>{' '}
-                        {formatFieldValue(definition, contact.customFields?.[definition.key])}
-                      </p>
-                    ))}
-                </div>
-              )}
-
-              <div className="mt-2.5 flex items-center gap-1 ps-7">
-                {confirmDeleteId === contact.id ? (
+                {confirmDeleteId !== contact.id && (
                   <>
-                    <span className="text-xs text-red-400">{t('deleteConfirm.title')}?</span>
-                    <button type="button" onClick={() => onDelete(contact.id)} className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white">
-                      {t('yesDelete')}
+                    <button type="button" onClick={() => chat(contact)} className="btn btn-ghost btn-icon" aria-label="Chat">
+                      <MessageSquare aria-hidden="true" />
                     </button>
-                    <button type="button" onClick={() => onConfirmDelete(null)} className="rounded-lg border border-gray-200 dark:border-white/10 px-2.5 py-1 text-xs text-gray-700 dark:text-white">
-                      {t('deleteConfirm.cancel')}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => onOpenDetails(contact)} className="rounded-lg border border-gray-200 dark:border-white/10 px-2.5 py-1.5 text-xs font-medium text-[#25D366]">
-                      {t('tabs.overview')}
-                    </button>
-                    <button type="button" onClick={() => onEdit(contact)} className="p-2 text-[#25D366]" title={t('table.actions')} aria-label={t('table.actions')}>
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button type="button" onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }} className="p-2 text-[#8696A0]" title="Chat" aria-label="Chat">
-                      <MessageSquare className="h-4 w-4" />
-                    </button>
-                    <button type="button" onClick={() => onConfirmDelete(contact.id)} className="ms-auto p-2 text-rose-400" title="Delete" aria-label="Delete">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <RowMenu contact={contact} onOpenDetails={onOpenDetails} onConfirmDelete={onConfirmDelete} />
                   </>
                 )}
               </div>
+              {(contact.contactTags ?? []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1 ps-[3.25rem]">
+                  {(contact.contactTags ?? []).map(({ tag }) => <TagChip key={tag.id} name={tag.name} color={tag.color} />)}
+                </div>
+              )}
+              {confirmDeleteId === contact.id && <div className="mt-2 ps-[3.25rem]">{deleteConfirm(contact)}</div>}
             </li>
           );
         })}
@@ -171,176 +202,85 @@ export default function ContactsTable({
 
       {/* ── Desktop table ── */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full">
+        <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-[#202C33]">
-              <th scope="col" className="w-10 px-4 py-3.5">
+            <tr className="border-b border-line">
+              <th scope="col" className="w-10 ps-4">
                 <span className="sr-only">Select</span>
                 <input
                   type="checkbox"
                   checked={allSelected}
                   ref={(el) => { if (el) el.indeterminate = someSelected; }}
                   onChange={onToggleAll}
-                  className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                  className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                 />
               </th>
               <SortTh k="name" label={t('table.name')} />
               <SortTh k="phone" label={t('table.phone')} />
-              <th className="px-4 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">
-                {t('table.tags')}
-              </th>
-              <th className="px-4 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">
-                {t('form.notes')}
-              </th>
+              <th className="px-3 py-2.5 text-2xs font-medium text-ink-3">{t('table.tags')}</th>
+              <th className="px-3 py-2.5 text-2xs font-medium text-ink-3">{t('form.notes')}</th>
               {customFieldDefs.map((definition) => (
-                <th
-                  key={definition.id}
-                  className="whitespace-nowrap px-4 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]"
-                >
-                  {definition.label}
-                </th>
+                <th key={definition.id} className="whitespace-nowrap px-3 py-2.5 text-2xs font-medium text-ink-3">{definition.label}</th>
               ))}
               <SortTh k="createdAt" label={t('table.createdAt')} />
-              <th className="px-4 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-[#8696A0]">
-                {t('table.actions')}
-              </th>
+              <th className="w-px px-3 py-2.5"><span className="sr-only">{t('table.actions')}</span></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-white/5">
-            {contacts.map((contact) => (
-              <tr
-                key={contact.id}
-                className={cn(
-                  'group transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]',
-                  selectedIds.has(contact.id) && 'bg-[#25D366]/5 dark:bg-[#25D366]/8',
-                )}
-              >
-                <td className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(contact.id)}
-                    onChange={() => onToggleSelect(contact.id)}
-                    className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
-                  />
-                </td>
-                <td className="px-4 py-3 text-sm font-medium">
-                  <Link
-                    href={`/contacts/${contact.id}`}
-                    className="group/name inline-flex items-center gap-2.5 text-gray-900 dark:text-white transition-colors"
-                  >
-                    <Avatar
-                      src={contact.customFields?.avatarUrl}
-                      name={contact.name || contact.phone}
-                      size={32}
+          <tbody className="stagger divide-y divide-line">
+            {contacts.map((contact) => {
+              const selected = selectedIds.has(contact.id);
+              return (
+                <tr key={contact.id} className={cn('group transition-colors hover:bg-raised/60', selected && 'bg-brand/[0.05]')}>
+                  <td className="w-10 ps-4">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => onToggleSelect(contact.id)}
+                      aria-label={contact.name || contact.phone}
+                      className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                     />
-                    <span
-                      dir={contact.name ? undefined : 'ltr'}
-                      className="text-gray-900 dark:text-white group-hover/name:text-[#128C7E] dark:group-hover/name:text-[#25D366] group-hover/name:underline"
-                    >
-                      {contact.name || <>{'‎'}{formatPhone(contact.phone)}</>}
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#8696A0]">
-                  <span dir="ltr" className="inline-block">{'‎'}{formatPhone(contact.phone)}</span>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex flex-wrap gap-1">
-                    {(contact.contactTags ?? []).length > 0
-                      ? (contact.contactTags ?? []).map(({ tag }) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                            style={{ backgroundColor: tag.color }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))
-                      : <span className="text-gray-400 dark:text-[#8696A0]">-</span>}
-                  </div>
-                </td>
-                <td className="max-w-xs truncate px-4 py-3 text-sm text-gray-600 dark:text-[#8696A0]">
-                  {contact.notes || '-'}
-                </td>
-                {customFieldDefs.map((definition) => (
-                  <td key={definition.id} className="max-w-xs truncate px-4 py-3 text-sm text-gray-600 dark:text-[#8696A0]">
-                    {formatFieldValue(definition, contact.customFields?.[definition.key])}
                   </td>
-                ))}
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8696A0]">
-                  {new Date(contact.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  {confirmDeleteId === contact.id ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-red-400">{t('deleteConfirm.title')}?</span>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(contact.id)}
-                        className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600 transition-colors"
-                      >
-                        {t('yesDelete')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onConfirmDelete(null)}
-                        className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-xs text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
-                      >
-                        {t('deleteConfirm.cancel')}
-                      </button>
+                  <td className="px-3 py-2">
+                    <Link href={`/contacts/${contact.id}`} className="inline-flex items-center gap-2.5 font-medium text-ink hover:text-brand">
+                      <Avatar src={contact.customFields?.avatarUrl} name={contact.name || contact.phone} size={30} />
+                      <span dir={contact.name ? undefined : 'ltr'}>{contact.name || <>{'‎'}{formatPhone(contact.phone)}</>}</span>
+                    </Link>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-2">
+                    <span dir="ltr" className="inline-block">{'‎'}{formatPhone(contact.phone)}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {(contact.contactTags ?? []).length > 0
+                        ? (contact.contactTags ?? []).map(({ tag }) => <TagChip key={tag.id} name={tag.name} color={tag.color} />)
+                        : <span className="text-ink-4">—</span>}
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(contact)}
-                        className="p-1.5 text-[#25D366] hover:text-[#25D366]/80 transition-colors"
-                        title={t('table.actions')}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onOpenDetails(contact)}
-                        className="px-2 py-1 text-xs font-medium text-[#25D366] hover:text-[#25D366]/80 transition-colors"
-                      >
-                        {t('tabs.overview')}
-                      </button>
-                      <Link
-                        href={`/tasks?contactId=${encodeURIComponent(contact.id)}`}
-                        className="p-1.5 text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
-                        title="New Task"
-                      >
-                        <PlusCircle className="h-4 w-4" />
-                      </Link>
-                      <Link
-                        href={`/deals?contactId=${encodeURIComponent(contact.id)}`}
-                        className="p-1.5 text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
-                        title="New Deal"
-                      >
-                        <PlusCircle className="h-4 w-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
-                        className="p-1.5 text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
-                        title="Chat"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onConfirmDelete(contact.id)}
-                        className="p-1.5 text-rose-400 hover:text-rose-300 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="max-w-[16rem] truncate px-3 py-2 text-ink-3">{contact.notes || <span className="text-ink-4">—</span>}</td>
+                  {customFieldDefs.map((definition) => (
+                    <td key={definition.id} className="max-w-xs truncate px-3 py-2 text-ink-3">
+                      {formatFieldValue(definition, contact.customFields?.[definition.key])}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-3">
+                    {new Date(contact.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {confirmDeleteId === contact.id ? deleteConfirm(contact) : (
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        <button type="button" onClick={() => chat(contact)} className="btn btn-ghost btn-icon btn-sm" title="Chat" aria-label="Chat">
+                          <MessageSquare aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => onEdit(contact)} className="btn btn-ghost btn-icon btn-sm" title={t('edit', { defaultValue: 'Edit' })} aria-label={t('edit', { defaultValue: 'Edit' })}>
+                          <Edit aria-hidden="true" />
+                        </button>
+                        <RowMenu contact={contact} onOpenDetails={onOpenDetails} onConfirmDelete={onConfirmDelete} />
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

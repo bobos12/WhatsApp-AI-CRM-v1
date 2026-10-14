@@ -39,7 +39,7 @@ export const SIMPLE_ROLE_LABEL: Record<SimpleRole, string> = {
 
 export const SIMPLE_ROLE_BADGE: Record<SimpleRole, string> = {
   SYSTEM_MANAGER: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
-  EMPLOYEE: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-[#8696A0]',
+  EMPLOYEE: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-ink-3',
 };
 
 /** Convenience: human label for a stored role. */

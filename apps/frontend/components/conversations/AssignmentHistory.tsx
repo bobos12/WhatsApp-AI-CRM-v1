@@ -65,25 +65,25 @@ export default function AssignmentHistory({ conversationId }: { conversationId: 
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+      <div className="px-4 py-3 border-b border-line">
+        <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">
           {t('details.assignmentHistory')}
         </p>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <p className="text-center text-xs text-gray-400 dark:text-[#8696A0] mt-8">{t('assignmentHistory.loading')}</p>
+          <p className="text-center text-xs text-ink-4 mt-8">{t('assignmentHistory.loading')}</p>
         ) : logs.length === 0 ? (
-          <p className="text-center text-xs text-gray-400 dark:text-[#8696A0] mt-8">{t('assignmentHistory.noHistory')}</p>
+          <p className="text-center text-xs text-ink-4 mt-8">{t('assignmentHistory.noHistory')}</p>
         ) : (
-          <ol className="relative border-l border-gray-200 dark:border-white/10 ml-2 space-y-4">
+          <ol className="relative border-l border-line ml-2 space-y-4">
             {logs.map((log) => (
               <li key={log.id} className="ml-4">
-                <span className="absolute -left-2 flex h-4 w-4 items-center justify-center rounded-full bg-white dark:bg-[#111B21] ring-2 ring-gray-200 dark:ring-white/10">
+                <span className="absolute -left-2 flex h-4 w-4 items-center justify-center rounded-full bg-surface ring-2 ring-gray-200 dark:ring-white/10">
                   <ActionIcon action={log.action} />
                 </span>
-                <p className="text-sm text-gray-800 dark:text-[#E9EDEF]">{describeAction(log)}</p>
-                <p className="text-xs text-gray-400 dark:text-[#8696A0]">{timeAgo(log.createdAt)}</p>
+                <p className="text-sm text-ink">{describeAction(log)}</p>
+                <p className="text-xs text-ink-4">{timeAgo(log.createdAt)}</p>
               </li>
             ))}
           </ol>

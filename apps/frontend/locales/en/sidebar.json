@@ -1,6 +1,6 @@
 {
-  "appName": "WhatsApp CRM",
-  "appSubtitle": "Business Suite",
+  "appName": "Nexus",
+  "appSubtitle": "WhatsApp CRM",
   "menu": "Menu",
   "admin": "Admin",
   "salesIntelligence": "Sales Intelligence",
@@ -13,24 +13,44 @@
     "action": "Get the app"
   },
   "nav": {
-    "dashboard": "Dashboard",
-    "conversations": "Conversations",
+    "dashboard": "Home",
+    "conversations": "Inbox",
     "contacts": "Contacts",
     "tags": "Tags",
     "savedReplies": "Saved Replies",
     "templates": "Templates",
     "interactive": "Interactive",
     "deals": "Deals",
-    "leads": "Lead Management",
+    "leads": "Leads",
     "tasks": "Tasks",
     "broadcasts": "Broadcasts",
     "settings": "Settings",
     "users": "Users",
     "teams": "Teams",
     "automations": "Automations",
-    "chatbot": "AI Tools",
+    "chatbot": "AI Settings",
     "aiConfig": "AI Configuration",
-    "customerAi": "Customer AI Bot",
-    "more": "More"
-  }
+    "customerAi": "AI Agent",
+    "more": "More",
+    "clients": "Clients"
+  },
+  "groups": {
+    "workspace": "Workspace",
+    "outreach": "Outreach",
+    "admin": "Admin",
+    "operator": "Operator"
+  },
+  "search": "Search or jump to…",
+  "collapse": "Collapse sidebar",
+  "expand": "Expand sidebar",
+  "account": {
+    "menu": "Account",
+    "theme": "Dark mode",
+    "language": "العربية",
+    "sync": "Sync now",
+    "refresh": "Reload app",
+    "signOut": "Sign out",
+    "settings": "Settings"
+  },
+  "askAi": "Ask AI"
 }

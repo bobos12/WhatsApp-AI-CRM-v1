@@ -26,26 +26,26 @@ export default function RuleCard({ rule, onEdit, onDelete, onToggle }: RuleCardP
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-soft dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:bg-gray-50 dark:hover:bg-[#202C33]">
+    <div className="rounded-xl border border-line bg-surface p-6 shadow-soft transition hover:-translate-y-0.5 hover:bg-gray-50 dark:hover:bg-raised">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">{rule.name}</h3>
+        <h3 className="text-lg font-medium text-ink">{rule.name}</h3>
         <div className="flex items-center space-x-2">
           {onToggle && (
             <button
               type="button"
               onClick={onToggle}
-              className={`rounded-full p-1 transition ${rule.isActive ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0]'}`}
+              className={`rounded-full p-1 transition ${rule.isActive ? 'text-brand' : 'text-ink-3'}`}
             >
               {rule.isActive ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
             </button>
           )}
           {!onToggle && (
-            <span className={`${rule.isActive ? 'text-[#25D366]' : 'text-gray-400 dark:text-[#8696A0]'}`}>
+            <span className={`${rule.isActive ? 'text-brand' : 'text-ink-4'}`}>
               {rule.isActive ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
             </span>
           )}
           {onEdit && (
-            <button type="button" onClick={onEdit} className="p-1 text-gray-500 dark:text-[#8696A0] transition hover:text-[#25D366] dark:hover:text-[#25D366]">
+            <button type="button" onClick={onEdit} className="p-1 text-ink-3 transition hover:text-brand dark:hover:text-brand">
               <Edit className="h-4 w-4" />
             </button>
           )}
@@ -59,22 +59,22 @@ export default function RuleCard({ rule, onEdit, onDelete, onToggle }: RuleCardP
 
       <div className="space-y-2">
         <div className="flex items-center">
-          <span className="text-sm font-medium text-gray-600 dark:text-[#8696A0]">{t('card.trigger')}:</span>
-          <span className="ml-2 rounded-full border border-[#25D366]/30 dark:border-[#25D366]/30 bg-[#25D366]/10 dark:bg-[#25D366]/15 px-2 py-1 text-xs text-[#25D366]">
+          <span className="text-sm font-medium text-ink-3">{t('card.trigger')}:</span>
+          <span className="ml-2 rounded-full border border-brand/30 dark:border-brand/30 bg-brand/10 dark:bg-brand/15 px-2 py-1 text-xs text-brand">
             {getTriggerLabel(rule.trigger)}
           </span>
         </div>
 
         {rule.keyword && (
           <div className="flex items-center">
-            <span className="text-sm font-medium text-gray-600 dark:text-[#8696A0]">{t('card.keyword')}:</span>
-            <span className="ml-2 text-sm text-gray-900 dark:text-white">&quot;{rule.keyword}&quot;</span>
+            <span className="text-sm font-medium text-ink-3">{t('card.keyword')}:</span>
+            <span className="ml-2 text-sm text-ink">&quot;{rule.keyword}&quot;</span>
           </div>
         )}
 
         <div>
-          <span className="text-sm font-medium text-gray-600 dark:text-[#8696A0]">{t('card.response')}:</span>
-          <p className="mt-1 line-clamp-2 text-sm text-gray-900 dark:text-white">{rule.response}</p>
+          <span className="text-sm font-medium text-ink-3">{t('card.response')}:</span>
+          <p className="mt-1 line-clamp-2 text-sm text-ink">{rule.response}</p>
         </div>
       </div>
     </div>

@@ -11,6 +11,9 @@ import { api } from '../../../lib/api';
 import { useSocket } from '../../../hooks/useSocket';
 import { useToast } from '../../../hooks/useToast';
 import { cn } from '../../../lib/utils';
+import { AnimatePresence, motion } from 'motion/react';
+import { PageHeader, SearchField, EmptyState } from '../../../components/ui/page';
+import { Skeleton } from '../../../components/ui/Skeleton';
 import {
   type Lead, type LeadStatus, type LeadStatusEvent,
   StatusBadge, PriorityBadge, FlagChips, SignalChips,
@@ -120,104 +123,77 @@ export default function LeadsPage() {
     return cfg.statuses.reduce((sum, s) => sum + (stats.statusCounts[s] ?? 0), 0);
   };
 
+  const statItems = [
+    { key: 'total', value: stats?.total ?? 0, label: t('stats.total') },
+    { key: 'attention', value: stats?.needsAttention ?? 0, label: t('stats.needsAttention'), tone: (stats?.needsAttention ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : undefined },
+    { key: 'intent', value: stats?.buyingIntent ?? 0, label: t('stats.buyingIntent'), tone: 'text-brand' },
+    { key: 'hot', value: tabCount('hot'), label: t('stats.hot') },
+    { key: 'handoff', value: stats?.noHandoff ?? 0, label: t('stats.noHandoff'), tone: (stats?.noHandoff ?? 0) > 0 ? 'text-amber-700 dark:text-amber-400' : undefined },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)] dark:border-white/10 dark:bg-[#111B21]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,211,102,0.10),transparent_40%)]" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <Sparkles className="h-3.5 w-3.5" />
-              {t('badge')}
-            </div>
-            <h1 className="mt-3 flex items-center gap-2 text-3xl font-semibold text-gray-900 dark:text-white">
-              <Target className="h-7 w-7 text-[#25D366]" />
-              {t('title')}
-            </h1>
-            <p className="mt-1.5 max-w-xl text-sm text-gray-500 dark:text-[#8696A0]">{t('subtitle')}</p>
+      <PageHeader title={t('title')} description={t('subtitle')} />
+
+      {/* ── Numbers, as a quiet strip ── */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-5 sm:grid-cols-5">
+        {statItems.map((s) => (
+          <div key={s.key} className="min-w-0">
+            <p className="truncate text-2xs font-medium text-ink-3">{s.label}</p>
+            <p className={cn('mt-1 text-2xl font-semibold tabular-nums tracking-[-0.02em]', s.tone ?? 'text-ink')}>{s.value}</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-5 lg:gap-6">
-            <Stat value={stats?.total ?? 0} label={t('stats.total')} />
-            <div className="h-8 w-px bg-gray-200 dark:bg-white/8" />
-            <Stat value={stats?.needsAttention ?? 0} label={t('stats.needsAttention')} icon={<AlertTriangle className="h-3.5 w-3.5 text-red-400" />} tone="text-red-400" />
-            <div className="h-8 w-px bg-gray-200 dark:bg-white/8" />
-            <Stat value={stats?.buyingIntent ?? 0} label={t('stats.buyingIntent')} icon={<ShoppingCart className="h-3.5 w-3.5 text-[#25D366]" />} tone="text-[#25D366]" />
-            <div className="h-8 w-px bg-gray-200 dark:bg-white/8" />
-            <Stat value={tabCount('hot')} label={t('stats.hot')} icon={<Flame className="h-3.5 w-3.5 text-orange-400" />} tone="text-orange-400" />
-            <div className="h-8 w-px bg-gray-200 dark:bg-white/8" />
-            <Stat
-              value={stats?.noHandoff ?? 0}
-              label={t('stats.noHandoff')}
-              icon={<UserX className="h-3.5 w-3.5 text-amber-400" />}
-              tone={(stats?.noHandoff ?? 0) > 0 ? 'text-amber-400' : undefined}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Controls: tabs + search ── */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {TABS.map((x) => {
-            const active = tab === x.key;
-            const count = tabCount(x.key);
-            return (
-              <button
-                key={x.key}
-                type="button"
-                onClick={() => setTab(x.key)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors',
-                  active
-                    ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                    : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-white/10 dark:bg-[#111B21] dark:text-[#8696A0] dark:hover:bg-white/5 dark:hover:text-white',
-                )}
-              >
-                {t(`tabs.${x.key}`)}
-                <span className={cn('rounded-full px-1.5 text-[10px] font-bold', active ? 'bg-[#25D366]/20' : 'bg-gray-200 dark:bg-white/10')}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="relative w-full lg:w-72">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-[#8696A0]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('search')}
-            className="h-10 w-full rounded-xl border border-gray-200 bg-white ps-9 pe-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#25D366]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:placeholder:text-[#8696A0]/60"
-          />
-        </div>
+        ))}
       </div>
 
-      {/* ── List ── */}
-      {loading ? (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => <SkeletonRow key={i} />)}
+      <div className="panel overflow-hidden">
+        {/* ── Tabs + search ── */}
+        <div className="flex flex-col gap-2 border-b border-line ps-2 pe-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex gap-0.5 overflow-x-auto scrollbar-none" role="tablist">
+            {TABS.map((x) => {
+              const active = tab === x.key;
+              return (
+                <button
+                  key={x.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(x.key)}
+                  className={cn('relative flex shrink-0 items-center gap-1.5 px-2.5 py-3 text-[13px] font-medium transition-colors', active ? 'text-ink' : 'text-ink-3 hover:text-ink')}
+                >
+                  {t(`tabs.${x.key}`)}
+                  <span className="text-2xs tabular-nums text-ink-4">{tabCount(x.key)}</span>
+                  {active && <motion.span layoutId="leads-tab" className="absolute inset-x-1.5 -bottom-px h-0.5 rounded-full bg-brand" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
+                </button>
+              );
+            })}
+          </div>
+          <SearchField value={search} onChange={setSearch} placeholder={t('search')} className="pb-2 lg:w-72 lg:pb-0" />
         </div>
-      ) : visible.length === 0 ? (
-        <EmptyState filtered={leads.length > 0} />
-      ) : (
-        <div className="space-y-3">
-          {visible.map((lead) => (
-            <LeadRow
-              key={lead.id}
-              lead={lead}
-              lang={lang}
-              analyzing={analyzingId === lead.contactId}
-              onAnalyze={() => analyze(lead)}
-              onOpenChat={() => openChat(lead)}
-            />
-          ))}
-        </div>
-      )}
-      {/* Mobile bottom-nav spacer */}
-      <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />
+
+        {/* ── List ── */}
+        {loading ? (
+          <div className="divide-y divide-line">{[0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)}</div>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={Target}
+            title={leads.length > 0 ? t('empty.filtered') : t('empty.title')}
+            description={leads.length > 0 ? undefined : t('empty.subtitle')}
+          />
+        ) : (
+          <ul className="stagger divide-y divide-line">
+            {visible.map((lead) => (
+              <LeadRow
+                key={lead.id}
+                lead={lead}
+                lang={lang}
+                analyzing={analyzingId === lead.contactId}
+                onAnalyze={() => analyze(lead)}
+                onOpenChat={() => openChat(lead)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -257,19 +233,14 @@ function LeadRow({
   };
 
   return (
-    <article className={cn(
-      'rounded-2xl border bg-white transition-colors dark:bg-[#111B21]',
-      lead.needsAttention ? 'border-red-500/25' : 'border-gray-200 hover:border-gray-300 dark:border-white/10 dark:hover:border-white/20',
-    )}>
-      {/* Header row */}
-      <div className="flex items-start gap-3 p-4">
-        {/* Avatar */}
+    <li className={cn('relative transition-colors', expanded ? 'bg-raised/40' : 'hover:bg-raised/40')}>
+      {lead.needsAttention && <span className="absolute inset-y-3 start-0 w-[3px] rounded-e-full bg-red-500" aria-hidden="true" />}
+      <div className="flex items-start gap-3 px-4 py-3.5">
         <LeadAvatar lead={lead} className="h-10 w-10 text-sm" />
 
-        {/* Main */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="truncate text-[14px] font-medium text-ink">
               {lead.contact?.name
                 ? lead.contact.name
                 : lead.contact?.phone
@@ -277,116 +248,87 @@ function LeadRow({
                   : '—'}
             </p>
             <StatusBadge status={lead.status} />
-            <PriorityBadge priority={lead.priority} />
-          </div>
-          {lead.contact?.name && (
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0] text-left" dir="ltr">
-              {'‎'}{lead.contact.phone}
-            </p>
-          )}
-          {summary && (
-            <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-700 dark:text-[#cfd9de]">{summary}</p>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {lead.priority !== 'NORMAL' && <PriorityBadge priority={lead.priority} />}
             <FlagChips lead={lead} />
-            <span className="text-[10px] text-gray-400 dark:text-[#8696A0]/50">{t('lastAnalyzed', { time: timeAgo(lead.lastAnalyzedAt, t) })}</span>
           </div>
+          {summary && <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-ink-2"><bdi>{summary}</bdi></p>}
+          <p className="mt-1.5 text-2xs text-ink-4">
+            {lead.contact?.name && <span dir="ltr" className="me-2 tabular-nums">{'‎'}{lead.contact.phone}</span>}
+            {t('lastAnalyzed', { time: timeAgo(lead.lastAnalyzedAt, t) })}
+          </p>
         </div>
 
-        {/* Score */}
-        <div className="shrink-0 text-center">
-          <p className={cn('text-2xl font-bold leading-none', scoreColor(lead.score))}>{lead.score}</p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wide text-gray-400/60 dark:text-[#8696A0]/60">{t('score')}</p>
+        {/* Score: the number for precision, the bar for a glance */}
+        <div className="hidden w-20 shrink-0 flex-col items-end gap-1.5 sm:flex">
+          <p className={cn('text-xl font-semibold leading-none tabular-nums', scoreColor(lead.score))}>{lead.score}</p>
+          <span className="h-1 w-full overflow-hidden rounded-full bg-raised ring-1 ring-inset ring-line">
+            <span className={cn('grow-x block h-full rounded-full', lead.score >= 75 ? 'bg-red-500' : lead.score >= 50 ? 'bg-amber-500' : 'bg-brand')} style={{ width: `${Math.max(4, Math.min(100, lead.score))}%` }} />
+          </span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" onClick={onOpenChat} disabled={!lead.contact?.phone} className="btn btn-secondary btn-sm">
+            <MessageSquare aria-hidden="true" />
+            <span className="hidden md:inline">{t('openConversation')}</span>
+          </button>
+          <button type="button" onClick={onAnalyze} disabled={analyzing} className="btn btn-ghost btn-icon btn-sm" title={analyzing ? t('analyzing') : t('reanalyze')} aria-label={t('reanalyze')}>
+            <RefreshCw className={cn(analyzing && 'animate-spin')} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={toggle} aria-expanded={expanded} className="btn btn-ghost btn-icon btn-sm" title={t('history')} aria-label={t('history')}>
+            <ChevronDown className={cn('transition-transform duration-base', expanded && 'rotate-180')} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 px-4 py-2.5 dark:border-white/5">
-        <button
-          type="button"
-          onClick={onOpenChat}
-          disabled={!lead.contact?.phone}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#25D366]/20 bg-[#25D366]/8 px-3 py-1.5 text-[11px] font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/15 disabled:opacity-40"
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-          {t('openConversation')}
-        </button>
-        <button
-          type="button"
-          onClick={onAnalyze}
-          disabled={analyzing}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', analyzing && 'animate-spin')} />
-          {analyzing ? t('analyzing') : t('reanalyze')}
-        </button>
-        <button
-          type="button"
-          onClick={toggle}
-          className="ms-auto inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] text-gray-500 transition-colors hover:text-gray-900 dark:text-[#8696A0] dark:hover:text-white"
-        >
-          {t('history')}
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
-        </button>
-      </div>
-
-      {/* Expanded detail */}
-      {expanded && (
-        <div className="space-y-4 border-t border-gray-100 px-4 py-4 dark:border-white/5">
-          {recommendation && (
-            <Detail label={t('recommendation')}>
-              <p className="rounded-xl border border-[#25D366]/15 bg-[#25D366]/5 px-3 py-2 text-xs leading-relaxed text-gray-700 dark:text-[#cfd9de]">
-                {recommendation}
-              </p>
-            </Detail>
-          )}
-          <Detail label={t('signals')}>
-            <SignalChips signals={lead.signals} />
-          </Detail>
-          <Detail label={t('history')}>
-            {loadingHistory ? (
-              <p className="text-xs text-gray-400/60 dark:text-[#8696A0]/60">…</p>
-            ) : !history || history.length === 0 ? (
-              <p className="text-xs text-gray-400/60 dark:text-[#8696A0]/60">{t('noHistory')}</p>
-            ) : (
-              <ol className="space-y-2">
-                {history.map((h) => (
-                  <li key={h.id} className="flex items-center gap-2 text-xs">
-                    <History className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-[#8696A0]/50" />
-                    <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold', STATUS_CFG[h.toStatus].badge, 'border')}>
-                      {t(`status.${h.toStatus}`)}
-                    </span>
-                    {h.fromStatus && (
-                      <span className="text-[10px] text-gray-400 dark:text-[#8696A0]/50">← {t(`status.${h.fromStatus}`)}</span>
-                    )}
-                    <span className="ms-auto text-[10px] text-gray-400/60 dark:text-[#8696A0]/40">{timeAgo(h.createdAt, t)}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Detail>
-        </div>
-      )}
-    </article>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="grid gap-5 px-4 pb-4 ps-[4.25rem] md:grid-cols-3">
+              {recommendation && (
+                <Detail label={t('recommendation')}>
+                  <p className="rounded-lg border-s-[3px] border-brand bg-brand/[0.06] px-3 py-2 text-[13px] leading-5 text-ink-2"><bdi>{recommendation}</bdi></p>
+                </Detail>
+              )}
+              <Detail label={t('signals')}>
+                <SignalChips signals={lead.signals} />
+              </Detail>
+              <Detail label={t('history')}>
+                {loadingHistory ? (
+                  <Skeleton className="h-4 w-32 rounded" />
+                ) : !history || history.length === 0 ? (
+                  <p className="text-xs text-ink-3">{t('noHistory')}</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {history.map((h) => (
+                      <li key={h.id} className="flex items-center gap-2 text-xs">
+                        <History className="h-3.5 w-3.5 shrink-0 text-ink-4" />
+                        <span className={cn('chip', STATUS_CFG[h.toStatus].badge)}>{t(`status.${h.toStatus}`)}</span>
+                        {h.fromStatus && <span className="text-2xs text-ink-4">← {t(`status.${h.fromStatus}`)}</span>}
+                        <span className="ms-auto text-2xs tabular-nums text-ink-4">{timeAgo(h.createdAt, t)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </Detail>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
   );
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
-function Stat({ value, label, icon, tone }: { value: string | number; label: string; icon?: React.ReactNode; tone?: string }) {
-  return (
-    <div className="text-center">
-      <p className={cn('flex items-center justify-center gap-1 text-xl font-bold', tone ?? 'text-gray-900 dark:text-white')}>
-        {icon}{value}
-      </p>
-      <p className="text-xs text-gray-500 dark:text-[#8696A0]">{label}</p>
-    </div>
-  );
-}
-
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]/70">{label}</p>
+      <p className="eyebrow mb-2">{label}</p>
       {children}
     </div>
   );
@@ -394,28 +336,13 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 
 function SkeletonRow() {
   return (
-    <div className="animate-pulse rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-white/5 dark:bg-[#111B21]">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-white/8" />
-        <div className="flex-1 space-y-2">
-          <div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-white/8" />
-          <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-white/5" />
-        </div>
-        <div className="h-8 w-8 rounded bg-gray-200 dark:bg-white/8" />
+    <div className="flex items-center gap-3 px-4 py-4">
+      <Skeleton className="h-10 w-10 rounded-full" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-3 w-1/3 rounded" />
+        <Skeleton className="h-3 w-2/3 rounded" />
       </div>
-    </div>
-  );
-}
-
-function EmptyState({ filtered }: { filtered: boolean }) {
-  const { t } = useTranslation('leads');
-  return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center dark:border-white/10 dark:bg-[#111B21]">
-      <div className="mb-4 rounded-full bg-[#25D366]/10 p-4">
-        <Target className="h-7 w-7 text-[#25D366]/70" />
-      </div>
-      <p className="text-sm font-semibold text-gray-900 dark:text-white">{filtered ? t('empty.filtered') : t('empty.title')}</p>
-      {!filtered && <p className="mt-1 max-w-sm text-xs text-gray-500 dark:text-[#8696A0]">{t('empty.subtitle')}</p>}
+      <Skeleton className="h-6 w-16 rounded" />
     </div>
   );
 }

@@ -74,52 +74,52 @@ export default function SavedRepliesPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-6 shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+      <section className="overflow-hidden rounded-xl border border-line bg-white dark:bg-raised p-6 ">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 dark:border-[#25D366]/30 bg-[#25D366]/10 dark:bg-[#25D366]/15 px-3 py-1.5 text-xs font-medium text-[#25D366]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 dark:border-brand/30 bg-brand/10 dark:bg-brand/15 px-3 py-1.5 text-xs font-medium text-brand">
             <MessageSquareReply className="h-3.5 w-3.5" />
             {t('settings:tabs.savedReplies')}
           </div>
-          <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('settings:savedReplies.title')}</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-[#8696A0]">
+          <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('settings:savedReplies.title')}</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
             {t('settings:savedReplies.description')}
           </p>
         </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="rounded-2xl border border-white/10 bg-white dark:bg-[#111B21] p-5">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings:savedReplies.saveReply')}</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-[#8696A0]">{t('settings:savedReplies.description')}</p>
+        <section className="rounded-xl border border-white/10 bg-surface p-5">
+          <h2 className="text-lg font-semibold text-ink">{t('settings:savedReplies.saveReply')}</h2>
+          <p className="mt-1 text-sm text-ink-3">{t('settings:savedReplies.description')}</p>
 
           {error && (
-            <div className="mt-4 rounded-2xl border border-red-300 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
+            <div className="mt-4 rounded-xl border border-red-300 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
               {error}
             </div>
           )}
 
           <div className="mt-4 space-y-3">
             <label className="block">
-              <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-gray-600 dark:text-[#8696A0]">{t('common:labels.shortcut')}</span>
+              <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-ink-3">{t('common:labels.shortcut')}</span>
               <div className="relative">
-                <AtSign className="absolute left-3 top-3.5 h-4 w-4 text-gray-400 dark:text-[#8696A0]" />
+                <AtSign className="absolute left-3 top-3.5 h-4 w-4 text-ink-4" />
                 <input
                   value={shortcut}
                   onChange={(e) => setShortcut(e.target.value)}
                   placeholder={t('settings:savedReplies.shortcutPlaceholder')}
-                  className="w-full rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] py-3 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:text-[#8696A0]"
+                  className="w-full rounded-xl border border-line bg-white dark:bg-raised py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-4"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-gray-600 dark:text-[#8696A0]">{t('common:labels.message')}</span>
+              <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-ink-3">{t('common:labels.message')}</span>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder={t('settings:savedReplies.messagePlaceholder')}
                 rows={6}
-                className="w-full rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:text-[#8696A0]"
+                className="w-full rounded-xl border border-line bg-white dark:bg-raised px-4 py-3 text-sm text-ink placeholder:text-ink-4"
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 {['{{name}}', '{{phone}}'].map((v) => (
@@ -127,19 +127,19 @@ export default function SavedRepliesPage() {
                     key={v}
                     type="button"
                     onClick={() => setMessage((m) => m + v)}
-                    className="rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#25D366] hover:bg-[#25D366]/20 transition-colors"
+                    className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand hover:bg-brand/20 transition-colors"
                   >
                     {v}
                   </button>
                 ))}
-                <span className="self-center text-xs text-gray-400 dark:text-[#8696A0]">{t('templates:builder.variables')}</span>
+                <span className="self-center text-xs text-ink-4">{t('templates:builder.variables')}</span>
               </div>
             </label>
 
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center rounded-2xl bg-[#25D366] dark:bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white dark:text-slate-950 transition hover:bg-[#25D366]/90 dark:hover:bg-[#25D366]/90"
+              className="btn btn-primary inline-flex"
             >
               <Plus className="mr-2 h-4 w-4" />
               {t('settings:savedReplies.saveReply')}
@@ -147,31 +147,31 @@ export default function SavedRepliesPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white dark:bg-[#111B21] p-5">
+        <section className="rounded-xl border border-white/10 bg-surface p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings:savedReplies.title')}</h2>
-              <p className="text-sm text-gray-600 dark:text-[#8696A0]">{t('chat:composer.savedReplies')}</p>
+              <h2 className="text-lg font-semibold text-ink">{t('settings:savedReplies.title')}</h2>
+              <p className="text-sm text-ink-3">{t('chat:composer.savedReplies')}</p>
             </div>
-            <div className="rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-1.5 text-xs text-gray-600 dark:text-[#8696A0]">
+            <div className="rounded-full border border-line bg-white dark:bg-raised px-3 py-1.5 text-xs text-ink-3">
               {savedReplies.length}
             </div>
           </div>
 
           <div className="mt-4 space-y-3">
             {savedReplies.map((reply) => (
-              <div key={reply.id} className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-4">
+              <div key={reply.id} className="rounded-xl border border-line bg-white dark:bg-raised p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white">{reply.shortcut}</p>
-                    <p className="mt-1 line-clamp-3 text-sm leading-6 text-gray-600 dark:text-[#8696A0]">
+                    <p className="font-medium text-ink">{reply.shortcut}</p>
+                    <p className="mt-1 line-clamp-3 text-sm leading-6 text-ink-3">
                       {reply.message.replace(/\{\{(\w+)\}\}/g, (_, k) => `[${k}]`)}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(reply.id)}
-                    className="inline-flex shrink-0 items-center rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-1.5 text-xs text-rose-200 transition hover:bg-rose-500/10"
+                    className="btn btn-secondary btn-sm inline-flex shrink-0"
                   >
                     <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                     {t('common:actions.delete')}
@@ -181,7 +181,7 @@ export default function SavedRepliesPage() {
             ))}
 
             {!loading && savedReplies.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-6 text-sm text-gray-600 dark:text-[#8696A0]">
+              <div className="rounded-xl border border-dashed border-line bg-white dark:bg-raised p-6 text-sm text-ink-3">
                 {t('settings:savedReplies.noReplies')}
               </div>
             )}

@@ -99,8 +99,8 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
   };
 
   const inputCls =
-    'mt-1 block w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] py-2 px-3 text-sm text-gray-900 dark:text-white shadow-sm outline-none transition focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]/30';
-  const labelCls = 'block text-sm font-medium text-gray-700 dark:text-white';
+    'mt-1 block w-full rounded-xl border border-line bg-white dark:bg-raised py-2 px-3 text-sm text-ink shadow-sm outline-none transition focus:border-brand focus:ring-1 focus:ring-brand/30';
+  const labelCls = 'block text-sm font-medium text-ink-2';
 
   return (
     <Modal
@@ -108,9 +108,9 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
       onClose={onCancel}
       aria-label={contact ? t('form.editTitle') : t('form.createTitle')}
       overlayClassName="items-start overflow-y-auto bg-black/70 p-4"
-      className="relative mx-auto my-10 w-full max-w-lg rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 shadow-lg"
+      className="relative mx-auto my-10 w-full max-w-lg rounded-xl border border-line bg-surface p-5 shadow-lg"
     >
-      <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+      <h3 className="mb-4 text-lg font-medium text-ink">
         {contact ? t('form.editTitle') : t('form.createTitle')}
       </h3>
 
@@ -170,7 +170,7 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
             /* Create mode — chip picker that collects IDs for after creation */
             <div className="mt-2">
               {allTags.length === 0 ? (
-                <p className="text-xs text-gray-400 dark:text-[#8696A0]">
+                <p className="text-xs text-ink-4">
                   {t('form.noTagsYet', { defaultValue: 'No tags yet — create them in the Tags page.' })}
                 </p>
               ) : (
@@ -213,19 +213,19 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
 
         {/* ── Custom fields ── */}
         {loadingFields ? (
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8696A0]">
+          <div className="flex items-center gap-2 text-xs text-ink-3">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {t('form.loadingFields', { defaultValue: 'Loading custom fields…' })}
           </div>
         ) : definitions.length > 0 ? (
-          <div className="space-y-4 border-t border-gray-200 dark:border-white/10 pt-4">
+          <div className="space-y-4 border-t border-line pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
+              <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">
                 {t('form.customFields', { defaultValue: 'Custom fields' })}
               </p>
               <Link
                 href="/settings/custom-fields"
-                className="inline-flex items-center gap-1 text-[11px] text-[#25D366] hover:underline"
+                className="inline-flex items-center gap-1 text-[11px] text-brand hover:underline"
               >
                 <Settings2 className="h-3 w-3" />
                 {t('form.manageFields', { defaultValue: 'Manage' })}
@@ -254,14 +254,14 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] px-4 py-2 text-sm font-medium text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-white/10"
+            className="btn btn-secondary"
           >
             {t('form.cancel')}
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-medium text-white hover:bg-[#25D366]/90 disabled:opacity-50"
+            className="btn btn-primary inline-flex disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {t('form.save')}

@@ -383,8 +383,8 @@ class AiBotService {
       const endMin   = endH   * 60 + endM;
       if (nowMin < startMin || nowMin >= endMin) {
         if (g.offHoursMessage?.trim()) {
-          const { sendMessage } = await import('../whatsapp/sender');
-          await sendMessage(ctx.phone, g.offHoursMessage, undefined, undefined, undefined, conversationId, { byBot: true });
+          const { providerManager } = await import('../providers/manager');
+          await providerManager.sendMessage({ phone: ctx.phone, text: g.offHoursMessage, conversationId });
         }
         logger.info('ai_bot.outside_business_hours', { conversationId });
         return;
@@ -414,8 +414,8 @@ class AiBotService {
 
         const transferMsg = cfg.handoff.transferMessage?.trim();
         if (transferMsg) {
-          const { sendMessage } = await import('../whatsapp/sender');
-          await sendMessage(ctx.phone, transferMsg, undefined, undefined, undefined, conversationId, { byBot: true });
+          const { providerManager } = await import('../providers/manager');
+          await providerManager.sendMessage({ phone: ctx.phone, text: transferMsg, conversationId });
         }
         logger.info('ai_bot.handoff', { conversationId });
         return;
@@ -492,8 +492,8 @@ class AiBotService {
         customerName: contactName,
         companyName: cfg.company.name || undefined,
       });
-      const { sendMessage } = await import('../whatsapp/sender');
-      await sendMessage(ctx.phone, text, undefined, undefined, undefined, conversationId, { byBot: true });
+      const { providerManager } = await import('../providers/manager');
+      await providerManager.sendMessage({ phone: ctx.phone, text: text, conversationId });
       logger.info('ai_bot.sent_welcome', { conversationId, exact: cfg.conversation.welcomeMessageExact });
       if (cfg.conversation.welcomeMessageExact) return;
       welcomeHandled = true;
@@ -520,23 +520,23 @@ class AiBotService {
         error: err instanceof Error ? err.message : String(err),
       });
       if (g.fallbackMessage?.trim()) {
-        const { sendMessage } = await import('../whatsapp/sender');
-        await sendMessage(ctx.phone, g.fallbackMessage, undefined, undefined, undefined, conversationId, { byBot: true });
+        const { providerManager } = await import('../providers/manager');
+        await providerManager.sendMessage({ phone: ctx.phone, text: g.fallbackMessage, conversationId });
       }
       return;
     }
 
     if (!reply) {
       if (g.fallbackMessage?.trim()) {
-        const { sendMessage } = await import('../whatsapp/sender');
-        await sendMessage(ctx.phone, g.fallbackMessage, undefined, undefined, undefined, conversationId, { byBot: true });
+        const { providerManager } = await import('../providers/manager');
+        await providerManager.sendMessage({ phone: ctx.phone, text: g.fallbackMessage, conversationId });
       }
       return;
     }
 
     // Lazy import breaks the circular dep: ai-bot → sender → getOrCreate → ...
-    const { sendMessage } = await import('../whatsapp/sender');
-    await sendMessage(ctx.phone, reply, undefined, undefined, undefined, conversationId, { byBot: true });
+    const { providerManager } = await import('../providers/manager');
+    await providerManager.sendMessage({ phone: ctx.phone, text: reply, conversationId });
     logger.info('ai_bot.replied', { conversationId, provider: provider.name });
   }
 }

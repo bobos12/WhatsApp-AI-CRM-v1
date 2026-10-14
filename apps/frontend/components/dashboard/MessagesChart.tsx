@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLanguage } from '../providers/I18nProvider';
+import { useReducedMotion } from 'motion/react';
+import { BarChart3 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell, type TooltipProps,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, type TooltipProps,
 } from 'recharts';
+import { useLanguage } from '../providers/I18nProvider';
+import { localeFor, formatNumber } from '../../lib/format';
+import { Panel, EmptyState } from '../ui/page';
 
 interface MessagesChartProps {
   data: Array<{ date: string; incoming: number; outgoing: number }>;
@@ -24,31 +27,35 @@ function useIsDark() {
   return isDark;
 }
 
-function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
-  const { language } = useLanguage();
-  const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+// SVG presentation attributes can't read CSS variables, so the chart takes
+// literal colours — the same values the tokens resolve to in each theme.
+const PALETTE = {
+  light: { sent: '#128245', received: '#C9D1CD', grid: '#E9EDEB', tick: '#8A948F', cursor: 'rgba(17,23,20,0.04)' },
+  dark:  { sent: '#2ECC74', received: '#36423C', grid: '#1E2622', tick: '#6E7873', cursor: 'rgba(255,255,255,0.04)' },
+};
+
+function ChartTooltip({ active, payload, label, locale }: TooltipProps<number, string> & { locale: string }) {
+  const { t } = useTranslation('dashboard');
   if (!active || !payload?.length) return null;
-  const total = (payload[0]?.value ?? 0) + (payload[1]?.value ?? 0);
+  const total = payload.reduce((s, p) => s + (Number(p.value) || 0), 0);
   return (
-    <div className="rounded-xl border border-gray-200/80 bg-white/95 backdrop-blur-md px-4 py-3 shadow-xl dark:border-white/10 dark:bg-[#1A2530]/95">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">
-        {new Date(label).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })}
+    <div className="min-w-[160px] rounded-lg bg-surface px-3 py-2.5 shadow-pop">
+      <p className="mb-2 text-2xs font-medium text-ink-3">
+        {new Date(label).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
       </p>
-      {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center gap-2.5 text-sm">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color ?? '#fff' }} />
-          <span className="text-gray-500 dark:text-[#8696A0]">{entry.name}:</span>
-          <span className="font-bold text-gray-900 dark:text-white">{(entry.value as number).toLocaleString(locale)}</span>
+      {payload.map((p) => (
+        <div key={p.dataKey as string} className="flex items-center justify-between gap-4 text-xs">
+          <span className="flex items-center gap-1.5 text-ink-2">
+            <span className="h-2 w-2 rounded-sm" style={{ background: p.color }} aria-hidden="true" />
+            {p.name}
+          </span>
+          <span className="font-semibold tabular-nums text-ink">{formatNumber(Number(p.value) || 0, locale)}</span>
         </div>
       ))}
-      {payload.length > 1 && (
-        <div className="mt-2 border-t border-gray-100 pt-2 dark:border-white/10">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-gray-400 dark:text-[#8696A0]">Total</span>
-            <span className="font-bold text-gray-900 dark:text-white">{total.toLocaleString(locale)}</span>
-          </div>
-        </div>
-      )}
+      <div className="mt-2 flex justify-between border-t border-line pt-1.5 text-2xs">
+        <span className="text-ink-3">{t('today.activity.total')}</span>
+        <span className="font-semibold tabular-nums text-ink">{formatNumber(total, locale)}</span>
+      </div>
     </div>
   );
 }
@@ -56,128 +63,71 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
 export default function MessagesChart({ data }: MessagesChartProps) {
   const { t } = useTranslation('dashboard');
   const { language } = useLanguage();
-  const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+  const locale = localeFor(language);
   const isDark = useIsDark();
+  const reduce = useReducedMotion();
+  const c = isDark ? PALETTE.dark : PALETTE.light;
 
-  const chartData = data.slice(-7);
-  const totalOutgoing = chartData.reduce((s, d) => s + d.outgoing, 0);
-  const totalIncoming = chartData.reduce((s, d) => s + d.incoming, 0);
-  const maxVal = Math.max(1, ...chartData.map((d) => d.outgoing + d.incoming));
+  // The server returns exactly the requested window, zero-filled, so every bar
+  // is a real day. It used to omit days with no traffic and the client took the
+  // last 7 rows — on a quiet account "the last 7 days" silently spanned weeks.
+  const totalOutgoing = data.reduce((s, d) => s + d.outgoing, 0);
+  const totalIncoming = data.reduce((s, d) => s + d.incoming, 0);
+  const hasActivity = totalOutgoing + totalIncoming > 0;
 
-  const axisTickColor = isDark ? '#8696A0' : '#9CA3AF';
-  const gridStroke = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-  const cursorFill = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+  const legend = (
+    <div className="flex items-center gap-4">
+      {[
+        { label: t('today.activity.sent'), value: totalOutgoing, color: c.sent },
+        { label: t('today.activity.received'), value: totalIncoming, color: c.received },
+      ].map((l) => (
+        <div key={l.label} className="flex items-center gap-1.5 text-xs">
+          <span className="h-2 w-2 rounded-sm" style={{ background: l.color }} aria-hidden="true" />
+          <span className="text-ink-3">{l.label}</span>
+          <span className="font-semibold tabular-nums text-ink">{formatNumber(l.value, locale)}</span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="rounded-[20px] bg-white/80 backdrop-blur-xl border border-gray-100 shadow-[0_2px_20px_rgba(0,0,0,0.05)] p-6 dark:bg-[#182229] dark:border-transparent dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
-
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('chart.title')}</h3>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]">{t('chart.subtitle')}</p>
-        </div>
-
-        <div className="flex items-center gap-5">
-          <div className="text-end">
-            <p className="text-xl font-bold tabular-nums text-[#16A34A] dark:text-[#25D366]">
-              {totalOutgoing.toLocaleString(locale)}
-            </p>
-            <div className="mt-0.5 flex items-center justify-end gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-[#25D366]" aria-hidden="true" />
-              <span className="text-[11px] text-gray-500 dark:text-[#8696A0]">{t('chart.sent')}</span>
-            </div>
-          </div>
-          <div className="text-end">
-            <p className="text-xl font-bold tabular-nums text-blue-500 dark:text-blue-400">
-              {totalIncoming.toLocaleString(locale)}
-            </p>
-            <div className="mt-0.5 flex items-center justify-end gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-blue-400" aria-hidden="true" />
-              <span className="text-[11px] text-gray-500 dark:text-[#8696A0]">{t('chart.received')}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {data.length === 0 ? (
-        <div className="flex h-56 items-center justify-center" role="status">
-          <p className="text-sm text-gray-500 dark:text-[#8696A0]">{t('chart.noData')}</p>
-        </div>
+    <Panel open title={t('today.activity.title')} description={t('today.activity.sub')} actions={<div className="hidden sm:block">{legend}</div>} className="h-full">
+      {!hasActivity ? (
+        <EmptyState compact icon={BarChart3} title={t('today.activity.empty')} />
       ) : (
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-              barGap={4}
-              barCategoryGap="18%"
-            >
-              <defs>
-                <linearGradient id="barGradOut" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#25D366" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#1FAA5C" stopOpacity={0.85} />
-                </linearGradient>
-                <linearGradient id="barGradIn" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60a5fa" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.85} />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
-
-              <XAxis
-                dataKey="date"
-                tick={{ fill: axisTickColor, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) =>
-                  new Date(v).toLocaleDateString(locale, { weekday: 'short' })
-                }
-              />
-              <YAxis
-                tick={{ fill: axisTickColor, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-
-              <Tooltip
-                content={<ChartTooltip />}
-                cursor={{ fill: cursorFill, radius: 4 }}
-              />
-
-              <Bar
-                dataKey="outgoing"
-                name={t('chart.sent')}
-                fill="url(#barGradOut)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={48}
-              >
-                {data.map((entry, i) => {
-                  const intensity = maxVal > 0 ? entry.outgoing / maxVal : 0;
-                  const opacity = 0.55 + intensity * 0.45;
-                  return <Cell key={i} fill="url(#barGradOut)" fillOpacity={opacity} />;
-                })}
-              </Bar>
-
-              <Bar
-                dataKey="incoming"
-                name={t('chart.received')}
-                fill="url(#barGradIn)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={48}
-              >
-                {data.map((entry, i) => {
-                  const intensity = maxVal > 0 ? entry.incoming / maxVal : 0;
-                  const opacity = 0.55 + intensity * 0.45;
-                  return <Cell key={i} fill="url(#barGradIn)" fillOpacity={opacity} />;
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="px-2 pb-3 pt-4 sm:px-4">
+          <div className="mb-3 px-2 sm:hidden">{legend}</div>
+          <div className="h-[280px]" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }} barGap={3} barCategoryGap="24%">
+                <CartesianGrid stroke={c.grid} vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: c.tick, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={8}
+                  reversed={language === 'ar'}
+                  tickFormatter={(v) => new Date(v).toLocaleDateString(locale, { weekday: 'short' })}
+                />
+                <YAxis
+                  tick={{ fill: c.tick, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={44}
+                  orientation={language === 'ar' ? 'right' : 'left'}
+                />
+                <Tooltip content={<ChartTooltip locale={locale} />} cursor={{ fill: c.cursor, radius: 6 }} />
+                <Bar dataKey="outgoing" name={t('today.activity.sent')} fill={c.sent} radius={[3, 3, 0, 0]} maxBarSize={26}
+                  isAnimationActive={!reduce} animationDuration={700} animationEasing="ease-out" />
+                <Bar dataKey="incoming" name={t('today.activity.received')} fill={c.received} radius={[3, 3, 0, 0]} maxBarSize={26}
+                  isAnimationActive={!reduce} animationDuration={700} animationBegin={120} animationEasing="ease-out" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

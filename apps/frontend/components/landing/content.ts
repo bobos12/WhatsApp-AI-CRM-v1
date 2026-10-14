@@ -260,7 +260,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         'Pixel-perfect WhatsApp message previews',
         'Multi-agent inbox with live presence',
         'Drag-and-drop campaign builder',
-        'Meta Business API + Baileys with auto-failover',
+        'Official Meta WhatsApp Business API — no unofficial libraries',
       ],
       url: 'app.nexuscrm.sa/inbox',
     },

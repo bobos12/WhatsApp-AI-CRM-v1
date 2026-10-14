@@ -47,8 +47,8 @@ const emptyForm = { name: '', email: '', password: '', role: 'EMPLOYEE' as Simpl
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
   return dir === 'asc'
-    ? <ArrowUp className="h-3 w-3 text-[#25D366]" />
-    : <ArrowDown className="h-3 w-3 text-[#25D366]" />;
+    ? <ArrowUp className="h-3 w-3 text-brand" />
+    : <ArrowDown className="h-3 w-3 text-brand" />;
 }
 
 export default function AdminUsersPage() {
@@ -180,8 +180,8 @@ export default function AdminUsersPage() {
       className={cn(
         'cursor-pointer select-none px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider transition-colors',
         sortKey === k
-          ? 'text-[#25D366]'
-          : 'text-gray-600 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
+          ? 'text-brand'
+          : 'text-ink-3 hover:text-ink',
       )}
     >
       <span className="flex items-center gap-1.5">
@@ -304,22 +304,22 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
 
       {/* ── Header ── */}
-      <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-6">
+      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-50 dark:bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
               <ShieldCheck className="h-3.5 w-3.5" />
               {t('badge')}
             </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('users.title')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
+            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('users.title')}</h1>
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
               {t('users.subtitle')}
             </p>
           </div>
           <button
             type="button"
             onClick={() => { setEditing(null); setShowForm(true); }}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#25D366]/90 transition-colors self-start lg:self-auto"
+            className="btn btn-primary inline-flex self-start lg:self-auto"
           >
             <Plus className="h-4 w-4" />
             {t('users.newUser')}
@@ -328,19 +328,19 @@ export default function AdminUsersPage() {
       </section>
 
       {/* ── Table ── */}
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] px-5 py-3.5">
+        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-raised px-5 py-3.5">
           {/* Search */}
           <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-[#8696A0]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" />
             <input
               type="text"
               placeholder={t('users.searchPlaceholder')}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#111B21] py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] outline-none focus:border-[#25D366]/50"
+              className="field w-full pl-10 pr-4"
             />
           </div>
 
@@ -351,14 +351,14 @@ export default function AdminUsersPage() {
             className={cn(
               'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors',
               showFilters || advancedFilterCount > 0
-                ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                : 'border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/10',
+                ? 'border-brand/40 bg-brand/10 text-brand'
+                : 'border-line bg-white dark:bg-white/5 text-ink-3 hover:bg-gray-50 dark:hover:bg-white/10',
             )}
           >
             <SlidersHorizontal className="h-4 w-4" />
             {t('common:actions.filter')}
             {advancedFilterCount > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-slate-950">
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
                 {advancedFilterCount}
               </span>
             )}
@@ -366,17 +366,17 @@ export default function AdminUsersPage() {
 
           {/* Results + selection count */}
           <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-gray-500 dark:text-[#8696A0]">
+            <span className="text-xs text-ink-3">
               {totalCount} {totalCount === 1 ? 'user' : 'users'}
               {selectedIds.size > 0 && (
-                <span className="ml-2 font-medium text-[#25D366]">· {selectedIds.size} selected</span>
+                <span className="ml-2 font-medium text-brand">· {selectedIds.size} selected</span>
               )}
             </span>
             {selectedIds.size > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="text-xs text-gray-500 dark:text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
+                className="text-xs text-ink-3 hover:text-ink transition-colors"
               >
                 {t('users.bulk.clearSelection')}
               </button>
@@ -386,14 +386,14 @@ export default function AdminUsersPage() {
 
         {/* Advanced filter panel */}
         {showFilters && (
-          <div className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] px-5 py-4">
+          <div className="border-b border-line bg-gray-50 dark:bg-canvas px-5 py-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('users.filters.role')}</p>
+                <p className="mb-1.5 text-xs font-medium text-ink-3">{t('users.filters.role')}</p>
                 <select
                   value={filterRole}
                   onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
-                  className="h-9 rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 text-sm text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50"
+                  className="field w-auto"
                 >
                   <option value="">{t('users.filters.allRoles')}</option>
                   {SIMPLE_ROLES.map((r) => (
@@ -402,11 +402,11 @@ export default function AdminUsersPage() {
                 </select>
               </div>
               <div>
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('users.filters.team')}</p>
+                <p className="mb-1.5 text-xs font-medium text-ink-3">{t('users.filters.team')}</p>
                 <select
                   value={filterTeam}
                   onChange={(e) => { setFilterTeam(e.target.value); setPage(1); }}
-                  className="h-9 rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 text-sm text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50"
+                  className="field w-auto"
                 >
                   <option value="">{t('users.filters.allTeams')}</option>
                   {teams.map((team) => (
@@ -418,7 +418,7 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={clearAdvancedFilters}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-300 dark:border-white/10 px-3 text-sm text-gray-600 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-ink-3 hover:bg-raised transition-colors"
                 >
                   <X className="h-3.5 w-3.5" /> {t('users.filters.clear')}
                 </button>
@@ -430,7 +430,7 @@ export default function AdminUsersPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33]">
+              <tr className="border-b border-line bg-raised">
                 <th scope="col" className="w-10 px-5 py-3.5">
                   <span className="sr-only">Select</span>
                   <input
@@ -438,20 +438,20 @@ export default function AdminUsersPage() {
                     checked={allPageSelected}
                     ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                     onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                    className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                   />
                 </th>
                 <SortTh k="name"      label={t('users.table.name')} />
                 <SortTh k="email"     label={t('users.table.email')} />
                 <SortTh k="role"      label={t('users.table.role')} />
-                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-[#8696A0]">
+                <th scope="col" className="px-5 py-3.5 text-start text-xs font-semibold uppercase tracking-wider text-ink-3">
                   {t('users.table.team')}
                 </th>
                 <SortTh k="createdAt" label={t('users.table.createdAt')} />
                 <th scope="col" className="px-5 py-3.5"><span className="sr-only">{t('users.table.actions')}</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody className="divide-y divide-line">
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
@@ -472,8 +472,8 @@ export default function AdminUsersPage() {
               ) : paginatedUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-16 text-center">
-                    <UserCog className="mx-auto mb-3 h-8 w-8 text-gray-300 dark:text-[#8696A0]/30" />
-                    <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                    <UserCog className="mx-auto mb-3 h-8 w-8 text-gray-300 dark:text-ink-3/30" />
+                    <p className="text-sm text-ink-3">
                       {search || advancedFilterCount > 0
                         ? t('users.noUsersFiltered')
                         : t('users.noUsers')}
@@ -482,7 +482,7 @@ export default function AdminUsersPage() {
                       <button
                         type="button"
                         onClick={() => { setSearch(''); clearAdvancedFilters(); }}
-                        className="mt-2 text-xs text-[#25D366] hover:underline"
+                        className="mt-2 text-xs text-brand hover:underline"
                       >
                         {t('users.clearAllFilters')}
                       </button>
@@ -494,8 +494,8 @@ export default function AdminUsersPage() {
                   <tr
                     key={u.id}
                     className={cn(
-                      'group transition-colors hover:bg-gray-50 dark:hover:bg-white/3',
-                      selectedIds.has(u.id) && 'bg-[#25D366]/5 dark:bg-[#25D366]/8',
+                      'group transition-colors hover:bg-raised/60',
+                      selectedIds.has(u.id) && 'bg-brand/5 dark:bg-brand/8',
                     )}
                   >
                     <td className="w-10 px-5 py-3.5">
@@ -503,27 +503,27 @@ export default function AdminUsersPage() {
                         type="checkbox"
                         checked={selectedIds.has(u.id)}
                         onChange={() => toggleSelect(u.id)}
-                        className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                        className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                       />
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-xs font-bold text-white">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
                           {u.name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{u.name}</span>
+                        <span className="text-sm font-medium text-ink">{u.name}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">{u.email}</td>
+                    <td className="px-5 py-3.5 text-sm text-ink-3">{u.email}</td>
                     <td className="px-5 py-3.5">
                       <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', SIMPLE_ROLE_BADGE[toSimpleRole(u.role)])}>
                         {SIMPLE_ROLE_LABEL[toSimpleRole(u.role)]}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">
+                    <td className="px-5 py-3.5 text-sm text-ink-3">
                       {u.team?.name ?? '—'}
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-[#8696A0]">
+                    <td className="px-5 py-3.5 text-sm text-ink-3">
                       {new Date(u.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-5 py-3.5">
@@ -533,14 +533,14 @@ export default function AdminUsersPage() {
                           <button
                             type="button"
                             onClick={() => handleDelete(u.id)}
-                            className="rounded-lg bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600 transition-colors"
+                            className="btn btn-sm bg-red-600 text-white hover:bg-red-700"
                           >
                             {t('users.deleteConfirm.yes')}
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(null)}
-                            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-xs text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                            className="btn btn-secondary btn-sm"
                           >
                             {t('users.deleteConfirm.no')}
                           </button>
@@ -550,7 +550,7 @@ export default function AdminUsersPage() {
                           <button
                             type="button"
                             onClick={() => { setEditing(u); setShowForm(true); }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                            className="btn btn-secondary btn-sm inline-flex"
                           >
                             <Pencil className="h-3 w-3" /> {t('common:actions.edit')}
                           </button>
@@ -582,7 +582,7 @@ export default function AdminUsersPage() {
 
       {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#202C33] px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
           <span className="text-sm font-medium text-white">
             {selectedIds.size} {selectedIds.size === 1 ? 'user' : 'users'} selected
           </span>
@@ -594,14 +594,14 @@ export default function AdminUsersPage() {
                 type="button"
                 onClick={handleBulkDelete}
                 disabled={bulkDeleting}
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {bulkDeleting ? t('users.bulk.deleting') : t('users.bulk.yesDelete')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowBulkConfirm(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8696A0] hover:bg-white/10 transition-colors"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
               >
                 {t('users.bulk.cancel')}
               </button>
@@ -618,7 +618,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8696A0] hover:bg-white/10 transition-colors"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
               >
                 {t('users.bulk.clearSelection')}
               </button>
@@ -633,7 +633,7 @@ export default function AdminUsersPage() {
         onClose={() => { setShowForm(false); setEditing(null); }}
         aria-label={editing ? t('users.form.editTitle') : t('users.form.createTitle')}
         overlayClassName="bg-black/70"
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111B21] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.4)]"
+        className="w-full max-w-md rounded-xl border border-line bg-surface p-6 shadow-pop"
       >
           <form onSubmit={handleSubmit}>
             <div className="mb-5 flex items-center gap-3">
@@ -645,55 +645,55 @@ export default function AdminUsersPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">{t('users.form.name')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('users.form.name')}</label>
                 <input
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]"
+                  className="field w-full"
                   placeholder="Ahmed Mohamed"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">{t('users.form.email')}</label>
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('users.form.email')}</label>
                 <input
                   required
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]"
+                  className="field w-full"
                   placeholder="ahmed@company.com"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">
+                <label className="mb-1.5 block text-xs font-medium text-ink-3">
                   {editing ? t('users.form.passwordEdit') : t('users.form.passwordCreate')}
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]"
+                  className="field w-full"
                   placeholder="••••••••"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">{t('users.form.role')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('users.form.role')}</label>
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as SimpleRole })}
-                    className="h-10 w-full rounded-lg border border-white/10 bg-[#202C33] px-3 text-sm text-white outline-none focus:border-[#25D366]"
+                    className="field h-10 w-full"
                   >
                     {SIMPLE_ROLES.map((r) => <option key={r} value={r}>{SIMPLE_ROLE_LABEL[r]}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">{t('users.form.team')}</label>
+                  <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('users.form.team')}</label>
                   <select
                     value={formData.teamId}
                     onChange={(e) => setFormData({ ...formData, teamId: e.target.value })}
-                    className="h-10 w-full rounded-lg border border-white/10 bg-[#202C33] px-3 text-sm text-white outline-none focus:border-[#25D366]"
+                    className="field h-10 w-full"
                   >
                     <option value="">{t('users.form.noTeam')}</option>
                     {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
@@ -708,14 +708,14 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditing(null); }}
-                className="rounded-xl border border-white/10 bg-[#202C33] px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
+                className="btn btn-secondary"
               >
                 {t('users.form.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#25D366]/90 transition-colors"
+                className="btn btn-primary disabled:opacity-50"
               >
                 {saving ? t('users.form.saving') : editing ? t('users.form.updateUser') : t('users.form.createUser')}
               </button>

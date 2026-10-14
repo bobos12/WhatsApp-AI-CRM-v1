@@ -42,10 +42,10 @@ const CARDS: CardDef[] = [
     key: 'openConversations',
     labelKey: 'stats.openConversations',
     Icon: MessageSquare,
-    accentBar: 'bg-[#25D366]',
-    iconColor: 'text-[#128C7E] dark:text-[#25D366]',
-    iconBg: 'bg-[#25D366]/10 border-[#25D366]/20',
-    glow: 'bg-[#25D366]/5 dark:bg-[#25D366]/10',
+    accentBar: 'bg-brand',
+    iconColor: 'text-brand-strong dark:text-brand',
+    iconBg: 'bg-brand/10 border-brand/20',
+    glow: 'bg-brand/5 dark:bg-brand/10',
   },
   {
     key: 'todayMessages',
@@ -75,7 +75,7 @@ export default function StatsCards({ data }: StatsCardsProps) {
       {CARDS.map(({ key, labelKey, Icon, accentBar, iconColor, iconBg, glow }) => (
         <div
           key={key}
-          className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-transparent dark:bg-[#182229] dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]"
+          className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-transparent dark:bg-raised dark:shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]"
         >
           {/* Top color accent bar */}
           <div className={`absolute inset-x-0 top-0 h-[2px] rounded-t-2xl ${accentBar}`} />
@@ -85,10 +85,10 @@ export default function StatsCards({ data }: StatsCardsProps) {
 
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-[#8696A0]">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-3">
                 {t(labelKey)}
               </p>
-              <p className="mt-3 text-4xl font-bold tabular-nums tracking-tight text-gray-900 dark:text-white">
+              <p className="mt-3 text-4xl font-bold tabular-nums tracking-tight text-ink">
                 {fmt(data[key])}
               </p>
             </div>

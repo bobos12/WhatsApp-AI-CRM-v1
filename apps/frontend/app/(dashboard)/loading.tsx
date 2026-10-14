@@ -19,14 +19,14 @@ export default function DashboardLoading() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="skeleton h-28 rounded-[20px] sm:h-36" />
+          <div key={i} className="skeleton h-28 rounded-xl sm:h-36" />
         ))}
       </div>
 
       {/* Content blocks */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="skeleton h-64 rounded-[20px] lg:col-span-8" />
-        <div className="skeleton h-64 rounded-[20px] lg:col-span-4" />
+        <div className="skeleton h-64 rounded-xl lg:col-span-8" />
+        <div className="skeleton h-64 rounded-xl lg:col-span-4" />
       </div>
     </div>
   );

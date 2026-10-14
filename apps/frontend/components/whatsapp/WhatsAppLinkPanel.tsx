@@ -1,380 +1,511 @@
 'use client';
 
 /**
- * WhatsAppLinkPanel — the one surface for linking a number, both ways round.
+ * The connect flow for a WhatsApp Business number.
  *
- * The QR code silently assumes a second screen. If you are running this CRM on
- * your phone — which most small operators are — the code is displayed on the
- * only camera you own, and the scan route has no path to completion at all. It
- * isn't awkward, it's impossible, and there was no other way through.
+ * This replaced a QR-scanning panel. On the official Cloud API there is nothing
+ * to scan: a number belongs to a WhatsApp Business Account, and this CRM sends
+ * through it using credentials from the tenant's Meta app. The job of this
+ * screen is therefore to make copying four values out of Meta's dashboard feel
+ * deliberate rather than clerical — one field per step, each explained where
+ * the user needs it, and a live verification at the end so nobody discovers a
+ * wrong token days later when a message silently fails to send.
  *
- * So this panel offers WhatsApp's two official routes:
- *
- *   qr   → scan, for anyone with a second device
- *   code → "Link with phone number", an 8-character code typed into WhatsApp
- *
- * On a touch device there is no choice to offer — the QR cannot work there — so
- * the tabs are not shown at all and the number field IS the screen. Presenting
- * two options when one of them is impossible just asks the user to figure that
- * out for themselves. The scan route stays reachable through one line of small
- * print, for the rarer case of linking a number that lives on a second phone.
- *
- * Every state of both routes lives here — waiting, expired pairing, error, and
- * the refresh that recovers all of them — so no caller has to reimplement what
- * "no code yet" looks like.
- *
- * Connection state comes from WhatsAppConnectProvider, so no two surfaces run
- * competing handshakes.
+ * Deliberately not a single long form. The values live on different Meta screens,
+ * and a wall of six inputs with no context is where self-serve onboarding dies.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { RefreshCw, WifiOff, QrCode, Smartphone, Copy, Check, ArrowRight } from 'lucide-react';
-import QRCodeDisplay from '../shared/QRCodeDisplay';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Loader2,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-react';
+import { api } from '../../lib/api';
 import { useWhatsAppConnection } from './WhatsAppConnectProvider';
-import { cn } from '../../lib/utils';
 
-type LinkMethod = 'qr' | 'code';
+type StepId = 'intro' | 'ids' | 'token' | 'webhook' | 'done';
 
-interface WhatsAppLinkPanelProps {
-  /** Width of the code area. `lg` is for full-width pages, `md` for dialogs. */
-  size?: 'md' | 'lg';
-  className?: string;
+interface ChannelInfo {
+  configured: boolean;
+  phoneNumberId: string | null;
+  wabaId: string | null;
+  appId: string | null;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  encryptionReady: boolean;
+  webhookUrl: string;
+  verifyTokenSet: boolean;
+  appSecretSet: boolean;
+  tokenHint: string | null;
 }
 
-const CODE_WIDTH = { md: 'w-52', lg: 'w-64' } as const;
+const META_APP_URL = 'https://developers.facebook.com/apps';
 
-/** `K73P9M2Q` → `K73P 9M2Q`. Eight characters is two glances, not one. */
-function formatPairingCode(code: string): string {
-  const clean = code.replace(/\s+/g, '').toUpperCase();
-  return clean.length === 8 ? `${clean.slice(0, 4)} ${clean.slice(4)}` : clean;
-}
+export default function WhatsAppLinkPanel({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const { refresh, configured, connectedPhone, verifiedName } = useWhatsAppConnection();
 
-export default function WhatsAppLinkPanel({ size = 'md', className }: WhatsAppLinkPanelProps) {
-  const { t } = useTranslation('common');
-  const {
-    qrCode, pairingIdle, error, refreshing, refreshQr,
-    pairing, requestingCode, codeError, requestPairingCode, clearPairing,
-  } = useWhatsAppConnection();
+  const [step, setStep] = useState<StepId>('intro');
+  const [channel, setChannel] = useState<ChannelInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [method, setMethod] = useState<LinkMethod>('qr');
-  /** Touch device — the QR is on the only camera they have, so it cannot work. */
-  const [touchOnly, setTouchOnly] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const touched = useRef(false);
-  // A code can also die before its countdown ends — its keypair belongs to the
-  // socket, and the socket goes away when WhatsApp's pairing refs run out. The
-  // form reappearing with no explanation reads as the button having done nothing.
-  const hadCode = useRef(false);
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [wabaId, setWabaId] = useState('');
+  const [appId, setAppId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [appSecret, setAppSecret] = useState('');
+  const [showToken, setShowToken] = useState(false);
 
-  // A phone or tablet cannot scan its own screen, so there is one route, not two.
-  // Deferred to an effect so SSR and hydration agree on the initial markup.
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // Load current channel state so a partially-configured tenant resumes rather
+  // than retyping values the server already holds.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.matchMedia?.('(pointer: coarse)').matches) {
-      setTouchOnly(true);
-      if (!touched.current) setMethod('code');
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get('/api/channel');
+        if (cancelled) return;
+        setChannel(data);
+        setPhoneNumberId(data.phoneNumberId ?? '');
+        setWabaId(data.wabaId ?? '');
+        setAppId(data.appId ?? '');
+        if (data.configured) setStep('done');
+      } catch {
+        /* an unconfigured tenant simply starts at the beginning */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  // A live code means someone is mid-entry on their phone. Never pull them back
-  // to the QR tab underneath them.
-  useEffect(() => {
-    if (pairing) {
-      setMethod('code');
-      hadCode.current = true;
-    }
-  }, [pairing]);
-
-  // Countdown. The code stops working when WhatsApp says so, and a user staring
-  // at a dead code with no explanation assumes the feature is broken.
-  useEffect(() => {
-    if (!pairing) { setSecondsLeft(null); return; }
-    const tick = () => {
-      const left = Math.max(0, Math.round((new Date(pairing.expiresAt).getTime() - Date.now()) / 1000));
-      setSecondsLeft(left);
-      return left;
-    };
-    if (tick() === 0) return;
-    const id = setInterval(() => { if (tick() === 0) clearInterval(id); }, 1000);
-    return () => clearInterval(id);
-  }, [pairing]);
-
-  const expired = pairing != null && secondsLeft === 0;
-
-  const countdown = useMemo(() => {
-    if (secondsLeft == null) return null;
-    const m = Math.floor(secondsLeft / 60);
-    const s = secondsLeft % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }, [secondsLeft]);
-
-  const chooseMethod = (next: LinkMethod) => {
-    touched.current = true;
-    setMethod(next);
-  };
-
-  const copyCode = async () => {
-    if (!pairing) return;
+  const copy = useCallback(async (value: string, key: string) => {
     try {
-      await navigator.clipboard.writeText(pairing.code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // Clipboard is permission-gated and can simply say no. The code is on
-      // screen either way, so a failed copy is not worth interrupting anyone.
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600);
+    } catch { /* clipboard blocked — the value is visible and selectable anyway */ }
+  }, []);
+
+  // A stored token satisfies the requirement. Both secrets are write-only, so
+  // the fields are empty on every reload — demanding a token here meant Save
+  // stayed disabled forever once credentials existed, and there was no way to
+  // correct the App Secret alone. Meta shows a system-user token exactly once,
+  // so "just paste it again" is frequently not an option.
+  const canSubmit =
+    phoneNumberId.trim().length > 0 && (accessToken.trim().length > 0 || Boolean(channel?.tokenHint));
+
+  const submit = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await api.put('/api/channel/credentials', {
+        phoneNumberId: phoneNumberId.trim(),
+        wabaId: wabaId.trim() || null,
+        appId: appId.trim() || null,
+        // Omitted when blank so the server keeps the stored one.
+        accessToken: accessToken.trim() || undefined,
+        appSecret: appSecret.trim() || null,
+      });
+
+      // The server saves and verifies in one call. A save that stored fine but
+      // failed verification is the important case: the number is not usable, and
+      // saying "connected" would be a lie the user discovers at their first send.
+      if (result?.verified === false) {
+        setError(result.error ?? 'WhatsApp did not accept these credentials.');
+        return;
+      }
+
+      setAccessToken('');
+      setAppSecret('');
+      setChannel(result.channel ?? channel);
+      await refresh();
+      setStep('webhook');
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not save these credentials.');
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [phoneNumberId, wabaId, appId, accessToken, appSecret, channel, refresh]);
 
-  const submitPhone = (e: React.FormEvent) => {
-    e.preventDefault();
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 8 || requestingCode) return;
-    void requestPairingCode(digits);
-  };
+  const compact = size === 'sm';
 
-  const qrState: 'error' | 'idle' | 'code' | 'waiting' = error
-    ? 'error'
-    : pairingIdle
-      ? 'idle'
-      : qrCode
-        ? 'code'
-        : 'waiting';
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10 text-gray-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
 
-  return (
-    <div className={cn('flex w-full flex-col items-center gap-4', className)}>
-      {/* ── Method switch — only where there is genuinely a choice ─────────── */}
-      {!touchOnly && (
-        <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-white/10 dark:bg-white/5">
-          {([
-            { key: 'qr' as const, icon: QrCode, label: t('sidebarConnect.methodQr') },
-            { key: 'code' as const, icon: Smartphone, label: t('sidebarConnect.methodCode') },
-          ]).map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => chooseMethod(key)}
-              aria-pressed={method === key}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
-                method === key
-                  ? 'bg-white text-gray-900 shadow-sm dark:bg-[#2A3942] dark:text-white'
-                  : 'text-gray-500 hover:text-gray-800 dark:text-[#8696A0] dark:hover:text-white',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── Scan ──────────────────────────────────────────────────────────── */}
-      {method === 'qr' && (
-        <div className="flex flex-col items-center gap-3.5">
-          <div className={cn('relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-white/10', CODE_WIDTH[size])}>
-            {/* Scanner corner brackets — reads as "point your camera here". */}
-            <span aria-hidden className="absolute left-1.5 top-1.5 h-4 w-4 rounded-tl-lg border-l-2 border-t-2 border-[#25D366]" />
-            <span aria-hidden className="absolute right-1.5 top-1.5 h-4 w-4 rounded-tr-lg border-r-2 border-t-2 border-[#25D366]" />
-            <span aria-hidden className="absolute bottom-1.5 left-1.5 h-4 w-4 rounded-bl-lg border-b-2 border-l-2 border-[#25D366]" />
-            <span aria-hidden className="absolute bottom-1.5 right-1.5 h-4 w-4 rounded-br-lg border-b-2 border-r-2 border-[#25D366]" />
-
-            {qrState === 'code' ? (
-              <div className="[&_img]:aspect-square [&_img]:h-auto [&_img]:w-full [&_img]:max-w-none">
-                <QRCodeDisplay qrCode={qrCode!} />
-              </div>
-            ) : (
-              <div className="grid aspect-square w-full place-items-center gap-2 rounded-lg bg-gray-50 px-3 text-center">
-                {qrState === 'error' && (
-                  <div className="flex flex-col items-center gap-2">
-                    <WifiOff className="h-8 w-8 text-red-500" />
-                    <p className="text-xs font-medium text-gray-600">{t('sidebarConnect.error')}</p>
-                  </div>
-                )}
-                {qrState === 'idle' && (
-                  <div className="flex flex-col items-center gap-2">
-                    <QrCode className="h-8 w-8 text-gray-400" />
-                    <p className="text-sm font-semibold text-gray-700">{t('sidebarConnect.expired')}</p>
-                    <p className="max-w-[15rem] text-[11px] leading-relaxed text-gray-500">
-                      {t('sidebarConnect.expiredHint')}
-                    </p>
-                  </div>
-                )}
-                {qrState === 'waiting' && (
-                  <div className="flex flex-col items-center gap-2">
-                    <RefreshCw className="h-8 w-8 animate-spin text-[#25D366]" />
-                    <p className="text-xs font-medium text-gray-500">{t('sidebarConnect.waiting')}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Refresh — present in every state, not only on failure: a WhatsApp QR
-              is valid for about a minute and the usual failure is looking away. */}
-          <button
-            type="button"
-            onClick={refreshQr}
-            disabled={refreshing}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold transition-all active:scale-95 disabled:opacity-60',
-              qrState === 'idle' || qrState === 'error'
-                ? 'bg-[#128C7E] text-white hover:bg-[#0f7a6e]'
-                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10',
-            )}
-          >
-            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-            {refreshing ? t('sidebarConnect.refreshing') : t('sidebarConnect.refresh')}
-          </button>
-
-          {/* Steps live with the method they describe. They used to sit in the
-              callers, which meant "scan this code to link" stayed on screen after
-              switching to the tab where nothing gets scanned. */}
-          <ol className="w-full max-w-sm space-y-2 rounded-xl bg-gray-50 p-3.5 dark:bg-white/5">
-            {[
-              t('sidebarConnect.steps.open'),
-              t('sidebarConnect.steps.linked'),
-              t('sidebarConnect.steps.scan'),
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <span className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#25D366]/12 text-[10px] font-bold text-[#16A34A] dark:text-[#25D366]">
-                  {i + 1}
-                </span>
-                <span className="text-xs leading-relaxed text-gray-600 dark:text-[#c8d2d7]">{step}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* ── Link with phone number ────────────────────────────────────────── */}
-      {method === 'code' && (
-        <div className="w-full max-w-sm">
-          {pairing && !expired ? (
-            <div className="flex flex-col items-center gap-3">
-              <p className="text-center text-xs font-semibold text-gray-500 dark:text-[#8696A0]">
-                {t('sidebarConnect.codeHeading')}
-              </p>
-
-              <button
-                type="button"
-                onClick={copyCode}
-                title={t('sidebarConnect.copyCode')}
-                className="group flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#25D366]/40 bg-[#25D366]/[0.06] px-4 py-4 transition-colors hover:bg-[#25D366]/[0.12]"
-              >
-                <span dir="ltr" className="font-mono text-2xl font-extrabold tracking-[0.25em] text-gray-900 sm:text-3xl dark:text-white">
-                  {formatPairingCode(pairing.code)}
-                </span>
-                {copied
-                  ? <Check className="h-5 w-5 shrink-0 text-[#16A34A] dark:text-[#25D366]" aria-hidden="true" />
-                  : <Copy className="h-5 w-5 shrink-0 text-gray-400 transition-colors group-hover:text-gray-600 dark:group-hover:text-white" aria-hidden="true" />}
-              </button>
-
-              {countdown && (
-                <p className={cn('text-xs font-semibold tabular-nums', (secondsLeft ?? 0) < 30 ? 'text-red-500' : 'text-gray-400 dark:text-[#8696A0]')}>
-                  {t('sidebarConnect.codeExpiresIn', { time: countdown })}
-                </p>
-              )}
-
-              <ol className="w-full space-y-2 rounded-xl bg-gray-50 p-3.5 dark:bg-white/5">
-                {[
-                  t('sidebarConnect.codeSteps.open'),
-                  t('sidebarConnect.codeSteps.linked'),
-                  t('sidebarConnect.codeSteps.linkWithPhone'),
-                  t('sidebarConnect.codeSteps.enter'),
-                ].map((step, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#25D366]/12 text-[10px] font-bold text-[#16A34A] dark:text-[#25D366]">
-                      {i + 1}
-                    </span>
-                    <span className="text-xs leading-relaxed text-gray-600 dark:text-[#c8d2d7]">{step}</span>
-                  </li>
-                ))}
-              </ol>
-
-              <button
-                type="button"
-                onClick={() => { clearPairing(); setPhone(''); hadCode.current = false; }}
-                className="text-xs font-semibold text-gray-500 underline underline-offset-2 transition-colors hover:text-gray-800 dark:text-[#8696A0] dark:hover:text-white"
-              >
-                {t('sidebarConnect.useAnotherNumber')}
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={submitPhone} className="flex flex-col gap-3">
-              <div>
-                <label htmlFor="wa-pairing-phone" className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-white">
-                  {t('sidebarConnect.phoneLabel')}
-                </label>
-                <input
-                  id="wa-pairing-phone"
-                  dir="ltr"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+971 50 123 4567"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-[#8696A0]"
-                />
-                <p className={cn(
-                  'mt-1.5 text-[11px] leading-relaxed',
-                  expired || hadCode.current
-                    ? 'font-medium text-amber-600 dark:text-amber-400'
-                    : 'text-gray-500 dark:text-[#8696A0]',
-                )}>
-                  {expired || hadCode.current
-                    ? t('sidebarConnect.codeExpired')
-                    : t('sidebarConnect.phoneHint')}
-                </p>
-              </div>
-
-              {codeError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                  {codeError}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={requestingCode || phone.replace(/\D/g, '').length < 8}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#16A34A] px-4 py-2.5 text-sm font-bold text-white shadow-[0_2px_10px_rgba(22,163,74,0.25)] transition-all hover:bg-[#15803D] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#25D366] dark:text-slate-950 dark:hover:bg-[#22c55e]"
-              >
-                {requestingCode
-                  ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  : <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />}
-                {requestingCode ? t('sidebarConnect.gettingCode') : t('sidebarConnect.getCode')}
-              </button>
-
-              {/* Small print, not a tab. Linking a number that lives on a second
-                  phone is real but rare — it shouldn't cost every mobile user a
-                  choice between a route that works and one that can't. */}
-              {touchOnly && (
-                <button
-                  type="button"
-                  onClick={() => chooseMethod('qr')}
-                  className="mx-auto text-[11px] font-semibold text-gray-400 underline underline-offset-2 transition-colors hover:text-gray-600 dark:text-[#8696A0] dark:hover:text-white"
-                >
-                  {t('sidebarConnect.scanInstead')}
-                </button>
-              )}
-            </form>
+  // ── Connected ──────────────────────────────────────────────────────────────
+  if (configured && step === 'done') {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <span className="grid h-14 w-14 place-items-center rounded-full bg-brand/15 text-brand dark:text-brand">
+          <CheckCircle2 className="h-8 w-8" />
+        </span>
+        <div>
+          <p className="text-base font-bold text-ink">Your number is connected</p>
+          {connectedPhone && (
+            <p className="mt-0.5 font-mono text-sm text-ink-3">{connectedPhone}</p>
+          )}
+          {verifiedName && (
+            <p className="mt-0.5 text-xs text-ink-3">Verified as “{verifiedName}”</p>
           )}
         </div>
-      )}
-
-      {/* The way back, once a touch user has opted into the scan route. */}
-      {touchOnly && method === 'qr' && (
         <button
           type="button"
-          onClick={() => chooseMethod('code')}
-          className="text-[11px] font-semibold text-gray-400 underline underline-offset-2 transition-colors hover:text-gray-600 dark:text-[#8696A0] dark:hover:text-white"
+          onClick={() => setStep('ids')}
+          className="mt-1 text-xs font-medium text-gray-500 underline-offset-2 hover:underline dark:text-ink-3"
         >
-          {t('sidebarConnect.useNumberInstead')}
+          Update credentials
         </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <StepDots current={step} />
+
+      {/* ── Intro ───────────────────────────────────────────────────────────── */}
+      {step === 'intro' && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-ink">
+              Connect your WhatsApp Business number
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-ink-3">
+              This CRM sends through the official WhatsApp Business API, so there is no QR code to
+              scan and no phone that has to stay online. You will copy four values from your Meta
+              account — we will verify them before saving.
+            </p>
+          </div>
+
+          <ul className="flex flex-col gap-2 rounded-2xl bg-gray-50 p-3 text-xs dark:bg-white/5">
+            {[
+              'Your number can never be banned for sending volume alone.',
+              'Messages keep delivering when your phone is off.',
+              'Meta publishes your quality rating, so problems are visible early.',
+            ].map((line) => (
+              <li key={line} className="flex items-start gap-2 text-ink-2">
+                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+
+          {channel && !channel.encryptionReady && (
+            <Callout tone="warn">
+              This server cannot store credentials securely yet — <code>CREDENTIAL_ENCRYPTION_KEY</code>{' '}
+              is not set. Ask your administrator to configure it before connecting.
+            </Callout>
+          )}
+
+          <a
+            href={META_APP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-strong hover:underline dark:text-brand"
+          >
+            Open Meta for Developers <ExternalLink className="h-3 w-3" />
+          </a>
+
+          <Nav
+            onNext={() => setStep('ids')}
+            nextLabel="Start"
+            nextDisabled={Boolean(channel && !channel.encryptionReady)}
+          />
+        </div>
       )}
+
+      {/* ── IDs ─────────────────────────────────────────────────────────────── */}
+      {step === 'ids' && (
+        <div className="flex flex-col gap-3">
+          <FieldHelp
+            title="Where to find these"
+            body="In your Meta app, open WhatsApp → API Setup. The Phone Number ID and WhatsApp Business Account ID are shown directly above the message-sending panel."
+          />
+
+          <Field
+            label="Phone Number ID"
+            required
+            value={phoneNumberId}
+            onChange={setPhoneNumberId}
+            placeholder="123456789012345"
+            hint="Digits only — not the phone number itself."
+            compact={compact}
+          />
+          <Field
+            label="WhatsApp Business Account ID"
+            value={wabaId}
+            onChange={setWabaId}
+            placeholder="987654321098765"
+            hint="Needed to create and submit message templates."
+            compact={compact}
+          />
+          <Field
+            label="App ID"
+            value={appId}
+            onChange={setAppId}
+            placeholder="1234567890"
+            hint="Only needed for templates with an image or video header."
+            compact={compact}
+          />
+
+          <Nav
+            onBack={() => setStep('intro')}
+            onNext={() => setStep('token')}
+            nextDisabled={!phoneNumberId.trim()}
+          />
+        </div>
+      )}
+
+      {/* ── Token ───────────────────────────────────────────────────────────── */}
+      {step === 'token' && (
+        <div className="flex flex-col gap-3">
+          <FieldHelp
+            title="Use a permanent token"
+            body="The temporary token on the API Setup page expires in 24 hours. Create a System User in Business Settings, give it access to your WhatsApp account, and generate a permanent token with the whatsapp_business_messaging and whatsapp_business_management permissions."
+          />
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-ink-2">
+              Permanent access token <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showToken ? 'text' : 'password'}
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                placeholder={channel?.tokenHint ? `Saved: ${channel.tokenHint}` : 'EAAG…'}
+                autoComplete="off"
+                spellCheck={false}
+                className="field field-sm w-full pr-10 font-mono transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((v) => !v)}
+                aria-label={showToken ? 'Hide token' : 'Show token'}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white"
+              >
+                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-ink-4">
+              Stored encrypted. It is never shown again after saving.
+            </p>
+          </div>
+
+          <Field
+            label="App Secret"
+            value={appSecret}
+            onChange={setAppSecret}
+            placeholder={channel?.appSecretSet ? 'Saved — leave blank to keep' : '32-character secret'}
+            hint="From App Settings → Basic. Used to verify that incoming messages genuinely came from Meta."
+            type="password"
+            compact={compact}
+          />
+
+          {error && <Callout tone="error">{error}</Callout>}
+
+          <Nav
+            onBack={() => setStep('ids')}
+            onNext={submit}
+            nextLabel={saving ? 'Verifying…' : 'Save and verify'}
+            nextDisabled={!canSubmit || saving}
+            busy={saving}
+          />
+        </div>
+      )}
+
+      {/* ── Webhook ─────────────────────────────────────────────────────────── */}
+      {step === 'webhook' && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2 rounded-2xl bg-brand/10 p-3">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand dark:text-brand" />
+            <p className="text-xs text-ink-2">
+              Credentials verified{connectedPhone ? ` for ${connectedPhone}` : ''}. One last step so
+              you can <strong>receive</strong> messages, not just send them.
+            </p>
+          </div>
+
+          <FieldHelp
+            title="Point Meta's webhook at this CRM"
+            body="In your Meta app, open WhatsApp → Configuration → Webhooks, paste the callback URL and verify token below, then subscribe to the messages field."
+          />
+
+          <CopyRow
+            label="Callback URL"
+            value={channel?.webhookUrl || `${window.location.origin.replace(/:\d+$/, ':4000')}/api/whatsapp/meta-webhook`}
+            copied={copied === 'url'}
+            onCopy={(v) => copy(v, 'url')}
+          />
+
+          {channel?.verifyTokenSet ? (
+            <p className="text-[11px] text-ink-3">
+              Use the verify token your administrator configured on this server.
+            </p>
+          ) : (
+            <Callout tone="warn">
+              No verify token is configured on this server yet. Ask your administrator to set{' '}
+              <code>META_WEBHOOK_VERIFY_TOKEN</code>, or Meta cannot complete the handshake.
+            </Callout>
+          )}
+
+          <Callout tone="info">
+            Subscribe to <strong>messages</strong>. Without it, replies from your customers will
+            never reach this inbox.
+          </Callout>
+
+          <Nav onNext={() => { void refresh(); setStep('done'); }} nextLabel="Finish" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Presentational helpers ───────────────────────────────────────────────────
+
+const STEPS: StepId[] = ['intro', 'ids', 'token', 'webhook'];
+
+function StepDots({ current }: { current: StepId }) {
+  if (current === 'done') return null;
+  const index = STEPS.indexOf(current);
+  return (
+    <div className="flex items-center gap-1.5" role="progressbar" aria-valuenow={index + 1} aria-valuemax={STEPS.length}>
+      {STEPS.map((s, i) => (
+        <span
+          key={s}
+          className={`h-1 flex-1 rounded-full transition-colors ${
+            i <= index ? 'bg-brand' : 'bg-overlay'
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Field({
+  label, value, onChange, placeholder, hint, required, type = 'text', compact,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  hint?: string;
+  required?: boolean;
+  type?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-ink-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        className={`w-full rounded-xl border border-gray-200 bg-white px-3 font-mono text-xs text-gray-900 outline-none transition-colors focus:border-brand dark:border-white/10 dark:bg-white/5 dark:text-white ${
+          compact ? 'py-1.5' : 'py-2'
+        }`}
+      />
+      {hint && <p className="text-[11px] text-ink-4">{hint}</p>}
+    </div>
+  );
+}
+
+function FieldHelp({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl bg-gray-50 p-3 dark:bg-white/5">
+      <p className="text-xs font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-3">{body}</p>
+    </div>
+  );
+}
+
+function CopyRow({
+  label, value, copied, onCopy,
+}: { label: string; value: string; copied: boolean; onCopy: (v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-semibold text-ink-2">{label}</span>
+      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+        <code className="flex-1 truncate font-mono text-[11px] text-ink-2">{value}</code>
+        <button
+          type="button"
+          onClick={() => onCopy(value)}
+          className="shrink-0 text-gray-400 transition-colors hover:text-brand-strong dark:hover:text-brand"
+          aria-label={`Copy ${label}`}
+        >
+          {copied ? <CheckCircle2 className="h-4 w-4 text-brand" /> : <Copy className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Callout({ tone, children }: { tone: 'info' | 'warn' | 'error'; children: React.ReactNode }) {
+  const styles = {
+    info: 'bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-blue-200',
+    warn: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200',
+    error: 'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-200',
+  }[tone];
+  return (
+    <div className={`flex items-start gap-2 rounded-xl p-3 text-[11px] leading-relaxed ${styles}`}>
+      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function Nav({
+  onBack, onNext, nextLabel = 'Continue', nextDisabled, busy,
+}: {
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  nextDisabled?: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 pt-1">
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 dark:text-ink-3 dark:hover:bg-white/5"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back
+        </button>
+      ) : (
+        <span />
+      )}
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={nextDisabled}
+        className="btn btn-primary btn-sm inline-flex disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {nextLabel}
+        {!busy && <ArrowRight className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
 }

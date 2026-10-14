@@ -276,4 +276,36 @@ router.post('/:id/send-bulk', checkPermission('create', 'messages'), async (req,
   }
 });
 
+/**
+ * Submit a template to Meta for review.
+ *
+ * Until a template is APPROVED it cannot reach anyone outside the 24-hour
+ * customer service window, which is essentially the whole audience of a
+ * campaign — so this endpoint is the gate on the product being usable at all,
+ * not an optional extra.
+ */
+router.post('/:id/submit', checkPermission('update', 'templates'), async (req, res) => {
+  try {
+    const { getChannel } = await import('../../providers/channel.service');
+    const channel = await getChannel();
+
+    if (!channel.cloud) {
+      return res.status(409).json({
+        error: 'Connect the WhatsApp Business API in Settings before submitting templates.',
+        code: 'CLOUD_API_NOT_CONFIGURED',
+      });
+    }
+
+    const { submitTemplate } = await import('../../providers/meta/templates');
+    const result = await submitTemplate(req.params.id, channel.cloud);
+    res.json(result);
+  } catch (error) {
+    const { HttpError } = await import('../../auth/authorize');
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
 export default router;

@@ -447,5 +447,26 @@
     "TIMEOUT": "WhatsApp did not respond in time",
     "INVALID_PHONE": "Not a valid phone number",
     "UNKNOWN": "Delivery failed"
+  },
+  "template": {
+    "label": "WhatsApp template",
+    "choose": "Choose an approved template",
+    "chooseHint": "WhatsApp requires one for anyone who has not messaged you in the last 24 hours",
+    "search": "Search approved templates…",
+    "noneApproved": "No approved templates yet",
+    "noneApprovedHint": "Create one in Templates and submit it for review. WhatsApp usually replies within minutes.",
+    "noMatch": "No approved template matches that search",
+    "unavailableCount": "{{count}} templates not available for campaigns",
+    "personalisation": "Personalisation",
+    "personalisationHint": "Each placeholder is filled per recipient from their contact record.",
+    "leaveEmpty": "Leave empty",
+    "preview": "Preview",
+    "remove": "Remove template",
+    "lockedNotice": "This campaign delivers the {{name}} template exactly as WhatsApp approved it. To change the wording, edit the template and submit it for review again.",
+    "fieldName": "Contact's full name",
+    "fieldFirstName": "First name",
+    "fieldPhone": "Phone number",
+    "fieldEmail": "Email",
+    "fieldCompany": "Company"
   }
 }

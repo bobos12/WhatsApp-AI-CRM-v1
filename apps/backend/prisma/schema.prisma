@@ -103,22 +103,72 @@ model Team {
   @@index([tenantId])
 }
 
-model WhatsAppSession {
-  id            String   @id @default(cuid())
-  /// One WhatsApp connection per tenant. Unique so a tenant can never hold two.
-  tenantId      String?  @unique
-  sessionId     String   @unique
-  data          Json
-  warmupEnabled Boolean  @default(false)
-  /// When this number started being used on WhatsApp — NOT when it was linked
-  /// here. A business connecting a number it has run for three years is not
-  /// operating a new account, and pacing it like one destroys its throughput for
-  /// no safety gain. Declared by the operator during setup; `createdAt` is only
-  /// a floor, and the CRM's own message history is used as evidence when it has
-  /// any. See broadcasts/safety/account-health.ts.
-  accountActiveSince DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+/// Meta's quality signal for a Cloud API number. Drives the messaging limit
+/// tier, and a sustained RED precedes restriction. Mirrored from the
+/// `account_update` webhook — never computed locally.
+enum ChannelQuality {
+  UNKNOWN
+  GREEN
+  YELLOW
+  RED
+}
+
+/// A tenant's WhatsApp Business Cloud API channel: the Meta credentials this
+/// CRM sends with, and the health Meta reports back about the number.
+///
+/// One row per tenant. There is no session or auth state to keep — the Cloud
+/// API is stateless HTTP, which is precisely why a number connected this way
+/// cannot be dropped, re-paired, or banned for being an unofficial client.
+model WhatsAppChannel {
+  id       String                @id @default(cuid())
+  /// One channel per tenant. Unique so a tenant can never hold two.
+  tenantId String?               @unique
+
+  // ── Cloud API configuration ──────────────────────────────────────────────
+  /// Meta's ID for the sending number, and the webhook routing key: an inbound
+  /// payload identifies its destination by this alone, so it must be unique
+  /// across the whole platform or deliveries land in the wrong tenant.
+  phoneNumberId      String? @unique
+  /// WhatsApp Business Account ID — the parent of the number, and the object
+  /// message templates are created under.
+  wabaId             String?
+  businessId         String?
+  /// Meta App ID. Only needed to submit templates that carry an image/video/
+  /// document header: those require an upload handle from the Resumable Upload
+  /// API, whose endpoint is namespaced by app. Text-only templates do not need it.
+  appId              String?
+  /// System User access token, AES-256-GCM encrypted at rest. Never returned to
+  /// a client; the API exposes only a masked hint. See lib/crypto.ts.
+  accessTokenEnc     String?
+  /// The tenant's own Meta App secret, encrypted. Needed because under manual
+  /// onboarding each tenant owns their Meta App, so webhook signatures are
+  /// signed with a different secret per tenant. Falls back to META_APP_SECRET
+  /// (the platform app) when null, which is the Embedded Signup case.
+  appSecretEnc       String?
+  /// E.164 number Meta reports for phoneNumberId — what recipients actually see.
+  displayPhoneNumber String?
+  /// The display name Meta approved for the business.
+  verifiedName       String?
+
+  // ── Health, as reported by Meta ──────────────────────────────────────────
+  qualityRating  ChannelQuality @default(UNKNOWN)
+  /// Meta's messaging limit tier (e.g. "TIER_1K"): how many unique customers
+  /// this number may start conversations with per rolling 24h. Null until Meta
+  /// reports one. Read by the broadcast preflight to size a campaign.
+  messagingLimit String?
+  /// Set when Meta reports the number restricted or disabled. Sends are refused
+  /// until it passes.
+  restrictedUntil DateTime?
+
+  /// Last successful credential/health sync against the Graph API.
+  lastSyncedAt  DateTime?
+  /// Why the last sync failed, surfaced in Settings so a tenant can self-serve
+  /// an expired token instead of silently failing to send.
+  lastSyncError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
 }
 
 model Contact {
@@ -393,6 +443,18 @@ model Message {
   /// For group messages: the WhatsApp display name (pushName) of the sender.
   senderName  String?
 
+  // ── Cloud API billing (from the `statuses` webhook) ──────────────────────────
+  // Meta bills per 24h *conversation*, not per message, and only the message
+  // that opens one is charged. Recording what Meta actually billed is the only
+  // way to reconcile a WhatsApp invoice or price a customer plan — and it can
+  // never be backfilled, because the webhook is the sole source.
+  /// Meta's conversation ID this message was billed under.
+  metaConversationId String?
+  /// MARKETING | UTILITY | AUTHENTICATION | SERVICE — the billing category.
+  metaPricingCategory String?
+  /// True when Meta charged for opening a conversation with this message.
+  metaBillable        Boolean?
+
   @@unique([externalId, sessionId])
   @@unique([clientId, conversationId])
   @@index([tenantId])
@@ -636,6 +698,20 @@ model Broadcast {
   /// Set once the user has seen and accepted the pre-flight report for the
   /// current `contentHash` + audience. Cleared on every edit.
   reviewedAt           DateTime?
+
+  // ── Cloud API delivery ─────────────────────────────────────────────────────
+  /// The approved Meta template this campaign sends. Required on Cloud API for
+  /// any recipient outside their 24h window — which, for a broadcast, is nearly
+  /// all of them. Null on Baileys, where free-form `message` is sent directly.
+  templateId           String?
+  template             MessageTemplate?     @relation(fields: [templateId], references: [id])
+  /// Contact-field mapping for the template's placeholders, resolved per
+  /// recipient at send time. Keyed by the variable's NAME as it appears in
+  /// `MessageTemplate.variables` — e.g. {"first_name":"name","ref":"custom.orderId"}
+  /// — NOT by the positional index. The worker reads it as
+  /// `vars[mapping[name] ?? name]`, so an unmapped variable falls back to the
+  /// personalization token of the same name. See broadcasts/personalization.ts.
+  templateVariables    Json?
 
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @default(now()) @updatedAt
@@ -883,15 +959,33 @@ model MessageTemplate {
   category       String? // MARKETING | UTILITY | AUTHENTICATION
   metaStatus     String? // PENDING | APPROVED | REJECTED | PAUSED | DELETED
   metaTemplateId String? // numeric ID returned by Meta after submission
+  /// Meta's stated reason for a REJECTED template. Shown verbatim in the UI —
+  /// a rejection the tenant cannot read is a support ticket.
+  metaRejectedReason String?
+  /// When the template was last pushed to Meta for review. Distinguishes "never
+  /// submitted" from "submitted and still PENDING", which look identical if you
+  /// only have metaStatus.
+  metaSubmittedAt    DateTime?
+  /// Last time metaStatus was refreshed from the Graph API (webhook or poll).
+  metaSyncedAt       DateTime?
+  /// Meta's post-delivery quality score for the template (GREEN/YELLOW/RED).
+  /// A RED template gets paused by Meta, so this is an early warning.
+  metaQualityScore   String?
   // Structured JSON payload — components array for Meta templates (header/body/footer/buttons)
   payload        Json?
   // Ordered variable names e.g. ["name","order_id"] matching {{1}},{{2}} in body
   variables      Json?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @default(now()) @updatedAt
+  broadcasts     Broadcast[]
 
   @@index([tenantId])
   @@index([teamId])
+  /// Meta identifies a template by (name, language) within a WABA, so the same
+  /// pair must not exist twice for one tenant or submission and status sync
+  /// become ambiguous.
+  @@unique([tenantId, name, language])
+  @@index([metaStatus])
 }
 
 model Task {

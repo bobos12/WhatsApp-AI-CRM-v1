@@ -12,6 +12,10 @@ import { Modal } from '../../../components/ui/modal';
 import { useSocket } from '../../../hooks/useSocket';
 import { useToast } from '../../../hooks/useToast';
 import { cn } from '../../../lib/utils';
+import { STAGE_TONE } from '../../../lib/format';
+import { PageHeader } from '../../../components/ui/page';
+import { Skeleton } from '../../../components/ui/Skeleton';
+import Avatar from '../../../components/ui/Avatar';
 
 type Stage = 'NEW' | 'INTERESTED' | 'NEGOTIATION' | 'CLOSED';
 
@@ -40,7 +44,7 @@ const STAGE_CFG: Record<Stage, {
   NEW:         { bar: 'bg-blue-500',   badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20'      },
   INTERESTED:  { bar: 'bg-violet-500', badge: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
   NEGOTIATION: { bar: 'bg-amber-500',  badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20'    },
-  CLOSED:      { bar: 'bg-[#25D366]',  badge: 'bg-[#25D366]/10 text-[#25D366] border-[#25D366]/20'   },
+  CLOSED:      { bar: 'bg-brand',  badge: 'bg-brand/10 text-brand border-brand/20'   },
 };
 
 function timeAgo(iso: string, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -59,19 +63,10 @@ function initial(s?: string | null): string {
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-2xl border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-[#202C33]/60 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="h-4 w-2/3 rounded-md bg-gray-100 dark:bg-white/8" />
-        <div className="h-5 w-16 rounded-full bg-gray-50 dark:bg-white/5" />
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <div className="h-5 w-5 rounded-full bg-gray-100 dark:bg-white/8" />
-        <div className="h-3 w-1/2 rounded-md bg-gray-50 dark:bg-white/5" />
-      </div>
-      <div className="mt-4 flex gap-2">
-        <div className="h-7 w-20 rounded-xl bg-gray-50 dark:bg-white/5" />
-        <div className="h-7 w-14 rounded-xl bg-gray-50 dark:bg-white/5" />
-      </div>
+    <div className="rounded-lg bg-surface p-3 shadow-soft ring-1 ring-line">
+      <Skeleton className="h-3.5 w-2/3 rounded" />
+      <Skeleton className="mt-3 h-3 w-1/2 rounded" />
+      <Skeleton className="mt-3 h-6 w-24 rounded-md" />
     </div>
   );
 }
@@ -91,112 +86,64 @@ function DealCard({
 }) {
   const { t } = useTranslation('deals');
   const { t: tc } = useTranslation('common');
-  const cfg = STAGE_CFG[deal.stage];
   const idx = STAGES.indexOf(deal.stage);
   const isLast = idx === STAGES.length - 1;
   const nextStageKey = !isLast ? STAGES[idx + 1] : null;
   const nextLabel = nextStageKey ? t(`stages.${nextStageKey}`) : null;
   const isConfirming = confirmDeleteId === deal.id;
   const isDeleting = deletingId === deal.id;
+  const who = deal.contact?.name || deal.contact?.phone || t('noContact');
 
   return (
     <article
       className={cn(
-        'rounded-2xl border bg-gray-50 dark:bg-[#202C33] p-4 transition-all duration-150',
-        isConfirming ? 'border-red-400/30' : 'cursor-pointer border-gray-200 dark:border-white/8 hover:border-[#25D366]/40 hover:bg-[#16A34A]/5 dark:hover:bg-[#243530]',
+        'lift group cursor-pointer rounded-lg bg-surface p-3 shadow-soft ring-1',
+        isConfirming ? 'ring-red-300 dark:ring-red-500/40' : 'ring-line',
       )}
       onClick={() => { if (!isConfirming) onEdit(); }}
     >
-      {/* Inline delete confirmation */}
-      {isConfirming && (
-        <div className="mb-3 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-          <p className="text-xs font-semibold text-red-300">{t('deleteConfirm.title')}</p>
-          <p className="mt-0.5 text-[11px] text-red-300/60 leading-relaxed">
-            {t('deleteConfirm.message', { title: deal.title })}
-          </p>
-          <div className="mt-2.5 flex gap-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onConfirmDelete(); }}
-              className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 transition-colors"
-            >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[13px] font-medium leading-snug text-ink">{deal.title}</p>
+        <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink">${Number(deal.value || 0).toLocaleString()}</span>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2 text-xs text-ink-3">
+        <Avatar name={deal.contact?.name || deal.contact?.phone || '?'} size={20} />
+        <span className="truncate">{who}</span>
+      </div>
+
+      <div className="mt-2.5 flex items-center justify-between gap-2 text-2xs text-ink-4">
+        <span className="truncate">{deal.owner ? (deal.owner.name || deal.owner.email) : t('unassigned')}</span>
+        <span className="shrink-0 tabular-nums">{timeAgo(deal.updatedAt, t)}</span>
+      </div>
+
+      {isConfirming ? (
+        <div className="mt-3 rounded-md bg-red-50 p-2.5 dark:bg-red-500/10" onClick={(e) => e.stopPropagation()}>
+          <p className="text-xs font-semibold text-red-700 dark:text-red-300">{t('deleteConfirm.title')}</p>
+          <p className="mt-0.5 text-2xs leading-4 text-red-700/80 dark:text-red-300/80">{t('deleteConfirm.message', { title: deal.title })}</p>
+          <div className="mt-2 flex gap-1.5">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onConfirmDelete(); }} className="btn btn-sm h-7 bg-red-600 text-white hover:bg-red-700">
               {t('deleteConfirm.confirm')}
             </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onCancelDelete(); }}
-              className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            >
+            <button type="button" onClick={(e) => { e.stopPropagation(); onCancelDelete(); }} className="btn btn-secondary btn-sm h-7">
               {t('deleteConfirm.cancel')}
             </button>
           </div>
         </div>
-      )}
-
-      {/* Title + value */}
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-semibold text-gray-900 dark:text-white leading-snug text-sm">{deal.title}</p>
-        <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-bold', cfg.badge)}>
-          ${Number(deal.value || 0).toLocaleString()}
-        </span>
-      </div>
-
-      {/* Contact */}
-      <div className="mt-2 flex items-center gap-2">
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#25D366]/15 text-[10px] font-bold text-[#25D366]">
-          {initial(deal.contact?.name ?? deal.contact?.phone)}
-        </div>
-        <p className="truncate text-xs text-gray-500 dark:text-[#8696A0]">
-          {deal.contact?.name || deal.contact?.phone || t('noContact')}
-        </p>
-      </div>
-
-      {/* Owner + time */}
-      <div className="mt-2 flex items-center justify-between">
-        {deal.owner ? (
-          <div className="flex items-center gap-1.5">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-[10px] font-bold text-violet-300">
-              {initial(deal.owner.name ?? deal.owner.email)}
-            </div>
-            <span className="text-[11px] text-gray-500 dark:text-[#8696A0] truncate max-w-[80px]">
-              {deal.owner.name || deal.owner.email}
-            </span>
-          </div>
-        ) : (
-          <span className="text-[11px] text-gray-400/60 dark:text-[#8696A0]/40">{t('unassigned')}</span>
-        )}
-        <span className="text-[10px] text-gray-400/60 dark:text-[#8696A0]/40">{timeAgo(deal.updatedAt, t)}</span>
-      </div>
-
-      {/* Action buttons */}
-      {!isConfirming && (
-        <div className="mt-3 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+      ) : (
+        <div className="mt-2.5 flex items-center gap-1 border-t border-line pt-2.5" onClick={(e) => e.stopPropagation()}>
           {!isLast && (
-            <button
-              type="button"
-              onClick={onAdvance}
-              className="inline-flex items-center gap-1 rounded-xl border border-[#25D366]/20 bg-[#25D366]/8 px-2.5 py-1.5 text-[11px] font-medium text-[#25D366] hover:bg-[#25D366]/15 transition-colors"
-            >
-              <ChevronRight className="h-3 w-3" />
+            <button type="button" onClick={onAdvance} className="btn btn-sm h-7 bg-brand/10 px-2 text-brand hover:bg-brand/15">
               {nextLabel}
+              <ChevronRight className="icon-mirror" aria-hidden="true" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex items-center gap-1 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-2.5 py-1.5 text-[11px] text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-          >
-            <Pencil className="h-3 w-3" />
-            {tc('actions.edit')}
+          <span className="flex-1" />
+          <button type="button" onClick={onEdit} className="btn btn-ghost btn-icon btn-sm h-7 w-7" aria-label={tc('actions.edit')} title={tc('actions.edit')}>
+            <Pencil aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            onClick={onRequestDelete}
-            disabled={isDeleting}
-            className="inline-flex items-center gap-1 rounded-xl border border-red-400/15 bg-red-400/5 px-2.5 py-1.5 text-[11px] text-red-400 hover:bg-red-400/12 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="h-3 w-3" />
-            {isDeleting ? '…' : tc('actions.delete')}
+          <button type="button" onClick={onRequestDelete} disabled={isDeleting} className="btn btn-ghost btn-icon btn-sm h-7 w-7 hover:text-red-600" aria-label={tc('actions.delete')} title={tc('actions.delete')}>
+            <Trash2 aria-hidden="true" />
           </button>
         </div>
       )}
@@ -369,76 +316,53 @@ export default function DealsPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-4 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,211,102,0.10),transparent_40%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <BriefcaseBusiness className="h-3.5 w-3.5" />
-              {t('badge')}
-            </div>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
-              {t('subtitle')}
-            </p>
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <button type="button" onClick={() => { setEditingDeal(null); setShowForm(true); }} className="btn btn-primary">
+            <Plus aria-hidden="true" />
+            {t('newDeal')}
+          </button>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-5 sm:grid-cols-4">
+        {[
+          { label: t('totalDeals'), value: String(totalDeals) },
+          { label: t('pipeline'), value: `$${totalValue.toLocaleString()}` },
+          { label: t('won'), value: `$${closedValue.toLocaleString()}`, tone: 'text-brand' },
+          { label: t('winRate'), value: `${winRate}%` },
+        ].map((s) => (
+          <div key={s.label} className="min-w-0">
+            <p className="truncate text-2xs font-medium text-ink-3">{s.label}</p>
+            <p className={cn('mt-1 truncate text-2xl font-semibold tabular-nums tracking-[-0.02em]', s.tone ?? 'text-ink')}>{s.value}</p>
           </div>
+        ))}
+      </div>
 
-          {/* Stats + action */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5 lg:gap-6">
-            <div className="grid grid-cols-2 gap-3 sm:contents">
-              <Stat value={totalDeals}                          label={t('totalDeals')}  />
-              <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-white/8" />
-              <Stat value={`$${totalValue.toLocaleString()}`}  label={t('pipeline')}    />
-              <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-white/8" />
-              <Stat value={`$${closedValue.toLocaleString()}`} label={t('won')}         highlight />
-              <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-white/8" />
-              <Stat value={`${winRate}%`}                       label={t('winRate')}    />
-            </div>
-            <button
-              type="button"
-              onClick={() => { setEditingDeal(null); setShowForm(true); }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-[#25D366]/90 transition-colors shadow-[0_0_18px_rgba(37,211,102,0.25)]"
-            >
-              <Plus className="h-4 w-4" />
-              {t('newDeal')}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Kanban ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {columns.map(({ stage, cfg, label, emptyText, items, total }) => (
-          <div key={stage} className="flex flex-col rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden min-h-[320px]">
-
-            {/* Colored accent bar */}
-            <div className={cn('h-1 w-full shrink-0', cfg.bar)} />
-
-            {/* Column header */}
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">{label}</span>
-                <span className={cn('rounded-full border px-2 py-0.5 text-xs font-bold', cfg.badge)}>
-                  {items.length}
-                </span>
+      {/* ── Board ── */}
+      <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-4">
+        {columns.map(({ stage, label, emptyText, items, total }) => (
+          <div key={stage} className="flex min-h-[320px] w-[78vw] shrink-0 snap-start flex-col rounded-xl bg-raised/60 ring-1 ring-inset ring-line sm:w-auto">
+            <div className="flex items-center justify-between gap-2 px-3.5 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', STAGE_TONE[stage]?.dot)} aria-hidden="true" />
+                <span className="truncate text-[13px] font-semibold text-ink">{label}</span>
+                <span className="text-2xs tabular-nums text-ink-4">{items.length}</span>
               </div>
-              <span className="text-xs font-medium text-gray-500 dark:text-[#8696A0]">${total.toLocaleString()}</span>
+              <span className="text-xs tabular-nums text-ink-3">${total.toLocaleString()}</span>
             </div>
 
-            {/* Card list */}
-            <div className="flex-1 space-y-3 p-3">
+            <div className="stagger flex-1 space-y-2 px-2 pb-2">
               {loading ? (
                 <>
                   <SkeletonCard />
                   <SkeletonCard />
                 </>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div className={cn('mb-3 rounded-full p-3 opacity-30', cfg.bar.replace('bg-', 'bg-') + '/10')}>
-                    <BriefcaseBusiness className="h-5 w-5 text-white" />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-[#8696A0]">{emptyText}</p>
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line-strong px-3 py-10 text-center">
+                  <p className="text-xs text-ink-3">{emptyText}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -446,9 +370,9 @@ export default function DealsPage() {
                       setFormData((c) => ({ ...emptyForm, stage, contactId: c.contactId }));
                       setShowForm(true);
                     }}
-                    className="mt-3 inline-flex items-center gap-1 text-xs text-[#25D366]/70 hover:text-[#25D366] transition-colors"
+                    className="btn btn-ghost btn-sm mt-2"
                   >
-                    <Plus className="h-3 w-3" /> {t('addDeal')}
+                    <Plus aria-hidden="true" /> {t('addDeal')}
                   </button>
                 </div>
               ) : (
@@ -476,18 +400,18 @@ export default function DealsPage() {
         open={showForm}
         onClose={() => { setShowForm(false); setEditingDeal(null); }}
         aria-label={editingDeal ? t('editDeal') : t('newDeal')}
-        className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+        className="w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-pop"
       >
           <form onSubmit={handleSubmit}>
             {/* Modal header */}
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-base font-semibold text-ink">
                 {editingDeal ? t('editDeal') : t('newDeal')}
               </h2>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingDeal(null); }}
-                className="rounded-lg p-1.5 text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="rounded-lg p-1.5 text-ink-3 hover:bg-raised hover:text-ink transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -498,7 +422,7 @@ export default function DealsPage() {
                 <select
                   value={formData.contactId}
                   onChange={(e) => setFormData({ ...formData, contactId: e.target.value })}
-                  className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-10 w-full transition-colors"
                 >
                   <option value="">{t('form.selectContact')}</option>
                   {contacts.map((c) => (
@@ -521,7 +445,7 @@ export default function DealsPage() {
                   <select
                     value={formData.stage}
                     onChange={(e) => setFormData({ ...formData, stage: e.target.value as Stage })}
-                    className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                    className="field h-10 w-full transition-colors"
                   >
                     {STAGES.map((s) => (
                       <option key={s} value={s}>{t(`stages.${s}`)}</option>
@@ -544,7 +468,7 @@ export default function DealsPage() {
                 <select
                   value={formData.ownerId}
                   onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
-                  className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-10 w-full transition-colors"
                 >
                   <option value="">{t('form.unassigned')}</option>
                   {members.map((m) => (
@@ -559,7 +483,7 @@ export default function DealsPage() {
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
                   placeholder={t('form.notesPlaceholder')}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 transition-colors placeholder:text-gray-400 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50 dark:placeholder:text-[#8696A0]/60"
+                  className="field w-full resize-none transition-colors"
                 />
               </Field>
             </div>
@@ -568,22 +492,20 @@ export default function DealsPage() {
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingDeal(null); }}
-                className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="btn btn-secondary"
               >
                 {t('form.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-xl bg-[#25D366] px-5 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50 hover:bg-[#25D366]/90 transition-colors"
+                className="btn btn-primary disabled:opacity-50"
               >
                 {saving ? t('form.saving') : editingDeal ? t('form.update') : t('form.create')}
               </button>
             </div>
           </form>
       </Modal>
-      {/* Mobile bottom-nav spacer */}
-      <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />
     </div>
   );
 }
@@ -593,10 +515,10 @@ export default function DealsPage() {
 function Stat({ value, label, highlight }: { value: string | number; label: string; highlight?: boolean }) {
   return (
     <div className="text-center">
-      <p className={cn('text-xl font-bold', highlight ? 'text-[#25D366]' : 'text-gray-900 dark:text-white')}>
+      <p className={cn('text-xl font-bold', highlight ? 'text-brand' : 'text-ink')}>
         {value}
       </p>
-      <p className="text-xs text-gray-500 dark:text-[#8696A0]">{label}</p>
+      <p className="text-xs text-ink-3">{label}</p>
     </div>
   );
 }
@@ -604,7 +526,7 @@ function Stat({ value, label, highlight }: { value: string | number; label: stri
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-[#8696A0]">{label}</label>
+      <label className="label">{label}</label>
       {children}
     </div>
   );

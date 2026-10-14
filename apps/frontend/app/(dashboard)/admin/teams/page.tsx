@@ -120,21 +120,21 @@ export default function AdminTeamsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-6">
+      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-50 dark:bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
               <ShieldCheck className="h-3.5 w-3.5" />
               {t('badge')}
             </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('teams.title')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
+            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('teams.title')}</h1>
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
               {t('teams.subtitle')}
             </p>
           </div>
           <button
             onClick={() => { setEditing(null); setShowForm(true); }}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#25D366]/90 transition-colors"
+            className="btn btn-primary inline-flex"
           >
             <Plus className="h-4 w-4" />
             {t('teams.newTeam')}
@@ -148,7 +148,7 @@ export default function AdminTeamsPage() {
       {/* Teams list */}
       <div className="space-y-4">
         {teams.length === 0 && (
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-10 text-center text-sm text-gray-500 dark:text-[#8696A0]">
+          <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-ink-3">
             {t('teams.noTeams')}
           </div>
         )}
@@ -158,7 +158,7 @@ export default function AdminTeamsPage() {
           const available   = allUsers.filter((u) => !memberIds.has(u.id));
 
           return (
-            <div key={team.id} className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden">
+            <div key={team.id} className="rounded-xl border border-line bg-surface overflow-hidden">
               {/* Team header row */}
               <div className="flex items-center justify-between px-5 py-4">
                 <button
@@ -166,12 +166,12 @@ export default function AdminTeamsPage() {
                   className="flex items-center gap-3 text-left"
                   onClick={() => setExpanded(isExpanded ? null : team.id)}
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E]">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand">
                     <UsersRound className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{team.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t(team.members.length !== 1 ? 'teams.memberCountPlural' : 'teams.memberCount', { count: team.members.length })}</p>
+                    <p className="text-sm font-semibold text-ink">{team.name}</p>
+                    <p className="text-xs text-ink-3">{t(team.members.length !== 1 ? 'teams.memberCountPlural' : 'teams.memberCount', { count: team.members.length })}</p>
                   </div>
                 </button>
                 <div className="flex items-center gap-2">
@@ -181,15 +181,15 @@ export default function AdminTeamsPage() {
                     title={team.autoAssign ? t('teams.autoAssignDisable') : t('teams.autoAssignEnable')}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                       team.autoAssign
-                        ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                        : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'
+                        ? 'border-brand/40 bg-brand/10 text-brand'
+                        : 'border-line bg-white dark:bg-raised text-gray-500 dark:text-gray-400 hover:bg-raised'
                     }`}
                   >
                     {team.autoAssign ? t('teams.autoAssignOn') : t('teams.autoAssignOff')}
                   </button>
                   <button
                     onClick={() => { setEditing(team); setShowForm(true); }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                    className="btn btn-secondary btn-sm inline-flex"
                   >
                     <Pencil className="h-3 w-3" /> {t('teams.rename')}
                   </button>
@@ -204,19 +204,19 @@ export default function AdminTeamsPage() {
 
               {/* Expanded: members */}
               {isExpanded && (
-                <div className="border-t border-gray-100 dark:border-white/5 px-5 py-4 space-y-3">
+                <div className="border-t border-line px-5 py-4 space-y-3">
                   {/* Member list */}
                   {team.members.length > 0 ? (
                     <ul className="space-y-2">
                       {team.members.map((m) => (
-                        <li key={m.id} className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-[#202C33] px-3 py-2">
+                        <li key={m.id} className="flex items-center justify-between rounded-lg bg-raised px-3 py-2">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-xs font-bold text-white">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
                               {m.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">{m.name}</p>
-                              <p className="text-xs text-gray-500 dark:text-[#8696A0]">{roleLabel(m.role)}</p>
+                              <p className="text-sm font-medium text-ink">{m.name}</p>
+                              <p className="text-xs text-ink-3">{roleLabel(m.role)}</p>
                             </div>
                           </div>
                           <button
@@ -229,7 +229,7 @@ export default function AdminTeamsPage() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-xs text-gray-400 dark:text-[#8696A0]">{t('teams.noMembers')}</p>
+                    <p className="text-xs text-ink-4">{t('teams.noMembers')}</p>
                   )}
 
                   {/* Add member */}
@@ -238,7 +238,7 @@ export default function AdminTeamsPage() {
                       <select
                         value={addUserId}
                         onChange={(e) => setAddUserId(e.target.value)}
-                        className="flex-1 h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 text-xs text-gray-900 dark:text-white outline-none focus:border-[#25D366]"
+                        className="field field-sm flex-1 h-9"
                       >
                         <option value="">{t('teams.selectUser')}</option>
                         {available.map((u) => (
@@ -248,7 +248,7 @@ export default function AdminTeamsPage() {
                       <button
                         onClick={() => handleAddMember(team.id)}
                         disabled={!addUserId}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#25D366]/90 transition-colors"
+                        className="btn btn-primary btn-sm inline-flex disabled:opacity-40"
                       >
                         <UserPlus className="h-3 w-3" /> {t('teams.add')}
                       </button>
@@ -267,7 +267,7 @@ export default function AdminTeamsPage() {
         onClose={() => { setShowForm(false); setEditing(null); }}
         aria-label={editing ? t('teams.form.renameTitle') : t('teams.form.createTitle')}
         overlayClassName="bg-black/70"
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111B21] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.4)]"
+        className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-pop"
       >
           <form onSubmit={handleSubmit}>
             <div className="flex items-center gap-3 mb-5">
@@ -275,12 +275,12 @@ export default function AdminTeamsPage() {
               <h2 className="text-lg font-semibold text-white">{editing ? t('teams.form.renameTitle') : t('teams.form.createTitle')}</h2>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[#8696A0]">{t('teams.form.teamName')}</label>
+              <label className="mb-1.5 block text-xs font-medium text-ink-3">{t('teams.form.teamName')}</label>
               <input
                 required
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-[#202C33] px-3 py-2.5 text-sm text-white outline-none focus:border-[#25D366]"
+                className="field w-full"
                 placeholder={t('teams.form.teamNamePlaceholder')}
               />
             </div>
@@ -289,14 +289,14 @@ export default function AdminTeamsPage() {
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditing(null); }}
-                className="rounded-xl border border-white/10 bg-[#202C33] px-4 py-2 text-sm text-white hover:bg-white/10"
+                className="btn btn-secondary"
               >
                 {t('teams.form.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#25D366]/90"
+                className="btn btn-primary disabled:opacity-50"
               >
                 {saving ? t('teams.form.saving') : editing ? t('teams.form.rename') : t('teams.form.createTeam')}
               </button>

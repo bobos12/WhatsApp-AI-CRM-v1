@@ -20,7 +20,7 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
 };
 
 const TYPE_COLOR: Record<NotificationType, { dot: string; icon: string; bg: string }> = {
-  BUYING_INTENT:  { dot: 'bg-[#25D366]',  icon: 'text-[#25D366]',  bg: 'bg-[#25D366]/10' },
+  BUYING_INTENT:  { dot: 'bg-brand',  icon: 'text-brand',  bg: 'bg-brand/10' },
   NEEDS_ATTENTION:{ dot: 'bg-red-400',    icon: 'text-red-400',    bg: 'bg-red-500/10'   },
   STATUS_UPGRADE: { dot: 'bg-amber-400',  icon: 'text-amber-400',  bg: 'bg-amber-500/10' },
 };
@@ -46,7 +46,7 @@ interface HotLead {
   contact: { name: string | null; phone: string } | null;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ placement = 'bar' }: { placement?: 'nav' | 'bar' }) {
   const router = useRouter();
   const { t, i18n } = useTranslation('leads');
   const { t: tCommon } = useTranslation('common');
@@ -59,6 +59,15 @@ export default function NotificationBell() {
   const [hotLeads, setHotLeads]   = useState<HotLead[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // In the sidebar the panel opens beside the trigger, positioned from its
+  // rect — an absolute dropdown would be clipped by the sidebar's overflow.
+  const [anchor, setAnchor] = useState<{ top: number; side: number } | null>(null);
+  useEffect(() => {
+    if (!open || placement !== 'nav' || !ref.current) { setAnchor(null); return; }
+    const r = ref.current.getBoundingClientRect();
+    const top = Math.max(12, Math.min(r.top, window.innerHeight - 520));
+    setAnchor({ top, side: isAr ? window.innerWidth - r.left + 10 : r.right + 10 });
+  }, [open, placement, isAr]);
 
   const fetchHotLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -129,47 +138,41 @@ export default function NotificationBell() {
         aria-label={tCommon('header.notifications')}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'relative rounded-xl p-2 transition-all duration-150',
-          open
-            ? 'bg-[#25D366]/10 text-[#25D366]'
-            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-[#8696A0] dark:hover:bg-[#2A3942] dark:hover:text-[#E9EDEF]',
+          'relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-fast',
+          placement === 'nav'
+            ? (open ? 'bg-nav-hover text-nav-ink' : 'text-nav-muted hover:bg-nav-hover hover:text-nav-ink')
+            : (open ? 'bg-raised text-ink' : 'text-ink-3 hover:bg-raised hover:text-ink'),
         )}
       >
         <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
         {unread > 0 && (
-          <span className="absolute -end-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 px-1 text-[9px] font-black text-white ring-2 ring-white dark:ring-[#111B21] shadow-sm">
+          <span className={cn('absolute -end-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold tabular-nums text-white ring-2', placement === 'nav' ? 'ring-nav' : 'ring-surface')}>
             {unread > 99 ? '99+' : unread}
           </span>
         )}
       </button>
 
       {/* ── Dropdown panel ────────────────────────────── */}
-      {open && (
+      {open && (placement !== 'nav' || anchor) && (
         <div
+          style={anchor ? { top: anchor.top, [isAr ? 'right' : 'left']: anchor.side } : undefined}
           className={cn(
-            // Base
-            'z-[9999] flex flex-col overflow-hidden rounded-2xl shadow-2xl',
-            'border border-black/[0.06] dark:border-white/[0.08]',
-            'bg-white/[0.98] dark:bg-[#111B21]/[0.98] backdrop-blur-2xl',
-            // Mobile: fixed compact card, end-aligned so it doesn't fill the screen
-            'fixed top-[64px] w-[min(340px,calc(100vw-24px))]',
-            isAr ? 'left-3' : 'right-3',
-            // ≥640 px: absolute dropdown below the bell
-            'sm:fixed-none sm:absolute sm:top-auto sm:left-auto sm:right-auto sm:mt-2 sm:w-[340px]',
-            isAr ? 'sm:start-0' : 'sm:end-0',
+            'pop-enter z-[9999] flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-xl bg-surface shadow-pop',
+            placement === 'nav'
+              ? 'fixed'
+              // Mobile header: a fixed card under the bar, end-aligned.
+              : cn('fixed top-[60px]', isAr ? 'left-3' : 'right-3'),
           )}
         >
           {/* ── Header ────────────────────────────────── */}
           <div className="relative flex items-center justify-between px-4 py-3">
-            {/* left accent bar */}
-            <div className="absolute start-0 top-[20%] h-[60%] w-[3px] rounded-e-full bg-gradient-to-b from-[#25D366] to-[#128C7E]" />
             <div className="flex items-center gap-2">
-              <Bell className="h-3.5 w-3.5 text-[#25D366]" />
-              <p className="text-[13px] font-bold tracking-tight text-gray-900 dark:text-white">
+              <Bell className="h-3.5 w-3.5 text-brand" />
+              <p className="text-[13px] font-bold tracking-tight text-ink">
                 {t('notifications.title')}
               </p>
               {unread > 0 && (
-                <span className="rounded-full bg-[#25D366]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#25D366]">
+                <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-bold text-brand">
                   {unread}
                 </span>
               )}
@@ -181,7 +184,7 @@ export default function NotificationBell() {
                   type="button"
                   onClick={() => markAllRead()}
                   title={t('notifications.markAllRead')}
-                  className="flex h-6 w-6 items-center justify-center rounded-lg text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
+                  className="flex h-6 w-6 items-center justify-center rounded-lg text-brand hover:bg-brand/10 transition-colors"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -198,7 +201,7 @@ export default function NotificationBell() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 hover:bg-raised transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -213,7 +216,7 @@ export default function NotificationBell() {
               <div className="px-3 py-2.5">
                 <div className="mb-2 flex items-center gap-1.5 px-1">
                   <Flame className="h-3 w-3 text-red-400" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-[#8696A0]">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-ink-4">
                     {t('tabs.hot')}
                   </p>
                 </div>
@@ -225,7 +228,7 @@ export default function NotificationBell() {
                         <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200 dark:bg-white/8" />
                         <div className="flex-1 space-y-1.5">
                           <div className="h-2.5 w-2/5 rounded bg-gray-200 dark:bg-white/8" />
-                          <div className="h-2 w-1/4 rounded bg-gray-100 dark:bg-white/5" />
+                          <div className="h-2 w-1/4 rounded bg-raised" />
                         </div>
                         <div className="h-6 w-8 shrink-0 rounded-lg bg-gray-200 dark:bg-white/8" />
                       </div>
@@ -247,7 +250,7 @@ export default function NotificationBell() {
                           key={lead.id}
                           type="button"
                           onClick={() => openLead(lead)}
-                          className="group flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-start transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
+                          className="group flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-start transition-colors hover:bg-raised"
                         >
                           {/* Avatar with score ring */}
                           <div className="relative shrink-0">
@@ -260,7 +263,7 @@ export default function NotificationBell() {
                                 : name.charAt(0).toUpperCase()}
                             </div>
                             <span
-                              className="absolute -bottom-0.5 -end-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-black text-white ring-[1.5px] ring-white dark:ring-[#111B21]"
+                              className="absolute -bottom-0.5 -end-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-black text-white ring-[1.5px] ring-white dark:ring-surface"
                               style={{ background: color }}
                             >
                               {isHot ? '🔥' : '✓'}
@@ -268,7 +271,7 @@ export default function NotificationBell() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12.5px] font-semibold text-gray-900 dark:text-white">
+                            <p className="truncate text-[12.5px] font-semibold text-ink">
                               {isPhone
                                 ? <span dir="ltr">{'‎'}{name}</span>
                                 : <bdi>{name}</bdi>}
@@ -297,7 +300,7 @@ export default function NotificationBell() {
             {items.length > 0 && (
               <div className="py-1.5">
                 {hotLeads.length > 0 && (
-                  <p className="px-4 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-[#8696A0]">
+                  <p className="px-4 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-widest text-ink-4">
                     {t('notifications.title')}
                   </p>
                 )}
@@ -310,25 +313,25 @@ export default function NotificationBell() {
                       type="button"
                       onClick={() => handleNotifClick(n)}
                       className={cn(
-                        'flex w-full items-start gap-3 px-4 py-2.5 text-start transition-colors hover:bg-gray-50 dark:hover:bg-white/5',
-                        !n.isRead && 'bg-[#25D366]/[0.04]',
+                        'flex w-full items-start gap-3 px-4 py-2.5 text-start transition-colors hover:bg-raised',
+                        !n.isRead && 'bg-brand/[0.04]',
                       )}
                     >
                       <span className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl', tone.bg)}>
                         <Icon className={cn('h-3.5 w-3.5', tone.icon)} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12.5px] font-semibold text-gray-900 dark:text-white">
+                        <p className="truncate text-[12.5px] font-semibold text-ink">
                           {pick(n.title)}
                         </p>
                         {n.body && (
-                          <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-gray-500 dark:text-[#8696A0]">
+                          <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-ink-3">
                             {pick(n.body)}
                           </p>
                         )}
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
-                        <span className="text-[10px] text-gray-400 dark:text-[#8696A0]/50">{timeAgo(n.createdAt)}</span>
+                        <span className="text-[10px] text-ink-4/50">{timeAgo(n.createdAt)}</span>
                         {!n.isRead && <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} />}
                       </div>
                     </button>
@@ -340,11 +343,11 @@ export default function NotificationBell() {
             {/* Empty state */}
             {!hasContent && (
               <div className="px-4 py-10 text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 dark:bg-white/5">
-                  <Bell className="h-5 w-5 text-gray-300 dark:text-[#8696A0]/50" />
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-raised">
+                  <Bell className="h-5 w-5 text-gray-300 dark:text-ink-3/50" />
                 </div>
-                <p className="text-sm font-semibold text-gray-700 dark:text-white">{t('notifications.empty')}</p>
-                <p className="mt-1 text-xs text-gray-400 dark:text-[#8696A0]/60">{t('notifications.emptyHint')}</p>
+                <p className="text-sm font-semibold text-ink-2">{t('notifications.empty')}</p>
+                <p className="mt-1 text-xs text-ink-4/60">{t('notifications.emptyHint')}</p>
               </div>
             )}
           </div>
@@ -353,7 +356,7 @@ export default function NotificationBell() {
           <button
             type="button"
             onClick={() => { setOpen(false); router.push('/leads'); }}
-            className="flex w-full items-center justify-center gap-1.5 border-t border-black/[0.04] dark:border-white/[0.05] px-4 py-2.5 text-[12px] font-semibold text-[#25D366] transition-colors hover:bg-[#25D366]/5"
+            className="flex w-full items-center justify-center gap-1.5 border-t border-black/[0.04] dark:border-white/[0.05] px-4 py-2.5 text-[12px] font-semibold text-brand transition-colors hover:bg-brand/5"
           >
             {t('notifications.viewAll')}
             <ChevronRight className={cn('h-3.5 w-3.5', isAr && 'rotate-180')} />

@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@crm/messaging-schema'],
+  // No `experimental.optimizePackageImports` here on purpose. It looks like an
+  // obvious win — 92 files import from lucide-react's barrel — but measured on
+  // this project it made Turbopack *slower* (cold route compile 4.9s → 6.4s),
+  // because Turbopack already resolves barrel exports natively and the option
+  // just adds a redundant rewrite pass. It is a webpack-era optimisation.
   async headers() {
     return [
       {

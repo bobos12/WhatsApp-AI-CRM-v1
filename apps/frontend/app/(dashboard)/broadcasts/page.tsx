@@ -18,11 +18,11 @@ import FriendlyError from '../../../components/ui/FriendlyError';
 import { classifyError } from '../../../lib/friendly-error';
 import { formatSchedule } from '../../../lib/schedule';
 import { cn } from '../../../lib/utils';
+import { PageHeader, MetricStrip } from '../../../components/ui/page';
 import {
   ALL_STATUSES, BroadcastActions, MEDIA_ICONS, STATUS_DOTS, STATUS_STYLES,
   RiskBadge, deliveryStats, useCountdownLabel, type BroadcastSummary as Broadcast,
 } from '../../../components/broadcasts/shared';
-import AccountHealthBanner from '../../../components/broadcasts/AccountHealthBanner';
 import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
 
 type BroadcastSortKey = 'name' | 'status' | 'recipientCount' | 'totalSent' | 'progress' | 'createdAt';
@@ -53,7 +53,7 @@ function WhenCell({ broadcast, now }: { broadcast: Broadcast; now: number }) {
         <span className="truncate">{formatSchedule(broadcast.scheduledAtLocal, broadcast.timezone)}</span>
       </span>
       {countdown && (
-        <p className={cn('mt-0.5 text-[11px]', countdown.overdue ? 'text-amber-500' : 'text-gray-400 dark:text-[#8696A0]/70')}>
+        <p className={cn('mt-0.5 text-[11px]', countdown.overdue ? 'text-amber-500' : 'text-ink-4/70')}>
           {countdown.label}
         </p>
       )}
@@ -65,13 +65,13 @@ function DeliveryCell({ broadcast }: { broadcast: Broadcast }) {
   const { t } = useTranslation('broadcasts');
   const { total, attempted, sentPct, failedPct, successRate } = deliveryStats(broadcast);
 
-  if (!total) return <span className="text-sm text-gray-400 dark:text-[#8696A0]/60">—</span>;
+  if (!total) return <span className="text-sm text-ink-4/60">—</span>;
 
   // Nothing has been attempted yet: show the size of the audience, not a 0% bar
   // that reads like a failure.
   if (broadcast.status === 'DRAFT' || broadcast.status === 'SCHEDULED') {
     return (
-      <span className="text-sm text-gray-500 dark:text-[#8696A0]">
+      <span className="text-sm text-ink-3">
         {t('delivery.queued', { count: total, defaultValue: '{{count}} queued' })}
       </span>
     );
@@ -80,17 +80,17 @@ function DeliveryCell({ broadcast }: { broadcast: Broadcast }) {
   return (
     <div className="min-w-[9rem]">
       <div
-        className="flex h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/10"
+        className="flex h-1.5 w-full overflow-hidden rounded-full bg-overlay"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={attempted}
       >
-        <div className="h-full bg-[#25D366] transition-all" style={{ width: `${sentPct}%` }} />
+        <div className="h-full bg-brand transition-all" style={{ width: `${sentPct}%` }} />
         <div className="h-full bg-red-400 transition-all" style={{ width: `${failedPct}%` }} />
       </div>
-      <p className="mt-1 text-[11px] tabular-nums text-gray-500 dark:text-[#8696A0]">
-        <span className="font-medium text-gray-900 dark:text-white">{broadcast.totalSent.toLocaleString()}</span>
+      <p className="mt-1 text-[11px] tabular-nums text-ink-3">
+        <span className="font-medium text-ink">{broadcast.totalSent.toLocaleString()}</span>
         {' / '}{total.toLocaleString()}
         {broadcast.totalFailed > 0 && (
           <span className="text-red-400">
@@ -98,7 +98,7 @@ function DeliveryCell({ broadcast }: { broadcast: Broadcast }) {
           </span>
         )}
         {successRate !== null && attempted === total && (
-          <span className="text-gray-400 dark:text-[#8696A0]/70"> · {successRate}%</span>
+          <span className="text-ink-4/70"> · {successRate}%</span>
         )}
       </p>
     </div>
@@ -108,8 +108,8 @@ function DeliveryCell({ broadcast }: { broadcast: Broadcast }) {
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
   return dir === 'asc'
-    ? <ArrowUp className="h-3 w-3 text-[#25D366]" />
-    : <ArrowDown className="h-3 w-3 text-[#25D366]" />;
+    ? <ArrowUp className="h-3 w-3 text-brand" />
+    : <ArrowDown className="h-3 w-3 text-brand" />;
 }
 
 export default function BroadcastsPage() {
@@ -271,7 +271,7 @@ export default function BroadcastsPage() {
       onClick={() => handleSort(k)}
       className={cn(
         'cursor-pointer select-none px-3 py-4 text-start text-xs font-semibold uppercase tracking-wider transition-colors lg:px-5 xl:px-6',
-        sortKey === k ? 'text-[#25D366]' : 'text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white',
+        sortKey === k ? 'text-brand' : 'text-ink-3 hover:text-ink',
         className,
       )}
     >
@@ -447,54 +447,32 @@ export default function BroadcastsPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-4 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,211,102,0.08),transparent_40%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <Megaphone className="h-3.5 w-3.5" />
-              {t('badge')}
-            </div>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
-              {t('subtitle')}
-            </p>
-          </div>
-          <Link
-            href="/broadcasts/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-[#25D366]/90 transition-colors self-start lg:self-auto"
-          >
-            <Plus className="h-4 w-4" />
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <Link href="/broadcasts/new" className="btn btn-primary">
+            <Plus aria-hidden="true" />
             {t('newBroadcast')}
           </Link>
-        </div>
-      </section>
+        }
+      />
 
-      {/* ── Account health ──
-          Above the stats on purpose: what the number can safely send today is
-          more decision-relevant than how many campaigns have ever been created. */}
-      <AccountHealthBanner />
-
-      {/* ── Stats cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label={t('stats.totalBroadcasts')} value={totals.total}    sub={t('stats.allCampaigns')} />
-        <StatCard label={t('stats.messagesSent')}    value={totals.sent}     sub={t('stats.cumulativeDeliveries')} highlight />
-        <StatCard label={t('stats.failed')}          value={totals.failed}   sub={t('stats.sendFailures')} error={totals.failed > 0} />
-        <StatCard
-          label={t('stats.inFlight')}
-          value={totals.scheduled + totals.sending + totals.drafts}
-          sub={t('stats.inFlightSub')}
-          pulse={totals.sending > 0}
-        />
-      </div>
+      <MetricStrip
+        items={[
+          { label: t('stats.totalBroadcasts'), value: totals.total, sub: t('stats.allCampaigns') },
+          { label: t('stats.messagesSent'), value: totals.sent, sub: t('stats.cumulativeDeliveries'), tone: 'brand' },
+          { label: t('stats.failed'), value: totals.failed, sub: t('stats.sendFailures'), tone: totals.failed > 0 ? 'danger' : undefined },
+          { label: t('stats.inFlight'), value: totals.scheduled + totals.sending + totals.drafts, sub: t('stats.inFlightSub'), live: totals.sending > 0 },
+        ]}
+      />
 
       {/* ── Why did messages fail? — friendly, actionable explanation ── */}
       {totals.failed > 0 && (
         waStatus === 'disconnected' ? (
           <FriendlyError classified={{ code: 'whatsappDisconnected', severity: 'error', values: {}, raw: '' }} />
         ) : (
-          <div className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/[0.07]">
+          <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/[0.07]">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
                 <Info className="h-5 w-5" />
@@ -524,10 +502,10 @@ export default function BroadcastsPage() {
       )}
 
       {/* ── Table ── */}
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-line">
           <div className="flex items-center gap-3">
             {/* Select-all for the card list, which has no header row of its own */}
             <label className="flex cursor-pointer items-center gap-2 md:hidden">
@@ -536,20 +514,20 @@ export default function BroadcastsPage() {
                 checked={allPageSelected}
                 ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                 onChange={toggleAll}
-                className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
               />
             </label>
-            <p className="text-xs text-gray-500 dark:text-[#8696A0]">
+            <p className="text-xs text-ink-3">
               {totalCount} {totalCount === 1 ? t('table.name').toLowerCase() : t('title').toLowerCase()}
               {selectedIds.size > 0 && (
-                <span className="ms-2 font-medium text-[#25D366]">· {selectedIds.size}</span>
+                <span className="ms-2 font-medium text-brand">· {selectedIds.size}</span>
               )}
             </p>
             {selectedIds.size > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="text-xs text-gray-500 dark:text-[#8696A0] hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="text-xs text-ink-3 hover:text-ink transition-colors"
               >
                 {t('common:actions.deselectAll')}
               </button>
@@ -558,20 +536,20 @@ export default function BroadcastsPage() {
 
           <div className="flex flex-1 items-center justify-end gap-2 sm:flex-none">
             <div className="relative flex-1 sm:w-56 sm:flex-none">
-              <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-[#8696A0]" />
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder={t('searchPlaceholder')}
-                className="h-9 w-full rounded-xl border border-gray-200 bg-gray-50 ps-9 pe-8 text-sm text-gray-900 outline-none transition-colors focus:border-[#25D366]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:placeholder:text-[#8696A0]"
+                className="field h-9 w-full ps-9 pe-8 transition-colors"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => { setSearch(''); setPage(1); }}
                   aria-label={t('clearFilters')}
-                  className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                  className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ink"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -584,14 +562,14 @@ export default function BroadcastsPage() {
               className={cn(
                 'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm transition-colors',
                 showFilters || advancedFilterCount > 0
-                  ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                  : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
+                  ? 'border-brand/40 bg-brand/10 text-brand'
+                  : 'border-line bg-raised text-ink-3 hover:bg-raised',
               )}
             >
               <SlidersHorizontal className="h-4 w-4" />
               <span className="hidden sm:inline">{t('common:actions.filter')}</span>
               {advancedFilterCount > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-slate-950">
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
                   {advancedFilterCount}
                 </span>
               )}
@@ -601,42 +579,42 @@ export default function BroadcastsPage() {
 
         {/* Advanced filter panel */}
         {showFilters && (
-          <div className="border-b border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-[#0B141A] px-4 sm:px-6 py-4">
+          <div className="border-b border-line bg-gray-100 dark:bg-canvas px-4 sm:px-6 py-4">
             <div className="flex flex-wrap items-end gap-3 sm:gap-4">
               <div className="w-full sm:w-auto">
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('common:labels.status')}</p>
+                <p className="mb-1.5 text-xs font-medium text-ink-3">{t('common:labels.status')}</p>
                 <select
                   value={filterStatus}
                   onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                  className="h-9 w-full sm:w-auto rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-9 w-full sm:w-auto"
                 >
                   <option value="">{t('allStatuses')}</option>
                   {ALL_STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
                 </select>
               </div>
               <div className="w-full sm:w-auto">
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('createdFrom')}</p>
+                <p className="mb-1.5 text-xs font-medium text-ink-3">{t('createdFrom')}</p>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                  className="h-9 w-full sm:w-auto rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-9 w-full sm:w-auto"
                 />
               </div>
               <div className="w-full sm:w-auto">
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('createdTo')}</p>
+                <p className="mb-1.5 text-xs font-medium text-ink-3">{t('createdTo')}</p>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                  className="h-9 w-full sm:w-auto rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#16A34A]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:focus:border-[#25D366]/50"
+                  className="field h-9 w-full sm:w-auto"
                 />
               </div>
               {advancedFilterCount > 0 && (
                 <button
                   type="button"
                   onClick={clearAdvancedFilters}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-white/10 px-3 text-sm text-gray-500 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-ink-3 hover:bg-raised transition-colors"
                 >
                   <X className="h-3.5 w-3.5" /> {t('clearFilters')}
                 </button>
@@ -653,21 +631,21 @@ export default function BroadcastsPage() {
                 <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-white/8" />
                 <div className="h-5 w-20 rounded-full bg-gray-100 dark:bg-white/8" />
                 <div className="flex gap-4">
-                  <div className="h-3 w-14 rounded bg-gray-50 dark:bg-white/5" />
-                  <div className="h-3 w-14 rounded bg-gray-50 dark:bg-white/5" />
+                  <div className="h-3 w-14 rounded bg-raised" />
+                  <div className="h-3 w-14 rounded bg-raised" />
                 </div>
               </div>
             ))
           ) : paginatedBroadcasts.length === 0 ? (
             <div className="px-4 py-16 text-center">
-              <Megaphone className="mx-auto mb-3 h-8 w-8 text-gray-400 dark:text-[#8696A0]/30" />
-              <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+              <Megaphone className="mx-auto mb-3 h-8 w-8 text-ink-4/30" />
+              <p className="text-sm text-ink-3">
                 {hasAnyFilter ? t('noResults') : t('noBroadcasts')}
               </p>
               {hasAnyFilter ? (
-                <button type="button" onClick={clearAdvancedFilters} className="mt-2 text-xs text-[#25D366] hover:underline">{t('clearFilters')}</button>
+                <button type="button" onClick={clearAdvancedFilters} className="mt-2 text-xs text-brand hover:underline">{t('clearFilters')}</button>
               ) : (
-                <Link href="/broadcasts/new" className="mt-2 inline-flex items-center gap-1 text-xs text-[#25D366] hover:underline">
+                <Link href="/broadcasts/new" className="mt-2 inline-flex items-center gap-1 text-xs text-brand hover:underline">
                   <Plus className="h-3 w-3" /> {t('noBroadcastsSubtitle')}
                 </Link>
               )}
@@ -678,7 +656,7 @@ export default function BroadcastsPage() {
                 key={broadcast.id}
                 className={cn(
                   'px-4 py-3 transition-colors',
-                  selectedIds.has(broadcast.id) && 'bg-[#25D366]/8',
+                  selectedIds.has(broadcast.id) && 'bg-brand/8',
                 )}
               >
                 {/* top row: checkbox + name + status */}
@@ -687,18 +665,18 @@ export default function BroadcastsPage() {
                     type="checkbox"
                     checked={selectedIds.has(broadcast.id)}
                     onChange={() => toggleSelect(broadcast.id)}
-                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-line-strong accent-brand"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
                         href={`/broadcasts/${broadcast.id}`}
-                        className="truncate text-sm font-semibold text-gray-900 hover:text-[#25D366] dark:text-white dark:hover:text-[#25D366]"
+                        className="truncate text-sm font-semibold text-gray-900 hover:text-brand dark:text-white dark:hover:text-brand"
                       >
                         {broadcast.name}
                       </Link>
                       {broadcast.mediaType && MEDIA_ICONS[broadcast.mediaType] && (
-                        <span className="inline-flex items-center rounded-full bg-[#25D366]/12 p-1 text-[#25D366]">
+                        <span className="inline-flex items-center rounded-full bg-brand/12 p-1 text-brand">
                           {(() => { const Icon = MEDIA_ICONS[broadcast.mediaType!]; return <Icon className="h-2.5 w-2.5" />; })()}
                         </span>
                       )}
@@ -706,11 +684,11 @@ export default function BroadcastsPage() {
                         <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[broadcast.status] ?? 'bg-gray-400')} />
                         {t(`status.${broadcast.status}`, { defaultValue: broadcast.status })}
                       </span>
-                      <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} />
+                      <RiskBadge canSend={(broadcast as any).preflight?.canSend} />
                     </div>
 
                     {/* meta row */}
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-[#8696A0]">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" /> {broadcast.recipientCount.toLocaleString()}
                       </span>
@@ -765,7 +743,7 @@ export default function BroadcastsPage() {
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#202C33]">
+              <tr className="border-b border-line bg-raised">
                 <th scope="col" className="w-10 px-3 py-4 lg:px-5 xl:px-6">
                   <span className="sr-only">Select</span>
                   <input
@@ -773,7 +751,7 @@ export default function BroadcastsPage() {
                     checked={allPageSelected}
                     ref={(el) => { if (el) el.indeterminate = somePageSelected; }}
                     onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                    className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                   />
                 </th>
                 <SortTh k="name"           label={t('table.campaign', { defaultValue: 'Campaign' })} />
@@ -781,43 +759,43 @@ export default function BroadcastsPage() {
                 <SortTh k="recipientCount" label={t('table.audience', { defaultValue: 'Audience' })} className="hidden xl:table-cell" />
                 <SortTh k="progress"       label={t('table.delivery', { defaultValue: 'Delivery' })} />
                 <SortTh k="createdAt"      label={t('table.when', { defaultValue: 'When' })} className="hidden lg:table-cell" />
-                <th scope="col" className="px-3 py-4 text-end text-xs font-semibold uppercase tracking-wider text-gray-500 lg:px-5 xl:px-6 dark:text-[#8696A0]">
+                <th scope="col" className="px-3 py-4 text-end text-xs font-semibold uppercase tracking-wider text-gray-500 lg:px-5 xl:px-6 dark:text-ink-3">
                   {t('table.actions')}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody className="divide-y divide-line">
               {loading ? (
                 [...Array(3)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-4 w-4 rounded bg-gray-100 dark:bg-white/8" /></td>
                     <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-4 w-40 rounded bg-gray-100 dark:bg-white/8" /></td>
                     <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-5 w-20 rounded-full bg-gray-100 dark:bg-white/8" /></td>
-                    <td className="hidden px-3 py-4 lg:px-5 xl:table-cell xl:px-6"><div className="h-3 w-8 rounded bg-gray-50 dark:bg-white/5" /></td>
-                    <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-3 w-8 rounded bg-gray-50 dark:bg-white/5" /></td>
-                    <td className="hidden px-3 py-4 lg:table-cell lg:px-5 xl:px-6"><div className="h-3 w-20 rounded bg-gray-50 dark:bg-white/5" /></td>
-                    <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-7 w-24 rounded bg-gray-50 dark:bg-white/5" /></td>
+                    <td className="hidden px-3 py-4 lg:px-5 xl:table-cell xl:px-6"><div className="h-3 w-8 rounded bg-raised" /></td>
+                    <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-3 w-8 rounded bg-raised" /></td>
+                    <td className="hidden px-3 py-4 lg:table-cell lg:px-5 xl:px-6"><div className="h-3 w-20 rounded bg-raised" /></td>
+                    <td className="px-3 py-4 lg:px-5 xl:px-6"><div className="h-7 w-24 rounded bg-raised" /></td>
                   </tr>
                 ))
               ) : paginatedBroadcasts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
-                    <Megaphone className="mx-auto mb-3 h-8 w-8 text-gray-400 dark:text-[#8696A0]/30" />
-                    <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                    <Megaphone className="mx-auto mb-3 h-8 w-8 text-ink-4/30" />
+                    <p className="text-sm text-ink-3">
                       {hasAnyFilter ? t('noResults') : t('noBroadcasts')}
                     </p>
                     {hasAnyFilter ? (
                       <button
                         type="button"
                         onClick={clearAdvancedFilters}
-                        className="mt-2 text-xs text-[#25D366] hover:underline"
+                        className="mt-2 text-xs text-brand hover:underline"
                       >
                         {t('clearFilters')}
                       </button>
                     ) : (
                       <Link
                         href="/broadcasts/new"
-                        className="mt-2 inline-flex items-center gap-1 text-xs text-[#25D366] hover:underline"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-brand hover:underline"
                       >
                         <Plus className="h-3 w-3" /> {t('noBroadcastsSubtitle')}
                       </Link>
@@ -831,8 +809,8 @@ export default function BroadcastsPage() {
                   <tr
                     key={broadcast.id}
                     className={cn(
-                      'transition-colors hover:bg-gray-50 dark:hover:bg-white/3',
-                      selectedIds.has(broadcast.id) && 'bg-[#25D366]/8',
+                      'transition-colors hover:bg-raised/60',
+                      selectedIds.has(broadcast.id) && 'bg-brand/8',
                     )}
                   >
                     <td className="px-3 py-3 lg:px-5 xl:px-6">
@@ -840,21 +818,21 @@ export default function BroadcastsPage() {
                         type="checkbox"
                         checked={selectedIds.has(broadcast.id)}
                         onChange={() => toggleSelect(broadcast.id)}
-                        className="h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-white/20 accent-[#25D366]"
+                        className="h-4 w-4 cursor-pointer rounded border-line-strong accent-brand"
                       />
                     </td>
                     <td className="max-w-[12rem] px-3 py-3 lg:px-5 xl:max-w-none xl:px-6">
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/broadcasts/${broadcast.id}`}
-                          className="truncate text-sm font-medium text-gray-900 hover:text-[#25D366] dark:text-white dark:hover:text-[#25D366]"
+                          className="truncate text-sm font-medium text-gray-900 hover:text-brand dark:text-white dark:hover:text-brand"
                         >
                           {broadcast.name}
                         </Link>
                         {MediaIcon && (
                           <span
                             title={broadcast.mediaType ?? undefined}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#25D366]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#25D366]"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/12 px-1.5 py-0.5 text-[10px] font-medium text-brand"
                           >
                             <MediaIcon className="h-2.5 w-2.5" />
                           </span>
@@ -873,11 +851,11 @@ export default function BroadcastsPage() {
                           <span className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOTS[broadcast.status] ?? 'bg-gray-400')} />
                           {t(`status.${broadcast.status}`, { defaultValue: broadcast.status })}
                         </span>
-                        <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} />
+                        <RiskBadge canSend={(broadcast as any).preflight?.canSend} />
                       </div>
                     </td>
                     <td className="hidden px-3 py-3 lg:px-5 xl:table-cell xl:px-6">
-                      <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-gray-500 dark:text-[#8696A0]">
+                      <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-ink-3">
                         <Users className="h-3.5 w-3.5 shrink-0 opacity-60" />
                         {broadcast.recipientCount.toLocaleString()}
                       </span>
@@ -885,7 +863,7 @@ export default function BroadcastsPage() {
                     <td className="px-3 py-3 lg:px-5 xl:px-6">
                       <DeliveryCell broadcast={broadcast} />
                     </td>
-                    <td className="hidden px-3 py-3 text-sm text-gray-500 lg:table-cell lg:px-5 xl:px-6 dark:text-[#8696A0]">
+                    <td className="hidden px-3 py-3 text-sm text-gray-500 lg:table-cell lg:px-5 xl:px-6 dark:text-ink-3">
                       <WhenCell broadcast={broadcast} now={now} />
                     </td>
                     <td className="px-3 py-3 lg:px-5 xl:px-6">
@@ -928,18 +906,18 @@ export default function BroadcastsPage() {
 
       {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
+        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white dark:bg-raised px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+          <span className="text-sm font-medium text-ink">
             {t('selectedCount', { count: selectedIds.size })}
           </span>
           <div className="h-5 w-px bg-gray-200 dark:bg-white/15" />
           {showBulkConfirm ? (
             <>
               <span className="text-xs text-red-300">{t('deleteConfirm.title')} {selectedIds.size}?</span>
-              <button type="button" onClick={handleBulkDelete} disabled={bulkDeleting} className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors">
+              <button type="button" onClick={handleBulkDelete} disabled={bulkDeleting} className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
                 {bulkDeleting ? t('status.SENDING') : t('deleteConfirm.confirm')}
               </button>
-              <button type="button" onClick={() => setShowBulkConfirm(false)} className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+              <button type="button" onClick={() => setShowBulkConfirm(false)} className="btn btn-secondary btn-sm">
                 {t('deleteConfirm.cancel')}
               </button>
             </>
@@ -948,7 +926,7 @@ export default function BroadcastsPage() {
               <button type="button" onClick={() => setShowBulkConfirm(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition-colors">
                 <Trash2 className="h-3.5 w-3.5" /> {t('common:actions.bulkDelete')}
               </button>
-              <button type="button" onClick={() => setSelectedIds(new Set())} className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs text-gray-500 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+              <button type="button" onClick={() => setSelectedIds(new Set())} className="btn btn-secondary btn-sm">
                 {t('common:actions.deselectAll')}
               </button>
             </>
@@ -981,10 +959,10 @@ function StatCard({
   highlight?: boolean; error?: boolean; pulse?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-3 sm:p-5">
-      <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.22em] text-gray-500 dark:text-[#8696A0] truncate">{label}</p>
+    <div className="rounded-xl border border-line bg-surface p-3 sm:p-5">
+      <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.22em] text-ink-3 truncate">{label}</p>
       <div className="mt-1.5 sm:mt-2 flex items-center gap-2">
-        <p className={cn('text-2xl sm:text-3xl font-semibold', highlight ? 'text-[#25D366]' : error ? 'text-red-400' : 'text-gray-900 dark:text-white')}>
+        <p className={cn('text-2xl font-semibold tabular-nums', highlight ? 'text-brand' : error ? 'text-red-400' : 'text-ink')}>
           {value}
         </p>
         {pulse && (
@@ -994,7 +972,7 @@ function StatCard({
           </span>
         )}
       </div>
-      <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-[#8696A0] truncate">{sub}</p>
+      <p className="mt-1 text-[10px] sm:text-xs text-ink-3 truncate">{sub}</p>
     </div>
   );
 }

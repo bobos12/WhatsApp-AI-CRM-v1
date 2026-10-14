@@ -391,7 +391,7 @@
     "placeholder": "Type a test message…"
   },
   "bot": {
-    "title": "Customer AI Bot",
+    "title": "AI Agent",
     "subtitle": "Your 24/7 WhatsApp representative. This is the single place to control how it talks, what it knows, who it answers, and when.",
     "masterOn": "Bot is ON",
     "masterOff": "Bot is OFF",
@@ -412,16 +412,56 @@
     "testNote": "The test uses your current unsaved settings. Save to apply them to the live bot.",
     "jumpTo": "Jump to",
     "sections": {
-      "connection":  { "title": "AI Connection",        "subtitle": "The AI provider and key that power the bot.",          "emoji": "🔌" },
-      "identity":    { "title": "Identity & Voice",      "subtitle": "Who the bot is and how it sounds.",                    "emoji": "🤖" },
-      "welcome":     { "title": "Welcome",               "subtitle": "The first thing a new customer sees.",                 "emoji": "👋" },
-      "knowledge":   { "title": "Knowledge",             "subtitle": "What the bot knows and is allowed to talk about.",     "emoji": "📚" },
-      "flow":        { "title": "Conversation & Sales",  "subtitle": "How it guides chats and moves customers to a result.", "emoji": "💬" },
-      "rules":       { "title": "Rules & Safety",        "subtitle": "What it must always do, and never do.",                "emoji": "🛡️" },
-      "audience":    { "title": "Who It Answers",        "subtitle": "Choose which customers the bot replies to.",           "emoji": "🎯" },
-      "schedule":    { "title": "When It Answers",       "subtitle": "Hours, pacing, and fallback replies.",                 "emoji": "⏰" },
-      "handoff":     { "title": "Human Handoff",         "subtitle": "When to stop the bot and pass the chat to a person.",  "emoji": "🤝" },
-      "advanced":    { "title": "Advanced",              "subtitle": "AI model, memory, variables and raw prompt override.", "emoji": "⚙️" }
+      "connection": {
+        "title": "AI Connection",
+        "subtitle": "The AI provider and key that power the bot.",
+        "emoji": "🔌"
+      },
+      "identity": {
+        "title": "Identity & Voice",
+        "subtitle": "Who the bot is and how it sounds.",
+        "emoji": "🤖"
+      },
+      "welcome": {
+        "title": "Welcome",
+        "subtitle": "The first thing a new customer sees.",
+        "emoji": "👋"
+      },
+      "knowledge": {
+        "title": "Knowledge",
+        "subtitle": "What the bot knows and is allowed to talk about.",
+        "emoji": "📚"
+      },
+      "flow": {
+        "title": "Conversation & Sales",
+        "subtitle": "How it guides chats and moves customers to a result.",
+        "emoji": "💬"
+      },
+      "rules": {
+        "title": "Rules & Safety",
+        "subtitle": "What it must always do, and never do.",
+        "emoji": "🛡️"
+      },
+      "audience": {
+        "title": "Who It Answers",
+        "subtitle": "Choose which customers the bot replies to.",
+        "emoji": "🎯"
+      },
+      "schedule": {
+        "title": "When It Answers",
+        "subtitle": "Hours, pacing, and fallback replies.",
+        "emoji": "⏰"
+      },
+      "handoff": {
+        "title": "Human Handoff",
+        "subtitle": "When to stop the bot and pass the chat to a person.",
+        "emoji": "🤝"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "subtitle": "AI model, memory, variables and raw prompt override.",
+        "emoji": "⚙️"
+      }
     },
     "connection": {
       "provider": "AI Provider",
@@ -459,10 +499,21 @@
     "addRule": "Add a rule",
     "rulePlaceholder": "e.g. Always reply in Arabic",
     "salesModes": {
-      "offLabel": "Just help",          "offDesc": "Answer questions only — no sales push",
-      "softLabel": "Gently suggest",    "softDesc": "Mention products naturally when relevant",
-      "hardLabel": "Actively sell",     "hardDesc": "Lead every chat toward a purchase",
-      "consultationLabel": "Consultative", "consultationDesc": "Understand needs first, then recommend"
-    }
+      "offLabel": "Just help",
+      "offDesc": "Answer questions only — no sales push",
+      "softLabel": "Gently suggest",
+      "softDesc": "Mention products naturally when relevant",
+      "hardLabel": "Actively sell",
+      "hardDesc": "Lead every chat toward a purchase",
+      "consultationLabel": "Consultative",
+      "consultationDesc": "Understand needs first, then recommend"
+    },
+    "discard": "Discard",
+    "live": "Live",
+    "off": "Off",
+    "testButton": "Test",
+    "templates": "Templates",
+    "unsavedBody": "Your changes apply to the bot once saved.",
+    "rawActive": "Override active"
   }
 }

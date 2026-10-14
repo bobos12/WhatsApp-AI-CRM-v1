@@ -243,5 +243,25 @@
   "yes": "Yes",
   "no": "No",
   "new": "New",
-  "required": "Required"
+  "required": "Required",
+  "palette": {
+    "placeholder": "Search people, chats, templates — or jump to a page",
+    "jump": "Go to",
+    "actions": "Create",
+    "preferences": "Preferences",
+    "newBroadcast": "New broadcast",
+    "addContact": "Add contact",
+    "importContacts": "Import contacts",
+    "newTemplate": "New template",
+    "toggleTheme": "Toggle dark mode",
+    "contacts": "Contacts",
+    "conversations": "Conversations",
+    "templates": "Templates",
+    "broadcasts": "Broadcasts",
+    "empty": "Nothing matches “{{query}}”",
+    "navigate": "Navigate",
+    "open": "Open",
+    "toggle": "Toggle",
+    "askAi": "Ask the AI assistant"
+  }
 }

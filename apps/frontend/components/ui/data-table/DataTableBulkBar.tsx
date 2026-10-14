@@ -34,7 +34,7 @@ export function DataTableBulkBar<TData>({
   }
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#202C33] px-5 py-3 shadow-xl z-40">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-line bg-raised px-5 py-3 shadow-xl z-40">
       <span className="text-sm font-medium text-white">
         {selectedCount} row{selectedCount !== 1 ? 's' : ''} selected
       </span>

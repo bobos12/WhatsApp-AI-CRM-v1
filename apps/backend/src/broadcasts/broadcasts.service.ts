@@ -7,10 +7,12 @@ import { logger } from '../lib/logger';
 import { ensureBroadcastWorker } from './broadcast.queue';
 import { claimAndEnqueue } from './broadcast.scheduler';
 import { type AudienceFilter } from './audience';
-import { runPreflight, verifyAccountGate, type PreflightResult } from './preflight.service';
-import { getAccountHealth } from './safety/account-health';
-import { PACING_PROFILES, type PacingProfile } from './safety/pacing';
-import { type ScoredRecipient } from './safety/contact-quality';
+import {
+  runPreflight,
+  verifyAccountGate,
+  type PreflightResult,
+  type PlannedRecipient,
+} from './preflight.service';
 
 ensureBroadcastWorker();
 
@@ -63,18 +65,23 @@ export interface BroadcastInput {
   smartSending?: boolean;
   batchSize?: number | null;
   batchIntervalMinutes?: number | null;
-  // ── Deliverability controls ─────────────────────────────────────────────────
-  /** CAREFUL | BALANCED | STEADY. Clamped to what account health allows. */
-  pacingProfile?: PacingProfile | null;
-  quietHoursEnabled?: boolean | null;
-  quietHoursStart?: number | null;
-  quietHoursEnd?: number | null;
-  /** Deliver this many first, then hold for a health check. */
-  pilotSize?: number | null;
-  /** Skip the recent-contact cooldown. Requires a stated reason in the UI. */
-  ignoreCooldown?: boolean;
-  /** Drop everyone who has never messaged us (the "send to warm contacts" fix). */
-  excludeCold?: boolean;
+  // ── Cloud API delivery ──────────────────────────────────────────────────────
+  /**
+   * The approved Meta template this campaign sends. Required: a broadcast
+   * audience is almost entirely outside the 24h window, where WhatsApp accepts
+   * nothing else.
+   */
+  templateId?: string | null;
+  /**
+   * Template variable name → contact field, e.g. `{"first_name": "name"}`.
+   *
+   * Keyed by NAME, not by position. `MessageTemplate.variables` holds the
+   * ordered names (`["first_name","order_id"]`) that correspond to Meta's
+   * `{{1}},{{2}}`, and the worker resolves each slot as
+   * `vars[mapping[name] ?? name]` — so an unmapped variable falls back to the
+   * personalization token of the same name and `{{name}}` just works.
+   */
+  templateVariables?: Record<string, string> | null;
   /** Drop anyone who already received the named broadcast (the duplicate fix). */
   excludeReceivedFrom?: string | null;
 }
@@ -107,13 +114,13 @@ const DEFAULT_BATCH_INTERVAL = 30;
  * at audience-build time. The worker then reads the next N pending rows in
  * `sortOrder` and needs no knowledge of how the ordering was reached.
  */
-function recipientRows(plan: ScoredRecipient[], variantCount: number) {
+function recipientRows(plan: PlannedRecipient[], variantCount: number) {
   const tenantId = getTenantContext()?.tenantId ?? null;
   return plan.map((recipient, index) => ({
     tenantId,
     phone: recipient.phone,
     contactId: recipient.contactId,
-    tier: recipient.tier,
+    tier: null,
     sortOrder: index,
     // Round-robin across variants. Interleaving rather than blocking means any
     // slice of the campaign — including a pilot — contains a mix of wordings,
@@ -132,13 +139,13 @@ function recipientRows(plan: ScoredRecipient[], variantCount: number) {
  * with no explanation, is how a safety feature gets mistaken for a bug and
  * worked around.
  */
-function skippedRows(excluded: ScoredRecipient[]) {
+function skippedRows(excluded: PlannedRecipient[]) {
   const tenantId = getTenantContext()?.tenantId ?? null;
   return excluded.map((recipient) => ({
     tenantId,
     phone: recipient.phone,
     contactId: recipient.contactId,
-    tier: recipient.tier,
+    tier: null,
     sortOrder: 1_000_000,
     variantIndex: 0,
     status: 'skipped',
@@ -148,15 +155,12 @@ function skippedRows(excluded: ScoredRecipient[]) {
 
 /** Columns derived from a pre-flight run. */
 function safetyColumns(preflight: PreflightResult) {
-  const { report } = preflight;
   return {
-    riskScore: report.riskScore,
-    riskLevel: report.riskLevel,
-    preflight: report as unknown as object,
+    // The risk score and pacing profile came from the ban-prevention engine that
+    // the Cloud API made unnecessary. The columns remain so historical campaigns
+    // still read back; new runs simply do not populate them.
+    preflight: preflight.report as unknown as object,
     contentHash: preflight.contentHash,
-    variants: preflight.variants as unknown as object,
-    pacingProfile: report.recommended.pacingProfile,
-    throttlePerHour: report.recommended.throttlePerHour,
   };
 }
 
@@ -165,45 +169,50 @@ function clampHour(value: number | null | undefined, fallback: number): number {
   return Math.min(23, Math.max(0, Math.floor(value)));
 }
 
-function requestedProfile(input: BroadcastInput): PacingProfile | undefined {
-  const value = input.pacingProfile;
-  return value && (PACING_PROFILES as string[]).includes(value) ? (value as PacingProfile) : undefined;
-}
 
 /** Run pre-flight for a create/update request. */
 async function preflightFor(input: BroadcastInput, excludeBroadcastId?: string): Promise<PreflightResult> {
   return runPreflight({
     message: input.message ?? '',
+    templateId: input.templateId ?? null,
     recipients: input.recipients,
     tag: input.tag,
     filter: input.filter,
     teamId: input.teamId,
     mediaUrl: input.mediaUrl,
     interactiveContent: input.interactiveContent ?? null,
-    pacingProfile: requestedProfile(input),
-    quietHoursEnabled: input.quietHoursEnabled !== false,
-    quietHoursStart: clampHour(input.quietHoursStart, 21),
-    quietHoursEnd: clampHour(input.quietHoursEnd, 9),
     excludeBroadcastId,
-    ignoreCooldown: input.ignoreCooldown === true,
-    excludeCold: input.excludeCold === true,
     excludeReceivedFrom: input.excludeReceivedFrom ?? undefined,
   });
 }
 
 /**
- * Columns for the delivery-safety controls the user set. Pilot size is clamped
- * to the audience so a "pilot of 100" on an 80-person campaign doesn't leave the
- * run permanently short of its own hold point.
+ * The template this campaign sends, plus its placeholder mapping.
+ *
+ * This replaced `deliveryColumns`, which wrote a `pilotSize` that nothing read:
+ * the worker that once honoured a pilot hold was part of the ban-prevention
+ * engine the Cloud API made unnecessary, and the column outlived it. A stored
+ * setting with no reader is worse than no setting — the UI showed "pilot: 100"
+ * and every recipient was sent to anyway.
+ *
+ * `templateVariables` is normalised to string→string so a number typed into the
+ * mapping cannot reach the Graph API as a non-string parameter, which Meta
+ * rejects for the whole send rather than for the one bad field.
  */
-function deliveryColumns(input: BroadcastInput, deliverable: number) {
-  const pilot = input.pilotSize != null ? Math.floor(Number(input.pilotSize)) : null;
+function templateColumns(input: BroadcastInput) {
+  const mapping = input.templateVariables ?? null;
+  const normalized =
+    mapping && typeof mapping === 'object'
+      ? Object.fromEntries(
+          Object.entries(mapping)
+            .filter(([, v]) => v != null && String(v).trim().length > 0)
+            .map(([k, v]) => [String(k), String(v)]),
+        )
+      : null;
+
   return {
-    quietHoursEnabled: input.quietHoursEnabled !== false,
-    quietHoursStart: clampHour(input.quietHoursStart, 21),
-    quietHoursEnd: clampHour(input.quietHoursEnd, 9),
-    pilotSize: pilot && pilot > 0 && pilot < deliverable ? pilot : null,
-    pilotCompletedAt: null,
+    templateId: input.templateId?.trim() || null,
+    templateVariables: normalized && Object.keys(normalized).length ? normalized : undefined,
   };
 }
 
@@ -237,16 +246,15 @@ function clampInt(value: number, min: number, max: number, fallback: number): nu
  * values come from the pre-flight recommendation. `nextBatchAt` remains owned by
  * the worker, which sets it after a batch finishes and there is more to send.
  */
-function smartColumns(preflight: PreflightResult) {
-  const { recommended } = preflight.report;
-  if (!recommended.smartSending) {
+function smartColumns(input: BroadcastInput) {
+  if (!input.smartSending) {
     return { smartSending: false, batchSize: null, batchIntervalMinutes: null, nextBatchAt: null };
   }
   return {
     smartSending: true,
-    batchSize: clampInt(recommended.batchSize, MIN_BATCH_SIZE, MAX_BATCH_SIZE, DEFAULT_BATCH_SIZE),
+    batchSize: clampInt(Number(input.batchSize ?? DEFAULT_BATCH_SIZE), MIN_BATCH_SIZE, MAX_BATCH_SIZE, DEFAULT_BATCH_SIZE),
     batchIntervalMinutes: clampInt(
-      recommended.batchIntervalMinutes,
+      Number(input.batchIntervalMinutes ?? DEFAULT_BATCH_INTERVAL),
       MIN_BATCH_INTERVAL, MAX_BATCH_INTERVAL, DEFAULT_BATCH_INTERVAL,
     ),
     nextBatchAt: null,
@@ -435,9 +443,25 @@ export class BroadcastsService {
     return result.report;
   }
 
-  /** Account-level health, independent of any one campaign. */
+  /**
+   * Channel health, as Meta reports it. This replaced a locally-computed
+   * "account health score" that tried to infer ban risk from send failures —
+   * guesswork that the Cloud API makes redundant, since Meta publishes the
+   * quality rating and messaging tier directly.
+   */
   static async getHealth() {
-    return getAccountHealth();
+    const { getChannel } = await import('../providers/channel.service');
+    const channel = await getChannel();
+    return {
+      connected: Boolean(channel.cloud),
+      qualityRating: channel.qualityRating,
+      messagingLimit: channel.messagingLimit,
+      restrictedUntil: channel.restrictedUntil,
+      displayPhoneNumber: channel.cloud?.displayPhoneNumber ?? null,
+      verifiedName: channel.cloud?.verifiedName ?? null,
+      lastSyncedAt: channel.lastSyncedAt,
+      lastSyncError: channel.lastSyncError,
+    };
   }
 
   static async createBroadcast(input: BroadcastInput) {
@@ -449,7 +473,10 @@ export class BroadcastsService {
       throw new HttpError(
         400,
         report.audience.requested > 0
-          ? 'None of the selected contacts can be messaged: they have opted out, are suppressed, were messaged too recently, or their numbers are not valid.'
+          // Names only reasons that still exist. Opt-out, suppression and the
+          // recent-contact cooldown were part of the deleted safety engine, and
+          // listing them sends people looking for settings that are not there.
+          ? 'None of the selected contacts can be messaged. Their numbers are not valid WhatsApp numbers, or they were all excluded as duplicates.'
           : 'At least one recipient, tag, or filter is required',
       );
     }
@@ -461,16 +488,16 @@ export class BroadcastsService {
         message: input.message,
         interactiveContent: input.interactiveContent ?? undefined,
         ...mediaColumns(input),
-        ...smartColumns(preflight),
+        ...smartColumns(input),
         ...safetyColumns(preflight),
-        ...deliveryColumns(input, plan.length),
+        ...templateColumns(input),
         status: schedule ? 'SCHEDULED' : 'DRAFT',
         type: schedule ? 'SCHEDULED' : 'IMMEDIATE',
         scheduledAt: schedule?.scheduledAt ?? null,
         timezone: schedule?.timezone ?? input.timezone?.trim() ?? 'UTC',
         description: input.tag ? `Tag: ${input.tag}` : null,
         recipients: {
-          create: [...recipientRows(plan, preflight.variants.length), ...skippedRows(excluded)],
+          create: [...recipientRows(plan, 1), ...skippedRows(excluded)],
         },
       },
       // Without this the response would claim `recipientCount: 0` for a
@@ -504,7 +531,10 @@ export class BroadcastsService {
       throw new HttpError(
         400,
         report.audience.requested > 0
-          ? 'None of the selected contacts can be messaged: they have opted out, are suppressed, were messaged too recently, or their numbers are not valid.'
+          // Names only reasons that still exist. Opt-out, suppression and the
+          // recent-contact cooldown were part of the deleted safety engine, and
+          // listing them sends people looking for settings that are not there.
+          ? 'None of the selected contacts can be messaged. Their numbers are not valid WhatsApp numbers, or they were all excluded as duplicates.'
           : 'At least one recipient, tag, or filter is required',
       );
     }
@@ -516,9 +546,9 @@ export class BroadcastsService {
         message: input.message,
         interactiveContent: input.interactiveContent ?? undefined,
         ...mediaColumns(input),
-        ...smartColumns(preflight),
+        ...smartColumns(input),
         ...safetyColumns(preflight),
-        ...deliveryColumns(input, plan.length),
+        ...templateColumns(input),
         status: schedule ? 'SCHEDULED' : 'DRAFT',
         type: schedule ? 'SCHEDULED' : 'IMMEDIATE',
         scheduledAt: schedule?.scheduledAt ?? null,
@@ -537,7 +567,7 @@ export class BroadcastsService {
         nextBatchAt: null,
         recipients: {
           deleteMany: {},
-          create: [...recipientRows(plan, preflight.variants.length), ...skippedRows(excluded)],
+          create: [...recipientRows(plan, 1), ...skippedRows(excluded)],
         },
       },
       include: { _count: { select: { recipients: DELIVERABLE_RECIPIENTS } } },
@@ -617,21 +647,14 @@ export class BroadcastsService {
       teamId: broadcast.teamId ?? undefined,
       mediaUrl: broadcast.mediaUrl,
       interactiveContent: (broadcast.interactiveContent ?? null) as object | null,
-      pacingProfile: broadcast.pacingProfile as PacingProfile,
-      quietHoursEnabled: broadcast.quietHoursEnabled,
-      quietHoursStart: broadcast.quietHoursStart,
-      quietHoursEnd: broadcast.quietHoursEnd,
       excludeBroadcastId: id,
       // Recipients already committed to this campaign are not re-cooldowned
       // against their own campaign.
-      ignoreCooldown: true,
     });
 
     await prisma.broadcast.updateMany({
       where: { id },
       data: {
-        riskScore: preflight.report.riskScore,
-        riskLevel: preflight.report.riskLevel,
         preflight: preflight.report as unknown as object,
       },
     });
@@ -675,10 +698,6 @@ export class BroadcastsService {
       teamId: source.teamId ?? undefined,
       mediaUrl: source.mediaUrl,
       interactiveContent: (source.interactiveContent ?? null) as object | null,
-      pacingProfile: source.pacingProfile as PacingProfile,
-      quietHoursEnabled: source.quietHoursEnabled,
-      quietHoursStart: source.quietHoursStart,
-      quietHoursEnd: source.quietHoursEnd,
       excludeBroadcastId: id,
     });
 
@@ -696,9 +715,6 @@ export class BroadcastsService {
         smartSending: source.smartSending,
         batchSize: source.batchSize,
         batchIntervalMinutes: source.batchIntervalMinutes,
-        quietHoursEnabled: source.quietHoursEnabled,
-        quietHoursStart: source.quietHoursStart,
-        quietHoursEnd: source.quietHoursEnd,
         ...safetyColumns(preflight),
         status: 'DRAFT',
         type: 'IMMEDIATE',
@@ -706,7 +722,7 @@ export class BroadcastsService {
         timezone: source.timezone,
         recipients: {
           create: [
-            ...recipientRows(preflight.plan, preflight.variants.length),
+            ...recipientRows(preflight.plan, 1),
             ...skippedRows(preflight.excluded),
           ],
         },
@@ -787,7 +803,7 @@ export class BroadcastsService {
       if (!gate.ok) {
         // A missing connection is not "the same reason" the breaker paused this
         // run — saying so would blame the account for the user's socket.
-        const connectionIssue = gate.code === 'NOT_CONNECTED' || gate.code === 'CONNECTING';
+        const connectionIssue = gate.code === 'NOT_CONNECTED';
         throw new HttpError(
           409,
           connectionIssue
@@ -942,10 +958,7 @@ export class BroadcastsService {
         healthPauseReason: true,
         pilotSize: true,
         pilotCompletedAt: true,
-        pacingProfile: true,
         throttlePerHour: true,
-        riskLevel: true,
-        riskScore: true,
         lastError: true,
       },
     });
@@ -967,7 +980,7 @@ export class BroadcastsService {
         where: { broadcastId: id, status: 'failed', errorCode: { not: null } },
         _count: { _all: true },
       }),
-      getAccountHealth().catch(() => null),
+      Promise.resolve(null),
       verifyAccountGate().catch(() => null),
     ]);
 
@@ -1010,20 +1023,8 @@ export class BroadcastsService {
        * the truth.
        */
       safety: {
-        /** Live account health — the number the ban risk actually turns on. */
-        health: health
-          ? {
-              score: health.score,
-              grade: health.grade,
-              confidence: health.confidence,
-              blocked: health.blocked,
-              blockedReason: health.blockedReason,
-              budget: health.budget,
-              failureRate: health.metrics.failureRate,
-              hardBlocks: health.metrics.hardBlocks,
-              coldReachoutBlocks: health.metrics.coldReachoutBlocks,
-            }
-          : null,
+        /** Meta's own view of the number — the signals that actually matter now. */
+        health,
         /** Why sending is (or is not) possible this second. */
         gate: gate ? { ok: gate.ok, code: gate.code, reason: gate.reason } : null,
         /** This campaign's own delivery record. */

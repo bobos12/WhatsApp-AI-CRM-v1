@@ -47,15 +47,15 @@ export default function SaveContactModal({ isOpen, onClose, phone, name, onSucce
       onClose={onClose}
       aria-label={t('form.createTitle')}
       overlayClassName="bg-black/50"
-      className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#111B21] shadow-lg"
+      className="w-full max-w-sm rounded-2xl bg-surface shadow-lg"
     >
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('form.createTitle')}</h2>
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 className="text-lg font-semibold text-ink">{t('form.createTitle')}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={tc('actions.close')}
-            className="text-gray-500 dark:text-[#8696A0] hover:text-gray-700 dark:hover:text-white"
+            className="text-ink-3 hover:text-ink"
           >
             <X className="h-5 w-5" />
           </button>
@@ -63,23 +63,23 @@ export default function SaveContactModal({ isOpen, onClose, phone, name, onSucce
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-white">{t('table.phone')}</label>
+            <label className="block text-sm font-medium text-ink-2">{t('table.phone')}</label>
             <input
               type="text"
               value={phone}
               disabled
-              className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] px-3 py-2 text-gray-900 dark:text-white opacity-60 cursor-not-allowed"
+              className="mt-1 block w-full rounded-lg border border-line bg-raised px-3 py-2 text-ink opacity-60 cursor-not-allowed"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-white">{t('table.name')}</label>
+            <label className="block text-sm font-medium text-ink-2">{t('table.name')}</label>
             <input
               type="text"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               placeholder={t('form.namePlaceholder')}
-              className="mt-1 block w-full rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+              className="mt-1 block w-full rounded-lg border border-line bg-white dark:bg-raised px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
@@ -93,14 +93,14 @@ export default function SaveContactModal({ isOpen, onClose, phone, name, onSucce
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 dark:border-white/10 bg-white dark:bg-transparent px-4 py-2 text-sm font-medium text-gray-700 dark:text-white transition hover:bg-gray-50 dark:hover:bg-white/5"
+              className="btn btn-secondary flex-1"
             >
               {t('form.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="flex-1 rounded-lg bg-[#25D366] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#25D366]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="btn btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
             >
               {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSaving ? t('form.save') + '...' : t('form.save')}

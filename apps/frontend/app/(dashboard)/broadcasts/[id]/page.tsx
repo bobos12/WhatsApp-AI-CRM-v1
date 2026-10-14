@@ -50,9 +50,9 @@ interface RecipientPage {
 }
 
 const RECIPIENT_STATUS_STYLES: Record<string, string> = {
-  sent:    'text-[#25D366]',
+  sent:    'text-brand',
   failed:  'text-red-400',
-  pending: 'text-gray-400 dark:text-[#8696A0]',
+  pending: 'text-ink-4',
   // Deliberately neutral, not red: an excluded recipient is the system working,
   // not a delivery that went wrong.
   skipped: 'text-amber-500 dark:text-amber-300/80',
@@ -106,9 +106,9 @@ const MEDIA_LABEL_KEYS: Record<string, string> = {
 function Fact({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-[#8696A0]">{label}</p>
-      <div className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{value}</div>
-      {hint && <p className="mt-0.5 text-[11px] text-gray-500 dark:text-[#8696A0]">{hint}</p>}
+      <p className="text-[11px] uppercase tracking-wider text-ink-3">{label}</p>
+      <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+      {hint && <p className="mt-0.5 text-[11px] text-ink-3">{hint}</p>}
     </div>
   );
 }
@@ -120,10 +120,10 @@ function Card({ title, icon: Icon, children, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111B21]">
+    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 sm:px-5 dark:border-white/10">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-          <Icon className="h-4 w-4 text-[#25D366]" />
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <Icon className="h-4 w-4 text-brand" />
           {title}
         </h2>
         {action}
@@ -158,21 +158,21 @@ function MediaPreview({ broadcast }: { broadcast: BroadcastDetail }) {
     return (
       <div className="space-y-1.5">
         <audio src={broadcast.mediaUrl} controls className="w-full" />
-        <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">{t('form.voiceHint')}</p>
+        <p className="text-[11px] text-ink-3">{t('form.voiceHint')}</p>
       </div>
     );
   }
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5">
       <div className="flex items-center gap-3 p-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#25D366]/15 text-[#25D366]">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand">
           <Icon className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+          <span className="block truncate text-sm font-medium text-ink">
             {broadcast.mediaFilename ?? t('detail.attachment', { defaultValue: 'Attachment' })}
           </span>
-          <span className="block truncate text-[11px] text-gray-500 dark:text-[#8696A0]">
+          <span className="block truncate text-[11px] text-ink-3">
             {broadcast.mediaMimeType ?? type}
           </span>
         </span>
@@ -181,17 +181,17 @@ function MediaPreview({ broadcast }: { broadcast: BroadcastDetail }) {
         <a
           href={broadcast.mediaUrl}
           download={broadcast.mediaFilename ?? true}
-          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-[#25D366] transition-colors hover:text-[#1FAA5C]"
+          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
           <Download className="h-3.5 w-3.5" />
           {t('detail.downloadFile', { defaultValue: 'Download' })}
         </a>
-        <div className="h-4 w-px bg-gray-200 dark:bg-white/10" />
+        <div className="h-4 w-px bg-overlay" />
         <a
           href={broadcast.mediaUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-[#25D366] transition-colors hover:text-[#1FAA5C]"
+          className="flex flex-1 items-center justify-center gap-1.5 py-1 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {t('detail.openFile', { defaultValue: 'Open' })}
@@ -489,8 +489,8 @@ export default function BroadcastDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center rounded-2xl border border-gray-200 bg-white py-24 dark:border-white/10 dark:bg-[#111B21]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#25D366]" />
+      <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-24 dark:border-white/10 dark:bg-surface">
+        <Loader2 className="h-6 w-6 animate-spin text-brand" />
       </div>
     );
   }
@@ -498,7 +498,7 @@ export default function BroadcastDetailPage() {
   if (loadError || !broadcast) {
     return (
       <div className="space-y-4">
-        <Link href="/broadcasts" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:text-[#8696A0] dark:hover:text-white">
+        <Link href="/broadcasts" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-ink-3 dark:hover:text-white">
           <BackIcon className="h-4 w-4" /> {t('back')}
         </Link>
         <FriendlyError error={loadError ?? new Error('Broadcast not found')} onRetry={fetchBroadcast} />
@@ -513,12 +513,11 @@ export default function BroadcastDetailPage() {
     <div className="space-y-5">
 
       {/* ── Header ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-[#111B21]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,211,102,0.08),transparent_40%)]" />
+      <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-surface">
         <div className="relative space-y-4">
           <Link
             href="/broadcasts"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-900 dark:text-[#8696A0] dark:hover:text-white"
+            className="inline-flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-ink-3 dark:hover:text-white"
           >
             <BackIcon className="h-4 w-4" /> {t('back')}
           </Link>
@@ -528,15 +527,15 @@ export default function BroadcastDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">{broadcast.name}</h1>
                 <StatusPill status={broadcast.status} size="md" />
-                <RiskBadge level={broadcast.riskLevel} score={broadcast.riskScore} size="md" />
+                <RiskBadge canSend={broadcast.preflight?.canSend} size="md" />
                 {MediaIcon && broadcast.mediaType && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#25D366]/12 px-2 py-1 text-[11px] font-medium text-[#25D366]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand/12 px-2 py-1 text-[11px] font-medium text-brand">
                     <MediaIcon className="h-3 w-3" />
                     {t(MEDIA_LABEL_KEYS[broadcast.mediaType] ?? '', { defaultValue: broadcast.mediaType })}
                   </span>
                 )}
               </div>
-              <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
+              <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
                 {t('detail.createdOn', {
                   date: new Date(broadcast.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
                   defaultValue: 'Created {{date}}',
@@ -579,7 +578,7 @@ export default function BroadcastDetailPage() {
 
       {/* ── Why it failed ── */}
       {broadcast.lastError && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-300/60 bg-red-50 p-4 dark:border-red-500/25 dark:bg-red-500/[0.07]">
+        <div className="flex items-start gap-3 rounded-xl border border-red-300/60 bg-red-50 p-4 dark:border-red-500/25 dark:bg-red-500/[0.07]">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-900 dark:text-red-200">
@@ -615,12 +614,12 @@ export default function BroadcastDetailPage() {
                   <p className="whitespace-pre-wrap break-words">{broadcast.message}</p>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                <p className="text-sm text-ink-3">
                   {t('detail.noMessageBody', { defaultValue: 'No text — the attachment is sent on its own.' })}
                 </p>
               )}
               {/\{\{\s*\w+\s*\}\}/.test(broadcast.message) && (
-                <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">{t('form.variablesHint')}</p>
+                <p className="text-[11px] text-ink-3">{t('form.variablesHint')}</p>
               )}
               {broadcast.interactiveContent?.kind ? (
                 <p className="inline-flex items-center gap-1.5 rounded-lg bg-blue-400/10 px-2 py-1 text-[11px] font-medium text-blue-500 dark:text-blue-300">
@@ -640,7 +639,7 @@ export default function BroadcastDetailPage() {
                   type="button"
                   onClick={exportFailed}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-[#8696A0] dark:hover:bg-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-ink-3 dark:hover:bg-white/10"
                 >
                   <Download className="h-3.5 w-3.5" />
                   {t('detail.exportFailed', { defaultValue: 'Export failed' })}
@@ -659,8 +658,8 @@ export default function BroadcastDetailPage() {
                     className={cn(
                       'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                       statusFilter === tab.key
-                        ? 'bg-[#25D366]/15 text-[#25D366]'
-                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-[#8696A0] dark:hover:bg-white/5 dark:hover:text-white',
+                        ? 'bg-brand/15 text-brand'
+                        : 'text-gray-500 hover:bg-gray-100 hover:text-ink-3 dark:hover:bg-white/5 dark:hover:text-white',
                     )}
                   >
                     {tab.label}
@@ -672,21 +671,21 @@ export default function BroadcastDetailPage() {
               </div>
 
               <div className="relative sm:w-52">
-                <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-[#8696A0]" />
+                <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
                 <input
                   type="text"
                   inputMode="tel"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('detail.searchPhone', { defaultValue: 'Search phone…' })}
-                  className="h-9 w-full rounded-xl border border-gray-200 bg-gray-50 ps-9 pe-8 text-sm text-gray-900 outline-none transition-colors focus:border-[#25D366]/50 dark:border-white/10 dark:bg-[#202C33] dark:text-white dark:placeholder:text-[#8696A0]"
+                  className="field h-9 w-full ps-9 pe-8 transition-colors"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch('')}
                     aria-label={t('clearFilters')}
-                    className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                    className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ink"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -696,36 +695,36 @@ export default function BroadcastDetailPage() {
 
             {/* rows — a two-column list, not a table: there is nothing to sort */}
             {recipientsLoading ? (
-              <div className="divide-y divide-gray-100 dark:divide-white/5">
+              <div className="divide-y divide-line">
                 {[...Array(4)].map((_, i) => (
                   <div key={i} className="flex animate-pulse items-center justify-between px-4 py-3 sm:px-5">
                     <div className="h-4 w-32 rounded bg-gray-100 dark:bg-white/8" />
-                    <div className="h-4 w-16 rounded bg-gray-50 dark:bg-white/5" />
+                    <div className="h-4 w-16 rounded bg-raised" />
                   </div>
                 ))}
               </div>
             ) : !recipients?.rows.length ? (
               <div className="px-4 py-12 text-center">
-                <Users className="mx-auto mb-3 h-8 w-8 text-gray-400 dark:text-[#8696A0]/30" />
-                <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                <Users className="mx-auto mb-3 h-8 w-8 text-ink-4/30" />
+                <p className="text-sm text-ink-3">
                   {t('detail.noRecipientsMatch', { defaultValue: 'No recipients match this filter.' })}
                 </p>
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-white/5">
+              <ul className="divide-y divide-line">
                 {recipients.rows.map((recipient) => {
                   const Icon = RECIPIENT_STATUS_ICONS[recipient.status] ?? CircleDashed;
                   return (
                     <li key={recipient.id} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
                       <span className="min-w-0">
-                        <span className="block truncate font-mono text-sm text-gray-900 dark:text-white" dir="ltr">
+                        <span className="block truncate font-mono text-sm text-ink" dir="ltr">
                           {recipient.phone}
                         </span>
                         {/* Why this one did not go out, in plain words. A phone
                             number next to "Excluded" with no reason is the kind
                             of gap that gets a safety feature reported as a bug. */}
                         {(recipient.skipReason || recipient.errorCode) && (
-                          <span className="mt-0.5 block truncate text-[11px] text-gray-500 dark:text-[#8696A0]">
+                          <span className="mt-0.5 block truncate text-[11px] text-ink-3">
                             {recipient.skipReason
                               ? t(`skipReason.${recipient.skipReason}`, { defaultValue: SKIP_REASON_FALLBACK[recipient.skipReason] ?? recipient.skipReason })
                               : t(`errorCode.${recipient.errorCode}`, { defaultValue: ERROR_CODE_FALLBACK[recipient.errorCode!] ?? recipient.errorCode! })}
@@ -734,7 +733,7 @@ export default function BroadcastDetailPage() {
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
                         {recipient.repliedAt && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#25D366]/12 px-2 py-0.5 text-[10px] font-medium text-[#25D366]">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-brand/12 px-2 py-0.5 text-[10px] font-medium text-brand">
                             <MessageSquare className="h-2.5 w-2.5" />
                             {t('detail.replied', { defaultValue: 'Replied' })}
                           </span>
@@ -782,7 +781,7 @@ export default function BroadcastDetailPage() {
               <div className="p-4 sm:p-5">
                 {reassessable && (
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] text-gray-500 dark:text-[#8696A0]">
+                    <p className="text-[11px] text-ink-3">
                       {refreshingPreflight
                         ? t('safety.reassessing', { defaultValue: 'Checking against your account right now…' })
                         : preflightAt
@@ -852,28 +851,28 @@ export default function BroadcastDetailPage() {
                 <SmartBatchProgress broadcast={broadcast} now={now} />
               )}
               {!stats?.total ? (
-                <p className="text-sm text-gray-500 dark:text-[#8696A0]">
+                <p className="text-sm text-ink-3">
                   {t('detail.nothingToDeliver', { defaultValue: 'No recipients yet.' })}
                 </p>
               ) : (
                 <>
                   <div
-                    className="flex h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/10"
+                    className="flex h-2 w-full overflow-hidden rounded-full bg-overlay"
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={stats.total}
                     aria-valuenow={stats.attempted}
                   >
-                    <div className="h-full bg-[#25D366] transition-all" style={{ width: `${stats.sentPct}%` }} />
+                    <div className="h-full bg-brand transition-all" style={{ width: `${stats.sentPct}%` }} />
                     <div className="h-full bg-red-400 transition-all" style={{ width: `${stats.failedPct}%` }} />
                   </div>
-                  <div className="flex flex-wrap justify-between gap-2 text-xs tabular-nums text-gray-500 dark:text-[#8696A0]">
+                  <div className="flex flex-wrap justify-between gap-2 text-xs tabular-nums text-ink-3">
                     <span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{stats.attempted.toLocaleString()}</span>
+                      <span className="font-semibold text-ink">{stats.attempted.toLocaleString()}</span>
                       {' / '}{stats.total.toLocaleString()}
                     </span>
                     {stats.successRate !== null && (
-                      <span>{t('stats.deliveryRate')}: <span className="font-semibold text-[#25D366]">{stats.successRate}%</span></span>
+                      <span>{t('stats.deliveryRate')}: <span className="font-semibold text-brand">{stats.successRate}%</span></span>
                     )}
                   </div>
                 </>
@@ -910,12 +909,12 @@ function StatCard({ label, value, tone, pulse }: {
   pulse?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-[#111B21]">
-      <p className="truncate text-[10px] uppercase tracking-[0.18em] text-gray-500 sm:text-xs dark:text-[#8696A0]">{label}</p>
+    <div className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-surface">
+      <p className="truncate text-[10px] uppercase tracking-[0.18em] text-gray-500 sm:text-xs dark:text-ink-3">{label}</p>
       <div className="mt-1.5 flex items-center gap-2">
         <p className={cn(
-          'text-2xl font-semibold tabular-nums sm:text-3xl',
-          tone === 'success' ? 'text-[#25D366]' : tone === 'error' ? 'text-red-400' : 'text-gray-900 dark:text-white',
+          'text-2xl font-semibold tabular-nums',
+          tone === 'success' ? 'text-brand' : tone === 'error' ? 'text-red-400' : 'text-ink',
         )}>
           {value.toLocaleString()}
         </p>

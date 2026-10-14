@@ -36,6 +36,13 @@ export interface MetaOutboundParams {
   };
   replyToExternalId?: string | null;
   replyToPreview?: string | null;
+  /**
+   * Pre-built content for kinds this builder cannot infer from text/media alone
+   * — templates and interactive messages. When present it wins outright, so the
+   * CRM stores what was actually sent rather than a flattened text
+   * approximation of it.
+   */
+  contentOverride?: MessageContent;
 }
 
 // ── Media helpers ─────────────────────────────────────────────────────────────
@@ -222,7 +229,9 @@ export function buildMetaOutbound(params: MetaOutboundParams): NormalizedMessage
   const now = new Date().toISOString();
 
   let content: MessageContent;
-  if (params.media?.url || params.media?.mimetype) {
+  if (params.contentOverride) {
+    content = params.contentOverride;
+  } else if (params.media?.url || params.media?.mimetype) {
     const mime = params.media.mimetype ?? 'application/octet-stream';
     let mediaType: MediaType = 'document';
     if (mime.startsWith('image/')) mediaType = mime === 'image/webp' ? 'sticker' : 'image';

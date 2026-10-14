@@ -45,20 +45,20 @@ const STAGE_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   OPEN: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
   PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-  ON_HOLD: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-[#8696A0]',
-  RESOLVED: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-[#8696A0]',
+  ON_HOLD: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-ink-3',
+  RESOLVED: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-ink-3',
 };
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: React.ElementType; label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-4 shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+    <div className="rounded-xl border border-line bg-surface p-4 ">
       <div className="flex items-center gap-3">
         <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', accent)}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-lg font-semibold text-gray-900 dark:text-white">{value}</p>
-          <p className="truncate text-xs text-gray-500 dark:text-[#8696A0]">{label}</p>
+          <p className="truncate text-lg font-semibold text-ink">{value}</p>
+          <p className="truncate text-xs text-ink-3">{label}</p>
         </div>
       </div>
     </div>
@@ -69,9 +69,9 @@ function SectionCard({ title, icon: Icon, iconColor, action, children }: {
   title: string; icon: React.ElementType; iconColor: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-      <div className="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-white/5 px-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+    <section className="overflow-hidden rounded-xl border border-line bg-surface ">
+      <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink">
           <Icon className={cn('h-4 w-4', iconColor)} />
           {title}
         </div>
@@ -142,12 +142,12 @@ export default function ContactProfilePage() {
 
   if (error || !contact) {
     return (
-      <div className="mx-auto max-w-md rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-8 text-center">
-        <p className="text-sm text-gray-600 dark:text-[#8696A0]">{error || t('contactDetails')}</p>
+      <div className="mx-auto max-w-md rounded-xl border border-line bg-surface p-8 text-center">
+        <p className="text-sm text-ink-3">{error || t('contactDetails')}</p>
         <button
           type="button"
           onClick={() => router.push('/contacts')}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
+          className="btn btn-primary mt-4 inline-flex"
         >
           <BackIcon className="h-4 w-4" />
           {t('title')}
@@ -162,26 +162,26 @@ export default function ContactProfilePage() {
       <button
         type="button"
         onClick={() => router.push('/contacts')}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-[#8696A0] dark:hover:text-white transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-ink-3 dark:hover:text-white transition-colors"
       >
         <BackIcon className="h-4 w-4" />
         {t('title')}
       </button>
 
       {/* Profile header */}
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-[#25D366]/5 via-white to-white dark:from-[#25D366]/10 dark:via-[#111B21] dark:to-[#111B21] shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
+      <section className="overflow-hidden rounded-xl border border-line bg-gradient-to-br from-brand/5 via-white to-white dark:from-brand/10 dark:via-surface dark:to-surface ">
         <div className="relative p-5 sm:p-6">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#25D366]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/10 blur-3xl" />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Avatar src={contact.customFields?.avatarUrl} name={name} size={64} />
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold text-gray-900 dark:text-white">
+                <h1 className="truncate text-2xl font-semibold text-ink">
                   {name.startsWith('+')
                     ? <span dir="ltr">{'‎'}{name}</span>
                     : <bdi>{name}</bdi>}
                 </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-[#8696A0]">
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-3">
                   <span dir="ltr" className="inline-flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5" /> {'‎'}{formatPhone(contact.phone)}
                   </span>
@@ -196,21 +196,21 @@ export default function ContactProfilePage() {
               <button
                 type="button"
                 onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#25D366]/30 transition hover:bg-[#25D366]/90"
+                className="btn btn-primary inline-flex"
               >
                 <MessageSquare className="h-4 w-4" />
                 {t('openConversation')}
               </button>
               <Link
                 href={`/deals?contactId=${encodeURIComponent(contact.id)}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/10 bg-white/70 dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-[#E9EDEF] transition hover:border-[#25D366]/40 hover:text-[#1FAA5C]"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/70 dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-2 transition hover:border-brand/40 hover:text-brand-strong"
               >
                 <BriefcaseBusiness className="h-4 w-4" />
                 {t('newDeal')}
               </Link>
               <Link
                 href={`/tasks?contactId=${encodeURIComponent(contact.id)}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/10 bg-white/70 dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-[#E9EDEF] transition hover:border-[#25D366]/40 hover:text-[#1FAA5C]"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/70 dark:bg-white/5 px-4 py-2.5 text-sm font-medium text-ink-2 transition hover:border-brand/40 hover:text-brand-strong"
               >
                 <CheckSquare className="h-4 w-4" />
                 {t('newTask')}
@@ -225,7 +225,7 @@ export default function ContactProfilePage() {
         <StatCard icon={BriefcaseBusiness} label={t('dealsSection')} value={String(details?.deals?.length ?? 0)} accent="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400" />
         <StatCard icon={BriefcaseBusiness} label={t('profile.dealValue')} value={`$${totalDealValue.toLocaleString()}`} accent="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400" />
         <StatCard icon={CheckSquare} label={t('profile.openTasks')} value={String(openTasks)} accent="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400" />
-        <StatCard icon={MessageSquare} label={t('conversationsSection')} value={String(details?.conversations?.length ?? 0)} accent="bg-[#25D366]/15 text-[#1FAA5C]" />
+        <StatCard icon={MessageSquare} label={t('conversationsSection')} value={String(details?.conversations?.length ?? 0)} accent="bg-brand/15 text-brand-strong" />
       </div>
 
       {/* Two-column content */}
@@ -237,7 +237,7 @@ export default function ContactProfilePage() {
             icon={BriefcaseBusiness}
             iconColor="text-amber-500"
             action={
-              <Link href={`/deals?contactId=${encodeURIComponent(contact.id)}`} className="inline-flex items-center gap-1 text-xs font-semibold text-[#25D366] hover:underline">
+              <Link href={`/deals?contactId=${encodeURIComponent(contact.id)}`} className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
                 <PlusCircle className="h-3.5 w-3.5" /> {t('newDeal')}
               </Link>
             }
@@ -245,10 +245,10 @@ export default function ContactProfilePage() {
             {details?.deals?.length ? (
               <div className="space-y-2">
                 {details.deals.map((deal) => (
-                  <div key={deal.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] px-3 py-2.5">
+                  <div key={deal.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{deal.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-[#8696A0]">${Number(deal.value || 0).toLocaleString()}</p>
+                      <p className="truncate text-sm font-medium text-ink">{deal.title}</p>
+                      <p className="text-xs text-ink-3">${Number(deal.value || 0).toLocaleString()}</p>
                     </div>
                     <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold', STAGE_COLORS[deal.stage] ?? STAGE_COLORS.NEW)}>
                       {deal.stage}
@@ -257,16 +257,16 @@ export default function ContactProfilePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 dark:text-[#8696A0]">{t('noDeals')}</p>
+              <p className="text-sm text-ink-4">{t('noDeals')}</p>
             )}
           </SectionCard>
 
           <SectionCard
             title={t('tasksSection')}
             icon={CheckSquare}
-            iconColor="text-[#25D366]"
+            iconColor="text-brand"
             action={
-              <Link href={`/tasks?contactId=${encodeURIComponent(contact.id)}`} className="inline-flex items-center gap-1 text-xs font-semibold text-[#25D366] hover:underline">
+              <Link href={`/tasks?contactId=${encodeURIComponent(contact.id)}`} className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
                 <PlusCircle className="h-3.5 w-3.5" /> {t('newTask')}
               </Link>
             }
@@ -274,23 +274,23 @@ export default function ContactProfilePage() {
             {details?.tasks?.length ? (
               <div className="space-y-2">
                 {details.tasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] px-3 py-2.5">
+                  <div key={task.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{task.title}</p>
+                      <p className="truncate text-sm font-medium text-ink">{task.title}</p>
                       {task.dueDate && (
-                        <p className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-[#8696A0]">
+                        <p className="inline-flex items-center gap-1 text-xs text-ink-3">
                           <Clock className="h-3 w-3" /> {new Date(task.dueDate).toLocaleDateString()}
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 rounded-full bg-gray-200/80 dark:bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-[#8696A0]">
+                    <span className="shrink-0 rounded-full bg-gray-200/80 dark:bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-ink-3">
                       {task.status}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 dark:text-[#8696A0]">{t('noTasks')}</p>
+              <p className="text-sm text-ink-4">{t('noTasks')}</p>
             )}
           </SectionCard>
 
@@ -302,7 +302,7 @@ export default function ContactProfilePage() {
               <button
                 type="button"
                 onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
-                className="text-xs font-semibold text-[#25D366] hover:underline"
+                className="text-xs font-semibold text-brand hover:underline"
               >
                 {t('openConversation')}
               </button>
@@ -315,25 +315,25 @@ export default function ContactProfilePage() {
                     key={conv.id}
                     type="button"
                     onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] px-3 py-2.5 text-start transition hover:border-[#25D366]/40 hover:bg-[#25D366]/5"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3 py-2.5 text-start transition hover:border-brand/40 hover:bg-brand/5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-gray-700 dark:text-[#E9EDEF]">{conv.lastMessage || t('timeline.noMessages')}</p>
+                      <p className="truncate text-sm text-ink-2">{conv.lastMessage || t('timeline.noMessages')}</p>
                       {conv.lastMessageAt && (
-                        <p className="text-xs text-gray-400 dark:text-[#8696A0]">{new Date(conv.lastMessageAt).toLocaleString()}</p>
+                        <p className="text-xs text-ink-4">{new Date(conv.lastMessageAt).toLocaleString()}</p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', STATUS_COLORS[conv.status] ?? STATUS_COLORS.ON_HOLD)}>
                         {conv.status}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-gray-300 dark:text-[#5C6970]" />
+                      <ChevronRight className="h-4 w-4 text-gray-300 dark:text-ink-4" />
                     </div>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 dark:text-[#8696A0]">{t('noLinkedConversations')}</p>
+              <p className="text-sm text-ink-4">{t('noLinkedConversations')}</p>
             )}
           </SectionCard>
         </div>
@@ -346,8 +346,8 @@ export default function ContactProfilePage() {
 
           <SectionCard title={t('form.notes')} icon={StickyNote} iconColor="text-amber-500">
             {contact.notes
-              ? <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-[#E9EDEF]">{contact.notes}</p>
-              : <p className="text-sm text-gray-400 dark:text-[#8696A0]">—</p>}
+              ? <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-2">{contact.notes}</p>
+              : <p className="text-sm text-ink-4">—</p>}
           </SectionCard>
 
           <SectionCard title={t('timeline.title')} icon={Clock} iconColor="text-blue-500">

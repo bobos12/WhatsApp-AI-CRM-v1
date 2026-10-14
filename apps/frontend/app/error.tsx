@@ -27,15 +27,15 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-[#0B141A]">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-[#111B21]">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-canvas">
+      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-surface">
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
           <AlertTriangle className="h-7 w-7 text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h1 className="text-xl font-semibold text-ink">
           Something went wrong
         </h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-[#8696A0]">
+        <p className="mt-2 text-sm text-ink-3">
           An unexpected error occurred. You can try again or return to the dashboard.
         </p>
         {error.message && (
@@ -47,7 +47,7 @@ export default function GlobalError({
           </pre>
         )}
         {error.digest && (
-          <p className="mt-2 font-mono text-[10px] text-gray-400 dark:text-[#8696A0]">
+          <p className="mt-2 font-mono text-[10px] text-ink-4">
             ref: {error.digest}
           </p>
         )}
@@ -55,7 +55,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => reset()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#25D366]/90 focus:outline-none focus:ring-4 focus:ring-[#25D366]/25"
+            className="btn btn-primary inline-flex justify-center"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Try again

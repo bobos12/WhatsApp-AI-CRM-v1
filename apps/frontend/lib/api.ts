@@ -64,6 +64,15 @@ export function stopImpersonation() {
   invalidateSessionCache();
 }
 
+let reloginStarted = false;
+function forceRelogin() {
+  if (reloginStarted || typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
+  reloginStarted = true;
+  window.localStorage.removeItem(IMPERSONATION_TOKEN_KEY);
+  window.localStorage.removeItem('refreshToken');
+  void import('next-auth/react').then(({ signOut }) => signOut({ callbackUrl: '/login' }));
+}
+
 async function getAccessToken() {
   // When impersonating, the tenant-scoped token wins over the operator's own
   // session so every request is fenced to the impersonated tenant.
@@ -143,6 +152,11 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
       });
     } else if (typeof window !== 'undefined') {
       window.localStorage.removeItem('accessToken');
+      // The session holds a token the backend no longer accepts (signed with an
+      // old secret, or a stale impersonation token) and it cannot be refreshed.
+      // Without this, every screen keeps firing requests that fail with
+      // "Invalid token"; a fresh login is the only way out.
+      if (response.status === 401) forceRelogin();
     }
   }
 

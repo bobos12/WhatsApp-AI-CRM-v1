@@ -90,14 +90,10 @@ export default function TagsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6">
+      <section className="relative">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 dark:bg-[#25D366]/15 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-            <Hash className="h-3.5 w-3.5" />
-            {t('chat:details.tags')}
-          </div>
-          <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('common:labels.tags')}</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-[#8696A0]">
+          <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('common:labels.tags')}</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
             {t('chat:details.tags')}
           </p>
         </div>
@@ -105,10 +101,10 @@ export default function TagsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.5fr]">
         {/* Left: tag management */}
-        <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 space-y-4">
+        <section className="rounded-xl border border-line bg-surface p-5 space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('common:labels.tags')}</h2>
-            <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('common:actions.filter')}</p>
+            <h2 className="text-base font-semibold text-ink">{t('common:labels.tags')}</h2>
+            <p className="text-xs text-ink-3">{t('common:actions.filter')}</p>
           </div>
 
           {/* Create tag */}
@@ -119,7 +115,7 @@ export default function TagsPage() {
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && createTag()}
               placeholder={t('chat:details.addTag')}
-              className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#111B21] px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#25D366]/50"
+              className="field w-full"
             />
             <div className="flex items-center gap-2 flex-wrap">
               {COLOR_PRESETS.map((c) => (
@@ -127,7 +123,7 @@ export default function TagsPage() {
                   key={c}
                   type="button"
                   onClick={() => setNewColor(c)}
-                  className={`h-5 w-5 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#111B21]' : ''}`}
+                  className={`h-5 w-5 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-surface' : ''}`}
                   style={{ backgroundColor: c, '--tw-ring-color': c } as any}
                 />
               ))}
@@ -135,7 +131,7 @@ export default function TagsPage() {
                 type="button"
                 onClick={createTag}
                 disabled={creating || !newName.trim()}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#25D366]/90 disabled:opacity-50 transition-colors"
+                className="btn btn-primary btn-sm ml-auto inline-flex disabled:opacity-50"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t('common:actions.create')}
@@ -146,7 +142,7 @@ export default function TagsPage() {
           {/* Tag list */}
           <div className="space-y-1">
             {!loading && tags.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-[#8696A0]">{t('common:empty.title')}</p>
+              <p className="text-sm text-ink-4">{t('common:empty.title')}</p>
             )}
             {selectedTagId && (
               <button
@@ -162,15 +158,15 @@ export default function TagsPage() {
                 key={tag.id}
                 className={`flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition-colors ${
                   selectedTagId === tag.id
-                    ? 'bg-[#25D366]/10 dark:bg-[#25D366]/15'
-                    : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                    ? 'bg-brand/10 dark:bg-brand/15'
+                    : 'hover:bg-raised'
                 }`}
                 onClick={() => setSelectedTagId(selectedTagId === tag.id ? null : tag.id)}
               >
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{tag.name}</span>
-                  <span className="text-xs text-gray-500 dark:text-[#8696A0]">
+                  <span className="text-sm font-medium text-ink">{tag.name}</span>
+                  <span className="text-xs text-ink-3">
                     {tag._count?.contacts ?? 0}
                   </span>
                 </div>
@@ -187,16 +183,16 @@ export default function TagsPage() {
         </section>
 
         {/* Right: contacts */}
-        <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5">
+        <section className="rounded-xl border border-line bg-surface p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-base font-semibold text-ink">
                 {selectedTagId
                   ? tags.find((tag) => tag.id === selectedTagId)?.name ?? ''
                   : t('common:labels.tags')}
               </h2>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-white/10 px-3 py-1.5 text-xs text-gray-600 dark:text-[#8696A0]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs text-ink-3">
               <Users2 className="h-3.5 w-3.5" />
               {filteredContacts.length}
             </div>
@@ -206,15 +202,15 @@ export default function TagsPage() {
             {filteredContacts.map((contact) => {
               const ctags = contact.contactTags?.map((ct) => ct.tag) ?? [];
               return (
-                <div key={contact.id} className="rounded-xl border border-gray-200 dark:border-white/10 p-4">
+                <div key={contact.id} className="rounded-xl border border-line p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{contact.name || t('common:labels.name')}</p>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-[#8696A0]"><bdi>{formatPhone(contact.phone)}</bdi></p>
+                      <p className="font-medium text-ink">{contact.name || t('common:labels.name')}</p>
+                      <p className="mt-0.5 text-xs text-ink-3"><bdi>{formatPhone(contact.phone)}</bdi></p>
                     </div>
                     <a
                       href={`/conversations?phone=${encodeURIComponent(contact.phone)}`}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366]/10 px-3 py-1.5 text-xs text-[#25D366] hover:bg-[#25D366]/20 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1.5 text-xs text-brand hover:bg-brand/20 transition-colors"
                     >
                       <MessageSquare className="h-3.5 w-3.5" />
                       {t('common:labels.message')}
@@ -235,7 +231,7 @@ export default function TagsPage() {
               );
             })}
             {!loading && filteredContacts.length === 0 && (
-              <div className="rounded-xl border border-dashed border-gray-200 dark:border-white/10 p-6 text-center text-sm text-gray-400 dark:text-[#8696A0]">
+              <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-4">
                 {t('common:empty.title')}
               </div>
             )}

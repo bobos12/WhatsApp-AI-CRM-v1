@@ -93,7 +93,7 @@ function ToastItem({
       onClick={clickable ? handleClick : undefined}
       style={{ '--tf-dur': `${duration}ms` } as React.CSSProperties}
       className={cn(
-        'relative w-full overflow-hidden rounded-[20px] backdrop-blur-2xl',
+        'relative w-full overflow-hidden rounded-xl backdrop-blur-2xl',
         'bg-white/[0.97] dark:bg-[#161D22]/[0.94]',
         'border border-black/[0.06] dark:border-white/[0.07]',
         'shadow-[0_8px_40px_rgba(0,0,0,0.13),_0_1px_0_rgba(0,0,0,0.04)]',
@@ -123,7 +123,7 @@ function ToastItem({
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             {toast.title && (
-              <p dir="auto" className="truncate text-[13.5px] font-bold leading-snug text-gray-900 dark:text-white">
+              <p dir="auto" className="truncate text-[13.5px] font-bold leading-snug text-ink">
                 {toast.title}
               </p>
             )}

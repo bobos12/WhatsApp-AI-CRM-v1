@@ -31,6 +31,8 @@ import {
 } from '../../../lib/audience-filter';
 import { Modal } from '../../../components/ui/modal';
 import { cn } from '../../../lib/utils';
+import { AnimatePresence, motion } from 'motion/react';
+import { PageHeader, SearchField } from '../../../components/ui/page';
 
 interface ContactTagRef {
   tag: { id: string; name: string; color: string };
@@ -66,8 +68,8 @@ function FilterToggle({
       className={cn(
         'inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors',
         active
-          ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-          : 'border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10',
+          ? 'border-brand/40 bg-brand/10 text-brand'
+          : 'border-line bg-white dark:bg-raised text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10',
       )}
     >
       {active ? <Check className="h-3.5 w-3.5" /> : icon}
@@ -135,6 +137,13 @@ export default function ContactsPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [detailTab, setDetailTab] = useState<'overview' | 'timeline' | 'tags'>('overview');
   const [showImport, setShowImport] = useState(false);
+
+  // Deep links from ⌘K and the dashboard: /contacts?new=1, /contacts?import=1.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') setShowForm(true);
+    if (searchParams.get('import') === '1') setShowImport(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Custom-field definitions drive the extra rows in the detail drawer *and* the
   // set of fields the condition builder can filter on.
@@ -351,262 +360,162 @@ export default function ContactsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-
-      {status === 'loading' && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
-          {tc('loading')}
-        </div>
-      )}
+    <div className="space-y-5">
       {error && (
         <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           {error}
         </div>
       )}
 
-      {/* ── Header ── */}
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6 shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <Users2 className="h-3.5 w-3.5" />
-              {t('badge')}
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-[#8696A0]">
-              {t('subtitle')}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/settings/custom-fields"
-              className="inline-flex items-center rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-2.5 text-sm text-gray-700 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
-            >
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={
+          <>
+            <Link href="/settings/custom-fields" className="btn btn-ghost">
+              <SlidersHorizontal aria-hidden="true" />
               {t('customFields', { defaultValue: 'Fields' })}
             </Link>
-            <button
-              type="button"
-              onClick={() => setShowImport(true)}
-              className="inline-flex items-center rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-2.5 text-sm text-gray-700 dark:text-white transition hover:bg-gray-100 dark:hover:bg-white/10"
-            >
-              <Upload className="mr-2 h-4 w-4" />
+            <button type="button" onClick={() => setShowImport(true)} className="btn btn-secondary">
+              <Upload aria-hidden="true" />
               {t('importContacts')}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
+            <button type="button" onClick={() => setShowForm(true)} className="btn btn-primary">
+              <Plus aria-hidden="true" />
               {t('addContact')}
             </button>
+          </>
+        }
+      />
+
+      {/* ── Toolbar + table, one surface ── */}
+      <div className="panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+          {/* Saved / unsaved — the quick filter people reach for first */}
+          <div className="seg max-w-full overflow-x-auto scrollbar-none">
+            {([
+              { key: 'all', label: t('segments.all'), count: segmentCounts.all },
+              { key: 'saved', label: t('segments.saved'), count: segmentCounts.saved },
+              { key: 'unsaved', label: t('segments.unsaved'), count: segmentCounts.unsaved },
+            ] as const).map(({ key, label, count }) => (
+              <button
+                key={key}
+                type="button"
+                data-active={segment === key}
+                onClick={() => { setSegment(key); setPage(1); }}
+                title={key === 'saved' ? t('segments.savedHint') : key === 'unsaved' ? t('segments.unsavedHint') : undefined}
+                className="seg-item"
+              >
+                {label}
+                <span className="tabular-nums text-ink-4">{count}</span>
+              </button>
+            ))}
           </div>
+          <SearchField value={search} onChange={setSearch} placeholder={t('searchPlaceholder')} className="min-w-[200px] flex-1" />
+          <button
+            type="button"
+            onClick={() => setShowFilters((f) => !f)}
+            aria-expanded={showFilters}
+            className={cn('btn btn-secondary', (showFilters || activeFilterCount > 0) && 'border-brand/40 text-brand')}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            {tc('actions.filter')}
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
-      </section>
 
-      {/* ── Search + filters ── */}
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] shadow-card dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]">
-
-        {/* Search row */}
-        <div className="p-5 pb-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-[#8696A0]" />
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#202C33] py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-[#8696A0] outline-none focus:border-[#25D366]/50"
-              />
-            </div>
+        {/* Tag chips */}
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-3 py-2 scrollbar-none">
+            <span className="me-1 inline-flex shrink-0 items-center gap-1.5 text-2xs font-medium text-ink-3">
+              <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+              {tc('labels.tags')}
+            </span>
             <button
               type="button"
-              onClick={() => setShowFilters((f) => !f)}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
-                showFilters || activeFilterCount > 0
-                  ? 'border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366]'
-                  : 'border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
-              )}
+              onClick={() => setTagFilter('')}
+              className={cn('h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors', !tagFilter ? 'bg-ink text-surface' : 'text-ink-2 hover:bg-raised')}
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              {tc('actions.filter')}
-              {activeFilterCount > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25D366] px-1 text-[10px] font-bold text-slate-950">
-                  {activeFilterCount}
-                </span>
-              )}
+              {tc('all')}
             </button>
-          </div>
-
-          {/* Saved / Unsaved segment — primary, easy-to-use quick filter */}
-          <div className="mt-3 flex w-full flex-wrap items-center gap-1 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#202C33] p-1 sm:flex-nowrap">
-            {([
-              { key: 'all', label: t('segments.all'), count: segmentCounts.all, icon: Users2 },
-              { key: 'saved', label: t('segments.saved'), count: segmentCounts.saved, icon: UserCheck },
-              { key: 'unsaved', label: t('segments.unsaved'), count: segmentCounts.unsaved, icon: Search },
-            ] as const).map(({ key, label, count, icon: Icon }) => {
-              const active = segment === key;
+            {allTags.map((tag) => {
+              const active = tagFilter === tag.name;
               return (
                 <button
-                  key={key}
+                  key={tag.id}
                   type="button"
-                  onClick={() => { setSegment(key); setPage(1); }}
-                  title={key === 'saved' ? t('segments.savedHint') : key === 'unsaved' ? t('segments.unsavedHint') : undefined}
+                  onClick={() => setTagFilter(active ? '' : tag.name)}
+                  aria-pressed={active}
                   className={cn(
-                    'flex flex-1 basis-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:basis-0',
-                    active
-                      ? 'bg-[#25D366] text-white shadow-sm'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white',
+                    'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors',
+                    active ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink',
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{label}</span>
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 text-[10px] font-bold tabular-nums',
-                      active ? 'bg-white/25 text-white' : 'bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-200',
-                    )}
-                  >
-                    {count}
-                  </span>
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} aria-hidden="true" />
+                  {tag.name}
+                  {tag._count !== undefined && <span className={cn('tabular-nums', active ? 'text-surface/70' : 'text-ink-4')}>{tag._count.contacts}</span>}
+                  {active && <X className="h-3 w-3 opacity-70" aria-hidden="true" />}
                 </button>
               );
             })}
           </div>
-
-          {/* Tag filter chips */}
-          {allTags.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-[#8696A0]">
-                <Filter className="h-3.5 w-3.5" />
-                {tc('labels.tags')}:
-              </div>
-
-              {/* All */}
-              <button
-                type="button"
-                onClick={() => setTagFilter('')}
-                className={cn(
-                  'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition',
-                  !tagFilter
-                    ? 'bg-[#25D366] text-white'
-                    : 'border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-600 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
-                )}
-              >
-                {tc('all')}
-              </button>
-
-              {allTags.map((tag) => {
-                const active = tagFilter === tag.name;
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => setTagFilter(active ? '' : tag.name)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
-                      active
-                        ? 'border-transparent text-white'
-                        : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-600 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/10',
-                    )}
-                    style={active ? { backgroundColor: tag.color, borderColor: tag.color } : undefined}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : tag.color }}
-                    />
-                    {tag.name}
-                    {tag._count !== undefined && (
-                      <span className={cn('text-[10px]', active ? 'text-white/70' : 'text-gray-400 dark:text-[#8696A0]')}>
-                        {tag._count.contacts}
-                      </span>
-                    )}
-                    {active && <X className="h-2.5 w-2.5 opacity-70" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Advanced filter panel */}
-        {showFilters && (
-          <div className="border-t border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#0B141A] px-5 py-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0] flex items-center gap-1.5">
-                  <CalendarRange className="h-3.5 w-3.5" /> {t('createdFrom')}
-                </p>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                  className="h-9 rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 text-sm text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50 transition-colors"
-                />
-              </div>
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-[#8696A0]">{t('createdTo')}</p>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                  className="h-9 rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 text-sm text-gray-900 dark:text-white outline-none focus:border-[#25D366]/50 transition-colors"
-                />
-              </div>
-
-              {/* Toggle chips */}
-              <div className="flex flex-wrap items-center gap-2">
-                <FilterToggle
-                  active={hasTags}
-                  onClick={() => { setHasTags((v) => !v); setPage(1); }}
-                  icon={<TagIcon className="h-3.5 w-3.5" />}
-                  label={t('filters.hasTags')}
-                />
-                <FilterToggle
-                  active={hasNotes}
-                  onClick={() => { setHasNotes((v) => !v); setPage(1); }}
-                  icon={<StickyNote className="h-3.5 w-3.5" />}
-                  label={t('filters.hasNotes')}
-                />
-              </div>
-
-              {activeFilterCount > 0 && (
-                <button
-                  type="button"
-                  onClick={clearAdvancedFilters}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-300 dark:border-white/10 px-3 text-sm text-gray-600 dark:text-[#8696A0] hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  {t('clearFilters')}
-                </button>
-              )}
-            </div>
-
-            {/* Field conditions — notes, company, status, and every custom field
-                the business has defined. Same builder the broadcast audience uses. */}
-            <div className="mt-4">
-              <AudienceFilterBuilder value={advancedFilter} onChange={setAdvancedFilter} />
-            </div>
-          </div>
         )}
 
+        {/* Advanced filter panel */}
+        <AnimatePresence initial={false}>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden border-b border-line bg-raised/40"
+            >
+              <div className="px-4 py-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div>
+                    <label className="label flex items-center gap-1.5"><CalendarRange className="h-3.5 w-3.5" /> {t('createdFrom')}</label>
+                    <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="field w-auto" />
+                  </div>
+                  <div>
+                    <label className="label">{t('createdTo')}</label>
+                    <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="field w-auto" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FilterToggle active={hasTags} onClick={() => { setHasTags((v) => !v); setPage(1); }} icon={<TagIcon className="h-3.5 w-3.5" />} label={t('filters.hasTags')} />
+                    <FilterToggle active={hasNotes} onClick={() => { setHasNotes((v) => !v); setPage(1); }} icon={<StickyNote className="h-3.5 w-3.5" />} label={t('filters.hasNotes')} />
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <button type="button" onClick={clearAdvancedFilters} className="btn btn-ghost">
+                      <X aria-hidden="true" />
+                      {t('clearFilters')}
+                    </button>
+                  )}
+                </div>
+                {/* Field conditions — notes, company, status, and every custom field
+                    the business has defined. Same builder the broadcast audience uses. */}
+                <div className="mt-4">
+                  <AudienceFilterBuilder value={advancedFilter} onChange={setAdvancedFilter} />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Results info row */}
-        <div className="flex items-center justify-between px-5 py-2.5 border-t border-gray-200 dark:border-white/10">
-          <p className="text-xs text-gray-500 dark:text-[#8696A0]">
-            {t('totalContacts', { count: totalCount })}
+        <div className="flex items-center justify-between px-4 py-2">
+          <p className="text-xs text-ink-3">
+            <span className="tabular-nums">{t('totalContacts', { count: totalCount })}</span>
             {selectedIds.size > 0 && (
-              <span className="ml-2 font-medium text-[#25D366]">· {t('bulkActions.selected', { count: selectedIds.size })}</span>
+              <span className="ms-2 font-medium text-brand">· {t('bulkActions.selected', { count: selectedIds.size })}</span>
             )}
           </p>
           {selectedIds.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-gray-500 dark:text-[#8696A0] hover:text-gray-700 dark:hover:text-white transition-colors"
-            >
+            <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs text-ink-3 transition-colors hover:text-ink">
               {t('clearSelection')}
             </button>
           )}
@@ -633,22 +542,22 @@ export default function ContactsPage() {
           {/* Empty state */}
           {totalCount === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
-                <Users2 className="h-6 w-6 text-gray-400 dark:text-[#8696A0]" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-raised">
+                <Users2 className="h-6 w-6 text-ink-4" />
               </div>
               {contacts.length === 0 ? (
                 <>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t('noContacts')}</p>
-                  <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('noContactsSubtitle')}</p>
+                  <p className="text-sm font-medium text-ink">{t('noContacts')}</p>
+                  <p className="text-xs text-ink-3">{t('noContactsSubtitle')}</p>
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{t('emptyFiltered')}</p>
-                  <p className="text-xs text-gray-500 dark:text-[#8696A0]">{t('emptyFilteredSubtitle')}</p>
+                  <p className="text-sm font-medium text-ink">{t('emptyFiltered')}</p>
+                  <p className="text-xs text-ink-3">{t('emptyFilteredSubtitle')}</p>
                   <button
                     type="button"
                     onClick={() => { setSegment('all'); setTagFilter(''); clearAdvancedFilters(); setSearch(''); }}
-                    className="mt-1 inline-flex items-center gap-1.5 rounded-xl border border-gray-300 dark:border-white/10 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#8696A0] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="mt-1 inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-medium text-ink-3 hover:bg-raised transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                     {t('clearFilters')}
@@ -673,7 +582,7 @@ export default function ContactsPage() {
 
       {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#202C33] px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
           <span className="text-sm font-medium text-white">
             {t('bulkActions.selected', { count: selectedIds.size })}
           </span>
@@ -685,14 +594,14 @@ export default function ContactsPage() {
                 type="button"
                 onClick={handleBulkDelete}
                 disabled={bulkDeleting}
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {bulkDeleting ? '…' : t('yesDelete')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowBulkConfirm(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8696A0] hover:bg-white/10 transition-colors"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
               >
                 {tc('actions.cancel')}
               </button>
@@ -710,7 +619,7 @@ export default function ContactsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8696A0] hover:bg-white/10 transition-colors"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
               >
                 {tc('actions.deselectAll')}
               </button>
@@ -745,17 +654,17 @@ export default function ContactsPage() {
           onClose={() => { setSelectedContact(null); setDetails(null); }}
           aria-label={t('contactDetails')}
           overlayClassName="items-stretch justify-end p-0 bg-black/60"
-          className="h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[#0B141A] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+          className="h-full w-full max-w-xl overflow-y-auto border-l border-line bg-canvas p-6 shadow-pop"
         >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wider text-[#25D366]/70">{t('contactDetails')}</p>
+                <p className="text-xs uppercase tracking-wider text-brand/70">{t('contactDetails')}</p>
                 <h2 className="mt-2 text-2xl font-semibold text-white">
                   {selectedContact.name
                     ? <bdi>{selectedContact.name}</bdi>
                     : <span dir="ltr">{'‎'}{selectedContact.phone}</span>}
                 </h2>
-                <p className="mt-1 text-sm text-[#8696A0]" dir="ltr">{'‎'}{selectedContact.phone}</p>
+                <p className="mt-1 text-sm text-ink-3" dir="ltr">{'‎'}{selectedContact.phone}</p>
               </div>
               <button
                 type="button"
@@ -775,8 +684,8 @@ export default function ContactsPage() {
                   className={cn(
                     'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                     detailTab === tab
-                      ? 'border-[#25D366] text-[#25D366]'
-                      : 'border-transparent text-[#8696A0] hover:text-white',
+                      ? 'border-brand text-brand'
+                      : 'border-transparent text-ink-3 hover:text-white',
                   )}
                 >
                   {TAB_LABELS[tab]}
@@ -799,7 +708,7 @@ export default function ContactsPage() {
 
             {detailTab === 'overview' && (
               loadingDetails ? (
-                <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-4 text-[#8696A0]">
+                <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-4 text-ink-3">
                   {t('loadingDetails')}
                 </div>
               ) : (
@@ -807,7 +716,7 @@ export default function ContactsPage() {
                   {/* Built-in profile fields plus every custom field the business defined. */}
                   <section className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                      <UserCheck className="h-4 w-4 text-[#25D366]" />
+                      <UserCheck className="h-4 w-4 text-brand" />
                       {t('profileSection', { defaultValue: 'Profile' })}
                     </div>
                     <dl className="space-y-2.5">
@@ -817,14 +726,14 @@ export default function ContactsPage() {
                         { label: t('form.notes'), value: details?.contact.notes },
                       ].map(({ label, value }) => (
                         <div key={label} className="flex items-start justify-between gap-4">
-                          <dt className="shrink-0 text-xs text-[#8696A0]">{label}</dt>
+                          <dt className="shrink-0 text-xs text-ink-3">{label}</dt>
                           <dd className="min-w-0 break-words text-end text-sm text-white">{value || '—'}</dd>
                         </div>
                       ))}
 
                       {customFieldDefs.map((definition) => (
                         <div key={definition.id} className="flex items-start justify-between gap-4">
-                          <dt className="shrink-0 text-xs text-[#8696A0]">{definition.label}</dt>
+                          <dt className="shrink-0 text-xs text-ink-3">{definition.label}</dt>
                           <dd className="min-w-0 break-words text-end text-sm text-white">
                             {formatFieldValue(definition, details?.contact.customFields?.[definition.key])}
                           </dd>
@@ -835,7 +744,7 @@ export default function ContactsPage() {
                     {customFieldDefs.length === 0 && (
                       <Link
                         href="/settings/custom-fields"
-                        className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#25D366] hover:underline"
+                        className="mt-3 inline-flex items-center gap-1.5 text-xs text-brand hover:underline"
                       >
                         <SlidersHorizontal className="h-3 w-3" />
                         {t('addCustomFields', { defaultValue: 'Add custom fields' })}
@@ -851,7 +760,7 @@ export default function ContactsPage() {
                     <div className="mb-3">
                       <Link
                         href={`/deals?contactId=${encodeURIComponent(selectedContact.id)}`}
-                        className="inline-flex items-center rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#25D366]/90 transition-colors"
+                        className="btn btn-primary btn-sm inline-flex"
                       >
                         <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
                         {t('newDeal')}
@@ -861,16 +770,16 @@ export default function ContactsPage() {
                       {(details?.deals || []).map((deal) => (
                         <div key={deal.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
                           <p className="font-medium text-white">{deal.title}</p>
-                          <p className="text-sm text-[#8696A0]">{deal.stage} · ${Number(deal.value || 0).toLocaleString()}</p>
+                          <p className="text-sm text-ink-3">{deal.stage} · ${Number(deal.value || 0).toLocaleString()}</p>
                         </div>
                       ))}
-                      {!details?.deals?.length && <p className="text-sm text-[#8696A0]">{t('noDeals')}</p>}
+                      {!details?.deals?.length && <p className="text-sm text-ink-3">{t('noDeals')}</p>}
                     </div>
                   </section>
 
                   <section className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                      <CheckSquare className="h-4 w-4 text-[#25D366]" />
+                      <CheckSquare className="h-4 w-4 text-brand" />
                       {t('tasksSection')}
                     </div>
                     <div className="mb-3">
@@ -895,7 +804,7 @@ export default function ContactsPage() {
                     </div>
                   </section>
 
-                  <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <section className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
                       <MessageSquare className="h-4 w-4 text-emerald-300" />
                       {t('conversationsSection')}

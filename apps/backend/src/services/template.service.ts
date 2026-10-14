@@ -10,9 +10,10 @@ import {
   type MediaType,
   type RenderableTemplate,
 } from '../lib/template-compiler';
-import { sendMessage } from '../whatsapp/sender';
+import { providerManager } from '../providers/manager';
 import { loadMedia, isAudioMediaType, resolveMediaUrl, toStorageRef } from '../lib/media';
 import { logger } from '../lib/logger';
+import { toMetaTemplateName } from '../providers/meta/templates';
 
 /**
  * A template's attachment is recorded in two places: inside the canonical
@@ -56,7 +57,7 @@ function withColumnMedia(canonical: CanonicalTemplate, template: any): Canonical
   return canonical;
 }
 
-function resolveCanonical(template: any): CanonicalTemplate {
+export function resolveCanonical(template: any): CanonicalTemplate {
   if (isLegacyPayload(template.payload)) {
     return withColumnMedia(
       legacyBlocksToCanonical(
@@ -133,32 +134,59 @@ export async function sendTemplate(
   const resolve = makeResolver(canonical, variables);
   const caption = resolve(canonical.body.text);
 
+  // ── Meta-approved template ─────────────────────────────────────────────────
+  // Sent as a real template message: it is the only thing WhatsApp delivers to
+  // someone outside the 24-hour window. Slots are named by the template's
+  // `variables` order ("1", "2" for templates imported from Meta).
+  if (template.metaStatus === 'APPROVED' && template.metaTemplateId) {
+    const slots: string[] = Array.isArray(template.variables) ? template.variables : [];
+    const result = await providerManager.sendMessage({
+      phone,
+      template: {
+        templateId: template.id,
+        name: toMetaTemplateName(template.name),
+        language: template.language,
+        bodyValues: slots.map((slot) => variables[slot] ?? ''),
+        headerMedia: template.mediaUrl
+          ? {
+              storageRef: template.mediaUrl,
+              format: (template.mediaType as 'IMAGE' | 'VIDEO' | 'DOCUMENT') ?? 'IMAGE',
+              filename: template.mediaFilename,
+            }
+          : null,
+        renderedBody: (template.content ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_: string, k: string) => variables[k] ?? ''),
+      },
+      clientId: opts.clientId,
+      conversationId: opts.conversationId,
+    });
+    logger.info('template.meta_sent', { templateName: template.name, phone });
+    return { messageId: result.messageId };
+  }
+
   // ── Media template ─────────────────────────────────────────────────────────
   const media = canonical.media;
   if (media?.url) {
     const loaded = await loadMedia(media.url, media.type, media.filename);
     if (loaded) {
       const isVoice = isAudioMediaType(media.type);
-      const result = await sendMessage(
+      const result = await providerManager.sendMessage({
         phone,
-        '',
-        {
-          mediaBuffer: loaded.buffer,
-          mediaMimeType: media.mimeType || loaded.mimetype,
-          mediaFileName: media.filename || undefined,
+        media: {
+          buffer: loaded.buffer,
+          mimetype: media.mimeType || loaded.mimetype,
+          filename: media.filename || undefined,
           // WhatsApp audio carries no caption; anything else does.
-          mediaCaption: isVoice ? undefined : caption || undefined,
-          mediaIsVoiceNote: isVoice,
+          caption: isVoice ? undefined : caption || undefined,
+          isVoiceNote: isVoice,
           // Points the persisted CRM message at the stored file so it renders in chat.
-          mediaUrl: resolveMediaUrl(media.url) ?? undefined,
+          url: resolveMediaUrl(media.url) ?? undefined,
         },
-        undefined,
-        opts.clientId,
-        opts.conversationId,
-      );
+        clientId: opts.clientId,
+        conversationId: opts.conversationId,
+      });
 
       logger.info('template.media_sent', { templateName: canonical.name, phone, type: media.type });
-      return { messageId: result.id };
+      return { messageId: result.messageId };
     }
 
     // The attachment is gone from storage. Falling back to text would quietly
@@ -175,9 +203,14 @@ export async function sendTemplate(
 
   // ── Text template ────────────────────────────────────────────────────────────
   if (!caption.trim()) throw new Error('Template produced no sendable content.');
-  const result = await sendMessage(phone, caption, undefined, undefined, opts.clientId, opts.conversationId);
+  const result = await providerManager.sendMessage({
+    phone,
+    text: caption,
+    clientId: opts.clientId,
+    conversationId: opts.conversationId,
+  });
   logger.info('template.text_sent', { templateName: canonical.name, phone });
-  return { messageId: result.id };
+  return { messageId: result.messageId };
 }
 
 export default { renderTemplate, sendTemplate };

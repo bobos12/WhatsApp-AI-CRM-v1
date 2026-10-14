@@ -13,7 +13,7 @@ import { getTenantContext } from './tenant-context';
 const TENANT_SCOPED_MODELS = new Set<string>([
   'User',
   'Team',
-  'WhatsAppSession',
+  'WhatsAppChannel',
   'Contact',
   'CustomFieldDefinition',
   'Tag',

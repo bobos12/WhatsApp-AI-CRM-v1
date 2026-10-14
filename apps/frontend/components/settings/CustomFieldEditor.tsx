@@ -16,9 +16,9 @@ import {
 } from '../../lib/custom-fields';
 
 const inputCls =
-  'block w-full rounded-xl border border-gray-300 dark:border-white/10 bg-white dark:bg-[#202C33] px-3 py-2 text-sm ' +
-  'text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#8696A0] outline-none transition ' +
-  'focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]/30';
+  'block w-full rounded-xl border border-line bg-white dark:bg-raised px-3 py-2 text-sm ' +
+  'text-ink placeholder:text-ink-4 outline-none transition ' +
+  'focus:border-brand focus:ring-1 focus:ring-brand/30';
 
 export interface CustomFieldDraft {
   label: string;
@@ -74,7 +74,7 @@ function OptionRows({
             type="color"
             value={option.color ?? '#25D366'}
             onChange={(event) => update(index, { color: event.target.value })}
-            className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border border-gray-300 dark:border-white/10 bg-transparent p-0.5"
+            className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-0.5"
             aria-label="Option colour"
           />
           <button
@@ -90,7 +90,7 @@ function OptionRows({
       <button
         type="button"
         onClick={() => onChange([...options, { value: '', label: '', color: '#25D366' }])}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 dark:border-white/15 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#8696A0] hover:border-[#25D366]/50 hover:text-[#25D366]"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 dark:border-white/15 px-3 py-1.5 text-xs font-medium text-ink-3 hover:border-brand/50 hover:text-brand"
       >
         <Plus className="h-3.5 w-3.5" />
         Add option
@@ -151,15 +151,15 @@ export default function CustomFieldEditor({
       onClose={onCancel}
       aria-label={isEdit ? 'Edit custom field' : 'New custom field'}
       overlayClassName="items-start overflow-y-auto bg-black/70 p-4"
-      className="relative mx-auto my-10 w-full max-w-lg rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 shadow-lg"
+      className="relative mx-auto my-10 w-full max-w-lg rounded-xl border border-line bg-surface p-5 shadow-lg"
     >
-      <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+      <h3 className="mb-4 text-lg font-medium text-ink">
         {isEdit ? 'Edit field' : 'New custom field'}
       </h3>
 
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-white">Field name</label>
+          <label className="block text-sm font-medium text-ink-2">Field name</label>
           <input
             autoFocus
             value={draft.label}
@@ -168,15 +168,15 @@ export default function CustomFieldEditor({
             className={cn(inputCls, 'mt-1')}
           />
           {derivedKey && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-[#8696A0]">
-              Template token: <code className="font-mono text-[#25D366]">{`{{${derivedKey}}}`}</code>
+            <p className="mt-1 text-xs text-ink-3">
+              Template token: <code className="font-mono text-brand">{`{{${derivedKey}}}`}</code>
               {isEdit && ' · cannot be changed'}
             </p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-white">Type</label>
+          <label className="block text-sm font-medium text-ink-2">Type</label>
           <select
             value={draft.type}
             onChange={(event) => setDraft({ ...draft, type: event.target.value as CustomFieldType })}
@@ -188,19 +188,19 @@ export default function CustomFieldEditor({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-gray-500 dark:text-[#8696A0]">{FIELD_TYPE_HINTS[draft.type]}</p>
+          <p className="mt-1 text-xs text-ink-3">{FIELD_TYPE_HINTS[draft.type]}</p>
         </div>
 
         {needsOptions && (
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-white">Options</label>
+            <label className="mb-2 block text-sm font-medium text-ink-2">Options</label>
             <OptionRows options={draft.options} onChange={(options) => setDraft({ ...draft, options })} />
           </div>
         )}
 
         {draft.type === 'CURRENCY' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-white">Currency</label>
+            <label className="block text-sm font-medium text-ink-2">Currency</label>
             <input
               value={draft.currency}
               onChange={(event) => setDraft({ ...draft, currency: event.target.value.toUpperCase().slice(0, 3) })}
@@ -208,13 +208,13 @@ export default function CustomFieldEditor({
               maxLength={3}
               className={cn(inputCls, 'mt-1 uppercase')}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-[#8696A0]">Three-letter ISO code, e.g. USD, EGP, SAR.</p>
+            <p className="mt-1 text-xs text-ink-3">Three-letter ISO code, e.g. USD, EGP, SAR.</p>
           </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-white">Placeholder</label>
+            <label className="block text-sm font-medium text-ink-2">Placeholder</label>
             <input
               value={draft.placeholder}
               onChange={(event) => setDraft({ ...draft, placeholder: event.target.value })}
@@ -222,7 +222,7 @@ export default function CustomFieldEditor({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-white">Help text</label>
+            <label className="block text-sm font-medium text-ink-2">Help text</label>
             <input
               value={draft.helpText}
               onChange={(event) => setDraft({ ...draft, helpText: event.target.value })}
@@ -236,7 +236,7 @@ export default function CustomFieldEditor({
             type="checkbox"
             checked={draft.required}
             onChange={(event) => setDraft({ ...draft, required: event.target.checked })}
-            className="h-4 w-4 rounded border-gray-300 text-[#25D366] focus:ring-[#25D366]"
+            className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
           />
           <span className="text-sm text-gray-700 dark:text-gray-200">Required on new contacts</span>
         </label>
@@ -249,14 +249,14 @@ export default function CustomFieldEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] px-4 py-2 text-sm font-medium text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-white/10"
+            className="btn btn-secondary"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-medium text-white hover:bg-[#25D366]/90 disabled:opacity-50"
+            className="btn btn-primary inline-flex disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create field'}
@@ -286,15 +286,15 @@ export function DeleteFieldDialog({
       onClose={onCancel}
       aria-label="Delete custom field"
       overlayClassName="items-center bg-black/70 p-4"
-      className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 shadow-lg"
+      className="w-full max-w-md rounded-xl border border-line bg-surface p-5 shadow-lg"
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-400">
           <Trash2 className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Delete “{definition.label}”?</h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-[#8696A0]">
+          <h3 className="text-lg font-medium text-ink">Delete “{definition.label}”?</h3>
+          <p className="mt-1 text-sm text-ink-3">
             The field disappears from every form, filter and import. Values already saved on your contacts are kept, so
             re-creating a field with the same key brings them back.
           </p>
@@ -317,7 +317,7 @@ export function DeleteFieldDialog({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-xl border border-gray-300 dark:border-white/10 bg-gray-100 dark:bg-[#202C33] px-4 py-2 text-sm font-medium text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-white/10"
+          className="btn btn-secondary"
         >
           Cancel
         </button>
@@ -328,7 +328,7 @@ export function DeleteFieldDialog({
             setBusy(true);
             try { await onConfirm(purge); } finally { setBusy(false); }
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+          className="btn bg-red-600 text-white hover:bg-red-700 inline-flex disabled:opacity-50"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           Delete field

@@ -110,35 +110,31 @@ export default function AutomationsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-6">
+      <section className="relative">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#25D366]/30 bg-[#25D366]/10 dark:bg-[#25D366]/15 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-              <Workflow className="h-3.5 w-3.5" />
-              Automation center
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{t('sidebar:nav.automations')}</h1>
-            <p className="mt-1.5 text-sm text-gray-500 dark:text-[#8696A0]">
+            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('sidebar:nav.automations')}</h1>
+            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
               Simple reply rules and multi-step drip flows.
             </p>
           </div>
           <button
             type="button"
             onClick={() => tab === 'rules' ? setShowRuleForm(true) : setShowFlowBuilder(true)}
-            className="inline-flex items-center rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#25D366]/90"
+            className="btn btn-primary inline-flex"
           >
             <Plus className="mr-2 h-4 w-4" />
             {tab === 'rules' ? 'Add Rule' : 'Add Flow'}
           </button>
         </div>
 
-        <div className="mt-4 flex gap-1 border-b border-gray-200 dark:border-white/10">
+        <div className="mt-4 flex gap-1 border-b border-line">
           <button
             type="button"
             onClick={() => setTab('rules')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === 'rules'
-                ? 'border-[#25D366] text-[#25D366]'
+                ? 'border-brand text-brand'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
@@ -149,7 +145,7 @@ export default function AutomationsPage() {
             onClick={() => setTab('flows')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === 'flows'
-                ? 'border-[#25D366] text-[#25D366]'
+                ? 'border-brand text-brand'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
@@ -161,7 +157,7 @@ export default function AutomationsPage() {
       {tab === 'rules' && (
         <>
           {rules.length === 0 && (
-            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-10 text-center text-sm text-gray-500 dark:text-[#8696A0]">
+            <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-ink-3">
               {t('common:empty.title')}
             </div>
           )}
@@ -182,7 +178,7 @@ export default function AutomationsPage() {
       {tab === 'flows' && (
         <>
           {flows.length === 0 && (
-            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-10 text-center text-sm text-gray-500 dark:text-[#8696A0]">
+            <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-ink-3">
               {t('common:empty.title')}
             </div>
           )}
@@ -190,12 +186,12 @@ export default function AutomationsPage() {
             {flows.map((flow) => (
               <div
                 key={flow.id}
-                className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111B21] p-5 space-y-3"
+                className="rounded-xl border border-line bg-surface p-5 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{flow.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-[#8696A0] mt-0.5">
+                    <p className="font-semibold text-ink">{flow.name}</p>
+                    <p className="text-xs text-ink-3 mt-0.5">
                       {flow.trigger}{flow.keyword ? ` · "${flow.keyword}"` : ''} · {flow.steps.length} steps
                     </p>
                   </div>
@@ -204,8 +200,8 @@ export default function AutomationsPage() {
                     onClick={() => handleToggleFlow(flow.id)}
                     className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                       flow.isActive
-                        ? 'bg-[#25D366]/10 text-[#25D366]'
-                        : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-[#8696A0]'
+                        ? 'bg-brand/10 text-brand'
+                        : 'bg-raised text-ink-3'
                     }`}
                   >
                     {flow.isActive ? t('common:status.active') : t('common:status.scheduled')}
@@ -214,7 +210,7 @@ export default function AutomationsPage() {
 
                 <div className="space-y-1">
                   {flow.steps.slice(0, 3).map((step, i) => (
-                    <div key={step.id} className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8696A0]">
+                    <div key={step.id} className="flex items-center gap-2 text-xs text-ink-3">
                       <Zap className="h-3 w-3 shrink-0" />
                       {step.type === 'WAIT'
                         ? `Wait ${Math.round((step.delayMs ?? 0) / 60000)} min`
@@ -222,7 +218,7 @@ export default function AutomationsPage() {
                     </div>
                   ))}
                   {flow.steps.length > 3 && (
-                    <p className="text-xs text-gray-400 dark:text-[#8696A0]">+{flow.steps.length - 3} more steps</p>
+                    <p className="text-xs text-ink-4">+{flow.steps.length - 3} more steps</p>
                   )}
                 </div>
 
@@ -230,7 +226,7 @@ export default function AutomationsPage() {
                   <button
                     type="button"
                     onClick={() => { setEditingFlow(flow); setShowFlowBuilder(true); }}
-                    className="flex-1 rounded-lg border border-gray-200 dark:border-white/10 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    className="flex-1 rounded-lg border border-line py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-raised transition-colors"
                   >
                     {t('common:actions.edit')}
                   </button>

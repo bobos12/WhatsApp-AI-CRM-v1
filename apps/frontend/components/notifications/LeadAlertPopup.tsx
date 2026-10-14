@@ -62,12 +62,12 @@ const TYPE_TONE: Record<
     dot: 'bg-blue-500',
   },
   BUYING_INTENT: {
-    rail: 'bg-[#25D366]',
-    avatar: 'bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white shadow-[0_4px_14px_rgba(37,211,102,0.45)]',
-    label: 'text-[#128C7E] dark:text-[#25D366]',
-    bar: 'bg-[#25D366]',
+    rail: 'bg-brand',
+    avatar: 'bg-brand text-white shadow-[0_4px_14px_rgba(37,211,102,0.45)]',
+    label: 'text-brand-strong dark:text-brand',
+    bar: 'bg-brand',
     glow: 'shadow-[0_20px_60px_-15px_rgba(37,211,102,0.45)]',
-    dot: 'bg-[#25D366]',
+    dot: 'bg-brand',
   },
   STATUS_UPGRADE: {
     rail: 'bg-amber-500',
@@ -199,7 +199,7 @@ function LeadAlertCard({
       onMouseEnter={pause}
       onMouseLeave={resume}
       className={cn(
-        'pointer-events-auto group relative w-full overflow-hidden rounded-2xl border backdrop-blur-xl',
+        'pointer-events-auto group relative w-full overflow-hidden rounded-xl border backdrop-blur-xl',
         'border-gray-200/80 bg-white/95 dark:border-white/10 dark:bg-[#1B262C]/95',
         tone.glow,
         'lead-alert-enter transition-all duration-300 ease-out',
@@ -225,9 +225,9 @@ function LeadAlertCard({
             </p>
           </div>
 
-          <p className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{pick(n.title)}</p>
+          <p className="mt-1 truncate text-sm font-semibold text-ink">{pick(n.title)}</p>
           {n.body && (
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-[#8696A0]">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-ink-3">
               {pick(n.body)}
             </p>
           )}
@@ -236,9 +236,9 @@ function LeadAlertCard({
             type="button"
             onClick={openChat}
             className={cn(
-              'mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-1.5 text-xs font-semibold text-[#0B141A]',
-              'shadow-[0_4px_14px_rgba(37,211,102,0.35)] transition-all hover:bg-[#22c55e] hover:shadow-[0_6px_18px_rgba(37,211,102,0.5)] active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50',
+              'mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-brand-fg',
+              'shadow-[0_4px_14px_rgba(37,211,102,0.35)] transition-all hover:bg-brand-strong hover:shadow-[0_6px_18px_rgba(37,211,102,0.5)] active:scale-95',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50',
             )}
           >
             <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
@@ -252,7 +252,7 @@ function LeadAlertCard({
           aria-label={t('notifications.popup.dismiss')}
           className={cn(
             'shrink-0 rounded-lg p-1 text-gray-400 opacity-0 transition-all group-hover:opacity-100',
-            'hover:bg-gray-100 hover:text-gray-700 dark:text-[#8696A0] dark:hover:bg-white/10 dark:hover:text-white',
+            'hover:bg-gray-100 hover:text-ink-2-3 dark:hover:bg-white/10 dark:hover:text-white',
             'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current',
           )}
         >
