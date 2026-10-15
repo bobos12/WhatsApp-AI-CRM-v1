@@ -162,12 +162,15 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    if (response.status === 401 || response.status === 403) {
-      throw new Error(errorData?.error || 'Authentication required');
-    }
-    const error = new Error(errorData?.error || `API request failed: ${response.statusText}`);
+    const error = new Error(
+      errorData?.error ||
+        (response.status === 401 || response.status === 403
+          ? 'Authentication required'
+          : `API request failed: ${response.statusText}`),
+    );
     (error as any).status = response.status;
     (error as any).data = errorData;
+    (error as any).code = errorData?.code;
     throw error;
   }
 

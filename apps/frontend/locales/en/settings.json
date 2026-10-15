@@ -11,7 +11,7 @@
   },
   "whatsapp": {
     "title": "WhatsApp Connection",
-    "description": "Manage your WhatsApp Web connection",
+    "description": "Your WhatsApp Business number and its health",
     "status": {
       "connected": "Connected",
       "disconnected": "Not connected",

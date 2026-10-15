@@ -43,6 +43,10 @@ export interface WhatsAppConnectState {
   tenantless: boolean;
   /** True while a status read is in flight. */
   refreshing: boolean;
+  /** True once one status read has succeeded — until then `configured` means nothing. */
+  loaded: boolean;
+  /** True when the server could not be reached at all (as opposed to "not connected"). */
+  unreachable: boolean;
   /** Re-read status now — call after finishing the connect wizard. */
   refresh: () => Promise<void>;
 }
@@ -59,6 +63,8 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
   const [error, setError] = useState<string | null>(null);
   const [tenantless, setTenantless] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [unreachable, setUnreachable] = useState(false);
 
   // Guards against a slow response from a previous poll overwriting a newer one.
   const requestSeq = useRef(0);
@@ -78,10 +84,13 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
       setHealth(data.health ?? null);
       setTenantless(Boolean(data.tenantless));
       setError(data.error?.message ?? data.lastSyncError ?? null);
+      setLoaded(true);
+      setUnreachable(false);
     } catch (err) {
       if (seq !== requestSeq.current) return;
       setStatus('disconnected');
       setError(err instanceof Error ? err.message : 'status_failed');
+      setUnreachable(true);
     } finally {
       if (seq === requestSeq.current) setRefreshing(false);
     }
@@ -117,6 +126,8 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
     error,
     tenantless,
     refreshing,
+    loaded,
+    unreachable,
     refresh,
   };
 }

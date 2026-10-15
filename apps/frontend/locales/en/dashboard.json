@@ -239,7 +239,7 @@
       "longest": " — the longest for <w>{{time}}</w>",
       "hot_one": "<b>{{count}} lead</b> turned hot today",
       "hot_other": "<b>{{count}} leads</b> turned hot today",
-      "noHot": "no new hot leads yet today",
+      "noHot": "No new hot leads yet today",
       "volume": "<b>{{count}}</b> messages so far today",
       "and": "and",
       "sections": {

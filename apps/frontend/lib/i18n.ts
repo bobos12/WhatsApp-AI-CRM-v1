@@ -20,6 +20,7 @@ import enAdmin from '../locales/en/admin.json';
 import enAutomations from '../locales/en/automations.json';
 import enLeads from '../locales/en/leads.json';
 import enAiConfig from '../locales/en/aiconfig.json';
+import enWhatsApp from '../locales/en/whatsapp.json';
 
 // ── Arabic translations ───────────────────────────────────────────────────────
 import arCommon from '../locales/ar/common.json';
@@ -40,6 +41,7 @@ import arAdmin from '../locales/ar/admin.json';
 import arAutomations from '../locales/ar/automations.json';
 import arLeads from '../locales/ar/leads.json';
 import arAiConfig from '../locales/ar/aiconfig.json';
+import arWhatsApp from '../locales/ar/whatsapp.json';
 
 export type Language = 'en' | 'ar';
 export const SUPPORTED_LANGUAGES: Language[] = ['en', 'ar'];
@@ -63,7 +65,7 @@ if (!i18n.isInitialized) {
     ns: [
       'common', 'auth', 'dashboard', 'chat', 'contacts',
       'templates', 'broadcasts', 'settings', 'sidebar',
-      'errors', 'validation', 'notifications', 'deals', 'tasks', 'admin', 'automations', 'leads', 'aiconfig',
+      'errors', 'validation', 'notifications', 'deals', 'tasks', 'admin', 'automations', 'leads', 'aiconfig', 'whatsapp',
     ],
     resources: {
       en: {
@@ -85,6 +87,7 @@ if (!i18n.isInitialized) {
         automations: enAutomations,
         leads: enLeads,
         aiconfig: enAiConfig,
+        whatsapp: enWhatsApp,
       },
       ar: {
         common: arCommon,
@@ -105,6 +108,7 @@ if (!i18n.isInitialized) {
         automations: arAutomations,
         leads: arLeads,
         aiconfig: arAiConfig,
+        whatsapp: arWhatsApp,
       },
     },
     interpolation: { escapeValue: false },

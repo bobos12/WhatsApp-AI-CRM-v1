@@ -1,0 +1,233 @@
+{
+  "gate": {
+    "loading": "Loading your workspace…",
+    "waking": "Waking up the server. After a quiet period the first visit can take up to a minute."
+  },
+  "waiting": {
+    "title": "WhatsApp isn't connected yet",
+    "body": "A manager needs to connect your company's WhatsApp number before the inbox, contacts and campaigns can work. You'll get in automatically as soon as it's done.",
+    "checkAgain": "Check again",
+    "checking": "Checking…",
+    "auto": "Checking automatically",
+    "signOut": "Sign out"
+  },
+  "setup": {
+    "eyebrow": "Workspace setup",
+    "title": "Connect your WhatsApp number",
+    "subtitle": "Everything in this CRM runs through your WhatsApp Business number. Connect it once and your whole team uses it.",
+    "time": "About 5 minutes",
+    "signOut": "Sign out",
+    "close": "Close",
+    "stepOf": "Step {{n}} of 3",
+    "steps": {
+      "credentials": "Connect Meta",
+      "number": "Choose number",
+      "finish": "Go live"
+    },
+    "why": {
+      "title": "What we do with these",
+      "items": [
+        "Find your WhatsApp numbers for you",
+        "Set up incoming messages automatically",
+        "Store the token encrypted — no one sees it again"
+      ]
+    },
+    "credentials": {
+      "title": "Connect your Meta app",
+      "body": "Paste two values from Meta. We use them to find your numbers and set everything else up for you.",
+      "token": "Permanent access token",
+      "tokenHint": "Starts with EAA. Stored encrypted and never shown again.",
+      "tokenShort": "This looks short for a permanent token. Temporary tokens from the API Setup page stop working after 24 hours.",
+      "tokenFormat": "Access tokens start with EAA — check you copied the whole token.",
+      "secret": "App Secret",
+      "secretHint": "32 characters, from App settings → Basic.",
+      "secretFormat": "An App Secret is 32 letters and numbers.",
+      "keepSaved": "Saved — leave empty to keep it",
+      "show": "Show",
+      "hide": "Hide",
+      "continue": "Find my numbers",
+      "finding": "Looking up your numbers…",
+      "business": {
+        "title": "Which business is this?",
+        "body": "Meta didn't say which business this token belongs to. Paste your Business ID and we'll find its numbers.",
+        "label": "Business ID",
+        "hint": "Business Settings → Business info. It's also the number after business_id= in the address bar."
+      },
+      "guide": {
+        "toggle": "Where do I find these?",
+        "steps": [
+          "Open Business Settings → Users → System users and click Add. Name it (for example “CRM”) and choose the Admin role.",
+          "Click Assign assets. Give it Full control of your app, then Full control of your WhatsApp account.",
+          "Click Generate token, choose your app, set Expiration to Never and tick these permissions:",
+          "Copy the token straight away — Meta shows it only once. If your business needs a second admin to approve, ask them and come back.",
+          "For the App Secret, open your app in Meta for Developers → App settings → Basic, then click Show next to App secret."
+        ],
+        "openSystemUsers": "Open System users",
+        "openApps": "Open Meta for Developers",
+        "copy": "Copy",
+        "copied": "Copied"
+      },
+      "secretPlaceholder": "Paste the 32-character secret"
+    },
+    "number": {
+      "title": "Choose the number to connect",
+      "found_one": "We found {{count}} number in your Meta account.",
+      "found_other": "We found {{count}} numbers in your Meta account.",
+      "recommended": "Recommended",
+      "ready": "Ready",
+      "notFinished": "Not finished in Meta",
+      "test": "Meta test number",
+      "cannotSend": "Can't send yet",
+      "quality": "Quality: {{q}}",
+      "account": "WhatsApp account {{id}}",
+      "testWarn": "Meta's test number can only message up to 5 numbers you add in Meta. Use your real number for customers.",
+      "notFinishedWarn": "This number isn't finished in Meta yet, so it can't send or receive. Finish registering it in WhatsApp Manager first, or pick another.",
+      "none": {
+        "title": "No numbers found",
+        "body": "This token can't see any WhatsApp numbers. Check that the system user has Full control of your WhatsApp account, then generate the token again."
+      },
+      "connect": "Connect this number",
+      "back": "Back"
+    },
+    "finish": {
+      "title": "Connecting {{number}}",
+      "rows": {
+        "verify": "Verifying your number with Meta",
+        "subscribe": "Linking your app to the WhatsApp account",
+        "webhook": "Setting up incoming messages",
+        "sending": "Checking this CRM can send",
+        "account": "Checking your WhatsApp account"
+      },
+      "successTitle": "You're live",
+      "successBody": "{{number}} is connected. Your approved templates are being imported in the background.",
+      "open": "Open your CRM",
+      "attentionTitle": "Connected — one thing left",
+      "attentionBody": "Your number is connected, but this needs fixing before everything works.",
+      "skip": "Continue to the CRM — I'll fix it later",
+      "failedTitle": "We couldn't connect this number",
+      "tryAgain": "Try again"
+    },
+    "register": {
+      "title": "Move your number to this CRM",
+      "body": "Your number is still registered with another app or provider (for example 360dialog), so WhatsApp won't let this CRM send from it. Enter the number's two-step verification PIN to move it here.",
+      "where": "Don't know the PIN? Set a new one in WhatsApp Manager → Phone numbers → your number → Two-step verification.",
+      "openManager": "Open WhatsApp Manager",
+      "label": "6-digit PIN",
+      "submit": "Move number",
+      "working": "Moving…",
+      "done": "Done — this CRM can now send from your number.",
+      "stillBlocked": "The number moved, but Meta still refuses sends. Check the system user has Full control of the WhatsApp account."
+    },
+    "webhook": {
+      "title": "Connect incoming messages by hand",
+      "body": "We couldn't set this up automatically. In your Meta app open WhatsApp → Configuration → Webhook → Edit, paste these two values, click Verify and save, then subscribe to messages.",
+      "callback": "Callback URL",
+      "verifyToken": "Verify token",
+      "recheck": "I've done it — check again",
+      "checking": "Checking…",
+      "stillMissing": "Meta isn't sending messages here yet. Check both values and that messages is subscribed."
+    },
+    "payment": {
+      "title": "Add a payment method in Meta",
+      "body": "Meta blocks messages you start — templates and campaigns — until the WhatsApp account has a working payment method. Replies to customers who message you still work.",
+      "open": "Open billing"
+    }
+  },
+  "errors": {
+    "TOKEN_REQUIRED": "Paste your access token to continue.",
+    "TOKEN_INVALID": "Meta didn't accept this token. Check you copied all of it and that it hasn't been revoked.",
+    "TOKEN_SCOPES": "This token is missing permissions. Generate it again with whatsapp_business_messaging and whatsapp_business_management ticked.",
+    "APP_SECRET_REQUIRED": "Paste your App Secret to continue. Without it, customer messages can't be verified and won't reach the inbox.",
+    "APP_SECRET_INVALID": "This App Secret belongs to a different app than the token. Copy both from the same app.",
+    "NUMBER_UNREACHABLE": "Meta couldn't find this number with this token.",
+    "PIN_MISMATCH": "That PIN doesn't match. Set a new one in WhatsApp Manager and try again.",
+    "REGISTER_RATE_LIMITED": "Too many attempts. Meta asks you to wait a while before trying again.",
+    "REGISTER_FAILED": "Meta couldn't move the number.",
+    "MANAGER_ONLY": "Only a manager can change the WhatsApp connection.",
+    "ENCRYPTION_NOT_CONFIGURED": "This server can't store credentials securely yet. Ask whoever runs the server to set CREDENTIAL_ENCRYPTION_KEY.",
+    "VALIDATION_ERROR": "Some details look wrong. Check the highlighted fields.",
+    "network": "Can't reach the server. Check your connection and try again.",
+    "generic": "Something went wrong. Please try again.",
+    "PHONE_NUMBER_ID_TAKEN": "This number is already connected to another workspace on this platform."
+  },
+  "health": {
+    "title": "Connection health",
+    "checkedAt": "Checked {{time}}",
+    "recheck": "Run checks again",
+    "checking": "Checking…",
+    "allGood": "Everything is working",
+    "needsAttention": "Needs attention",
+    "loadFailed": "Couldn't run the checks right now.",
+    "rows": {
+      "token": "Access token",
+      "number": "Phone number",
+      "account": "WhatsApp account",
+      "webhook": "Incoming messages",
+      "sending": "Sending"
+    },
+    "codes": {
+      "TOKEN_OK": "Valid and never expires",
+      "TOKEN_INVALID": "Not accepted by Meta — reconnect with a new token",
+      "TOKEN_SCOPES": "Missing permissions: {{detail}}",
+      "TOKEN_EXPIRES": "Expires {{detail}} — replace it with a permanent token",
+      "TOKEN_UNREADABLE": "Couldn't check the token",
+      "BLOCKED_BY_TOKEN": "Waiting on the access token",
+      "BLOCKED_BY_NUMBER": "Waiting on the phone number",
+      "NUMBER_OK": "{{detail}} is connected",
+      "NUMBER_STATUS": "Meta reports this number as {{detail}}",
+      "NUMBER_UNREACHABLE": "Meta couldn't find this number",
+      "QUALITY_RED": "Quality is low — Meta may limit sending soon",
+      "QUALITY_YELLOW": "Quality is medium — watch for customer blocks and reports",
+      "ACCOUNT_OK": "In good standing",
+      "ACCOUNT_BLOCKED": "Meta is blocking messages from this account",
+      "PAYMENT_METHOD": "No working payment method — templates and campaigns are blocked",
+      "NUMBER_NOT_VERIFIED": "The number isn't verified with WhatsApp yet",
+      "BUSINESS_VERIFICATION": "Business verification needs attention",
+      "DISPLAY_NAME": "The display name needs attention",
+      "WEBHOOK_OK": "Customer messages arrive in the inbox",
+      "WEBHOOK_MISSING": "Not set up — customer messages won't arrive",
+      "WEBHOOK_NO_MESSAGES": "Not subscribed to messages — customer messages won't arrive",
+      "WEBHOOK_ELSEWHERE": "Going to another address: {{detail}}",
+      "WEBHOOK_UNKNOWN": "Couldn't check",
+      "NO_APP_SECRET": "App Secret missing — reconnect to add it",
+      "APP_SECRET_INVALID": "App Secret doesn't match the app — reconnect",
+      "SENDING_OK": "This CRM can send from your number",
+      "NOT_REGISTERED_HERE": "Registered with another app or provider — move it here with your PIN",
+      "SENDING_UNKNOWN": "Couldn't confirm — Meta didn't respond"
+    },
+    "fix": {
+      "reconnect": "Reconnect",
+      "register": "Move number",
+      "webhook": "Fix automatically",
+      "billing": "Open billing",
+      "whatsapp_manager": "Open WhatsApp Manager"
+    },
+    "webhookFixed": "Incoming messages are set up.",
+    "managerOnly": "Only managers can change the WhatsApp connection."
+  },
+  "panel": {
+    "connected": "Connected",
+    "notSending": "Not sending",
+    "live": "Live",
+    "offline": "Offline",
+    "verifiedAs": "Verified as “{{name}}”",
+    "quality": "Quality",
+    "limit": "Daily limit",
+    "notRated": "Not rated yet",
+    "unlimited": "Unlimited",
+    "changeNumber": "Change number",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect WhatsApp?",
+    "disconnectBody": "Your whole team will stop sending and receiving messages until a manager connects a number again.",
+    "disconnectConfirm": "Disconnect",
+    "cancel": "Cancel"
+  },
+  "banner": {
+    "brokenTitle": "WhatsApp stopped working",
+    "brokenBody": "Messages can't be sent or received right now.",
+    "fix": "See what's wrong",
+    "askManager": "A manager can fix this in Settings → WhatsApp.",
+    "expand": "WhatsApp needs attention — tap for details",
+    "collapse": "Minimize"
+  }
+}

@@ -12,6 +12,7 @@ import LeadAlertPopup from '../../components/notifications/LeadAlertPopup';
 import CrmAssistantBubble from '../../components/layout/CrmAssistantBubble';
 import WhatsAppConnectBanner from '../../components/whatsapp/WhatsAppConnectBanner';
 import { WhatsAppConnectProvider } from '../../components/whatsapp/WhatsAppConnectProvider';
+import SetupGate from '../../components/whatsapp/setup/SetupGate';
 import AppUpdateBanner from '../../components/layout/AppUpdateBanner';
 import ImpersonationBanner from '../../components/layout/ImpersonationBanner';
 
@@ -22,25 +23,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className="flex h-[100dvh] overflow-hidden bg-canvas text-ink">
       <NotificationProvider />
       <RealtimeProvider>
-        <OnboardingWizard />
-        {/* One pairing handshake for the whole shell — the sidebar status line,
-            the connect popup and the dashboard QR all read the same one. */}
+        {/* One status read for the whole shell — the gate, sidebar line, banner
+            and settings all share it. */}
         <WhatsAppConnectProvider>
-          <Sidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Header />
-            <ImpersonationBanner />
-            <AppUpdateBanner />
-            <WhatsAppConnectBanner />
-            <AppMain>{children}</AppMain>
-          </div>
+          {/* Until a number is connected the CRM has nothing to work with, so the
+              whole shell waits behind the setup (or "ask your manager") screen. */}
+          <SetupGate>
+            <OnboardingWizard />
+            <Sidebar />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <Header />
+              <ImpersonationBanner />
+              <AppUpdateBanner />
+              <WhatsAppConnectBanner />
+              <AppMain>{children}</AppMain>
+            </div>
+            <BottomNav />
+            <CommandPalette />
+            <LeadAlertPopup />
+            <CrmAssistantBubble />
+          </SetupGate>
         </WhatsAppConnectProvider>
       </RealtimeProvider>
-      <BottomNav />
-      <CommandPalette />
       <Toaster />
-      <LeadAlertPopup />
-      <CrmAssistantBubble />
     </div>
   );
 }

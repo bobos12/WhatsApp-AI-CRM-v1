@@ -15,7 +15,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, QrCode } from 'lucide-react';
+import { Check, PlugZap } from 'lucide-react';
 import { useWhatsAppConnection } from './WhatsAppConnectProvider';
 import ConnectWhatsAppModal from './ConnectWhatsAppModal';
 import { cn } from '../../lib/utils';
@@ -100,7 +100,7 @@ export default function SidebarConnect({ compact = false }: { compact?: boolean 
           <span className={cn('block truncate text-xs font-semibold', connecting ? 'text-amber-300' : 'text-red-300')}>{label}</span>
           <span className="block truncate text-[10px] text-nav-muted">{t('sidebarConnect.tapToScan')}</span>
         </span>
-        <QrCode className={cn('h-4 w-4 shrink-0', connecting ? 'text-amber-300' : 'text-red-300', textCls.includes('hidden') && 'hidden', compact === 'below-lg' && 'lg:block')} aria-hidden="true" />
+        <PlugZap className={cn('h-4 w-4 shrink-0', connecting ? 'text-amber-300' : 'text-red-300', textCls.includes('hidden') && 'hidden', compact === 'below-lg' && 'lg:block')} aria-hidden="true" />
       </button>
 
       <ConnectWhatsAppModal open={connectOpen} onClose={() => setConnectOpen(false)} />

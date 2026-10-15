@@ -5,7 +5,7 @@ import { env } from '../lib/env';
 import { isManager, type Role } from './authorize';
 import { runAsPlatform, runWithContext } from '../lib/tenant-context';
 
-interface AuthRequest extends Request {
+export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
@@ -98,6 +98,13 @@ const SELF_SERVICE_DELETABLE = new Set([
 ]);
 
 /**
+ * Resources only managers may change at all. The WhatsApp connection is shared by
+ * the whole company: one mistaken save by an employee replaces the token every
+ * teammate sends with.
+ */
+const MANAGER_ONLY_WRITE = new Set(['whatsapp']);
+
+/**
  * Two-tier permission gate.
  *   - System Managers (SUPER_ADMIN, ADMIN, TEAM_LEAD): full access.
  *   - Employees (AGENT, ANALYST, VIEWER): read/create/update plus delete on
@@ -113,6 +120,13 @@ export function checkPermission(action: string, resource: string) {
 
       if (isManager(role)) {
         return next();
+      }
+
+      if (action !== 'read' && MANAGER_ONLY_WRITE.has(resource)) {
+        return res.status(403).json({
+          error: 'Only a manager can change the WhatsApp connection.',
+          code: 'MANAGER_ONLY',
+        });
       }
 
       // Employees: block destructive deletes on critical resources only.

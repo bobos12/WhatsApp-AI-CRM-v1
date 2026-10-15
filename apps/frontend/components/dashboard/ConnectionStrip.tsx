@@ -17,49 +17,40 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import { MessageCircle, RotateCw, ShieldCheck, Copy, Check, Flame, Zap } from 'lucide-react';
+import { MessageCircle, Copy, Check, Flame, Zap } from 'lucide-react';
 import { useSessionStatus } from '../../hooks/useSessionStatus';
 import { useWhatsAppConnection } from '../whatsapp/WhatsAppConnectProvider';
-import WhatsAppLinkPanel from '../whatsapp/WhatsAppLinkPanel';
+import { useSession } from 'next-auth/react';
+import { isManager } from '../../lib/roles';
 import { formatPhone } from '../../lib/phone';
 
+/**
+ * Shown on the dashboard when a connected number has stopped working. First-time
+ * setup happens before the dashboard is reachable (SetupGate), so this only ever
+ * reports a broken connection — and where it gets fixed.
+ */
 export default function ConnectionStrip() {
-  const { t } = useTranslation('dashboard');
-  const { status, isLoading } = useSessionStatus() as { status?: string; isLoading: boolean };
-  const { tenantless } = useWhatsAppConnection();
+  const { t } = useTranslation('whatsapp');
+  const { data: session } = useSession();
+  const canManage = isManager((session?.user as { role?: string } | undefined)?.role);
+  const { status, configured, loaded, tenantless } = useWhatsAppConnection();
 
-  if (isLoading || status === 'connected' || tenantless) return null;
-  const connecting = status === 'connecting';
+  if (!loaded || tenantless || !configured || status !== 'disconnected') return null;
 
   return (
-    <section className="panel enter overflow-hidden" aria-label={t('connection.aria', { defaultValue: 'WhatsApp connection' })}>
-      <div className="grid gap-6 p-5 sm:p-7 md:grid-cols-[1fr_auto] md:items-center">
-        <div className="max-w-md">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            {connecting
-              ? <RotateCw className="h-5 w-5 animate-spin" aria-hidden="true" />
-              : <MessageCircle className="h-5 w-5" aria-hidden="true" />}
-          </span>
-          <h2 className="mt-4 text-lg font-semibold tracking-[-0.01em] text-ink">
-            {t('connection.setupTitle', { defaultValue: 'Connect your WhatsApp' })}
-          </h2>
-          <p className="mt-1.5 text-[13px] leading-6 text-ink-3">
-            {t('connection.setupBody', { defaultValue: 'Connect your WhatsApp Business number to start sending and receiving.' })}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-3">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-brand" aria-hidden="true" />
-              {t('common:sidebarConnect.secure')}
-            </span>
-            <Link href="/settings?section=whatsapp" className="font-medium text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink">
-              {t('connection.moreOptions', { defaultValue: 'More connection options' })}
-            </Link>
-          </div>
-        </div>
-        <div className="flex justify-center md:justify-end">
-          <WhatsAppLinkPanel size="md" />
-        </div>
+    <section role="status" className="panel enter flex flex-col gap-3 border-red-500/25 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-500">
+        <MessageCircle className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-ink">{t('banner.brokenTitle')}</h2>
+        <p className="mt-0.5 text-[13px] text-ink-3">{canManage ? t('banner.brokenBody') : t('banner.askManager')}</p>
       </div>
+      {canManage && (
+        <Link href="/settings?section=whatsapp" className="btn btn-primary btn-sm self-start sm:self-auto">
+          {t('banner.fix')}
+        </Link>
+      )}
     </section>
   );
 }

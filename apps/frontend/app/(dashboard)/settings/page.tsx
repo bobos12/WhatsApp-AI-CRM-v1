@@ -6,7 +6,6 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import WhatsAppLinkPanel from '../../../components/whatsapp/WhatsAppLinkPanel';
-import { useWhatsAppConnection } from '../../../components/whatsapp/WhatsAppConnectProvider';
 import ConnectionStatus from '../../../components/shared/ConnectionStatus';
 import FriendlyError from '../../../components/ui/FriendlyError';
 import { useSocket } from '../../../hooks/useSocket';
@@ -47,14 +46,6 @@ export default function SettingsPage() {
     sectionParam && validSections.includes(sectionParam) ? sectionParam : 'whatsapp',
   );
 
-  // ── WhatsApp channel ──────────────────────────────────────────────────────
-  //
-  // Status is read from the app-wide connector. There is no pairing handshake to
-  // own here any more: connecting is done in the wizard below, and everything
-  // this page used to manage locally — QR refresh, warm-up, session reset — was
-  // a property of the unofficial socket and no longer exists.
-  const { status, connectedPhone, verifiedName, configured, health, error: whatsAppError, refresh } =
-    useWhatsAppConnection();
 
   // ── Password change state ──────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword]   = useState('');
@@ -126,90 +117,7 @@ export default function SettingsPage() {
 
   // ── Content renderers ─────────────────────────────────────────────────────
   function WhatsAppSection() {
-    return (
-      <div className="space-y-4">
-        {/* Meta reports the number's health; there is nothing else to configure.
-            The old block here held pairing status, QR linking, warm-up and
-            session reset — all of which were properties of running an
-            unofficial WhatsApp Web socket, and none of which exist on the
-            official API. */}
-        {configured && (
-          <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-raised">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink">
-                  {status === 'connected' ? 'Connected' : 'Not sending'}
-                </p>
-                {connectedPhone && (
-                  <p className="mt-0.5 font-mono text-sm text-ink-3">{connectedPhone}</p>
-                )}
-                {verifiedName && (
-                  <p className="mt-0.5 text-xs text-ink-3">Verified as “{verifiedName}”</p>
-                )}
-              </div>
-              <span
-                className={cn(
-                  'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide',
-                  status === 'connected'
-                    ? 'bg-brand/15 text-brand dark:text-brand'
-                    : 'bg-red-500/10 text-red-600 dark:text-red-300',
-                )}
-              >
-                {status === 'connected' ? 'Live' : 'Offline'}
-              </span>
-            </div>
-
-            {/* Meta's own signals. Shown because a falling quality rating is the
-                only advance warning before Meta limits or restricts a number. */}
-            {health && (
-              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 dark:border-white/5">
-                <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-4">Quality</dt>
-                  <dd
-                    className={cn(
-                      'mt-0.5 text-sm font-semibold',
-                      health.qualityRating === 'GREEN' && 'text-brand dark:text-brand',
-                      health.qualityRating === 'YELLOW' && 'text-amber-500',
-                      health.qualityRating === 'RED' && 'text-red-500',
-                      health.qualityRating === 'UNKNOWN' && 'text-ink-3',
-                    )}
-                  >
-                    {health.qualityRating === 'UNKNOWN' ? 'Not rated yet' : health.qualityRating}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-ink-4">Daily limit</dt>
-                  <dd className="mt-0.5 text-sm font-semibold text-ink">
-                    {health.messagingLimit
-                      ? health.messagingLimit.replace('TIER_', '').replace('UNLIMITED', 'Unlimited')
-                      : '—'}
-                  </dd>
-                </div>
-              </dl>
-            )}
-
-            {whatsAppError && (
-              <p className="mt-3 rounded-xl bg-red-500/10 p-2.5 text-[11px] text-red-700 dark:text-red-300">
-                {whatsAppError}
-              </p>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="mt-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline dark:text-ink-3"
-            >
-              Re-check now
-            </button>
-          </div>
-        )}
-
-        {/* The connect / update-credentials wizard. */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-raised">
-          <WhatsAppLinkPanel size="md" />
-        </div>
-      </div>
-    );
+    return <WhatsAppLinkPanel />;
   }
 
   function AccountSection() {
