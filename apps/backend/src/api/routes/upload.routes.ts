@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import multer from 'multer';
 import crypto from 'crypto';
 import { authMiddleware } from '../../auth/auth.middleware';
 import { uploadFile } from '../../lib/storage';
+import { singleUpload } from '../upload-guard';
 
 const router = Router();
 
@@ -39,26 +39,17 @@ function baseMimeOf(mimetype: string): string {
   return mimetype.split(';')[0].trim().toLowerCase();
 }
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 32 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_TYPES[baseMimeOf(file.mimetype)]) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Unsupported file type: ${file.mimetype}`));
-    }
-  },
+const uploadFileField = singleUpload('file', (_req, file, cb) => {
+  if (ALLOWED_TYPES[baseMimeOf(file.mimetype)]) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Unsupported file type: ${file.mimetype}`));
+  }
 });
 
 router.use(authMiddleware);
 
-router.post('/', (req, res) => {
-  upload.single('file')(req, res, async (err) => {
-    if (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      return res.status(400).json({ error: message });
-    }
+router.post('/', uploadFileField, async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file provided' });
       const baseMime = baseMimeOf(req.file.mimetype);
@@ -75,7 +66,6 @@ router.post('/', (req, res) => {
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Upload failed' });
     }
-  });
 });
 
 export default router;

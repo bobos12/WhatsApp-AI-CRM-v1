@@ -86,6 +86,10 @@ async function uploadS3(
       Key: key,
       Body: buffer,
       ContentType: mimeType,
+      // Names are random and never reused, so a browser may keep a file
+      // forever. Without this every chat scroll re-downloaded each image,
+      // which is what spends a free plan's monthly bandwidth.
+      CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
   return { url: s3.resolveUrl(key), key };

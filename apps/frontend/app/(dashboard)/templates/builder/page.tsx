@@ -16,6 +16,7 @@ import type { CanonicalTemplate, MessageType, MediaType, TemplateCategory } from
 import { isCanonicalPayload, isLegacyPayload } from '../../../../lib/template-engine/schema';
 import { toRenderable, extractVariableNames, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType } from '../../../../lib/template-engine/compiler';
 import { ApprovalPanel, type ApprovalFields } from '../../../../components/templates/ApprovalStatus';
+import { prepareUpload } from '@/lib/prepare-upload';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -306,10 +307,13 @@ function BuilderContent() {
     setUploading(true);
     setUploadError(null);
     try {
+      const ready = await prepareUpload(file);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', ready);
       const res = await apiForm('/api/upload', fd);
-      update({ media: { ...template.media, url: `${API_BASE}${res.url}`, filename: file.name } });
+      // S3 returns an absolute URL; only a local-storage path needs the API origin.
+      const url = /^https?:\/\//i.test(res.url) ? res.url : `${API_BASE}${res.url}`;
+      update({ media: { ...template.media, url, filename: ready.name } });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {

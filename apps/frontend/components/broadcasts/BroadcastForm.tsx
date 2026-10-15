@@ -28,6 +28,7 @@ import { blockers, type PreflightFinding } from '../../lib/preflight';
 import TemplatePicker from './TemplatePicker';
 import type { MetaStatus } from '../templates/ApprovalStatus';
 import { useRouter } from 'next/navigation';
+import { prepareUpload } from '../../lib/prepare-upload';
 
 /** Slowest → fastest, so a user's choice can be compared against the safe cap. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -630,13 +631,14 @@ export default function BroadcastForm({
     setUploading(true);
     setUploadError(null);
     try {
+      const ready = await prepareUpload(file);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', ready);
       const res = await apiForm('/api/upload', fd);
       // Local storage returns a path ("/uploads/x.jpg"); S3 returns an absolute URL.
       // Only the former needs the API origin prepended to be loadable here.
       setMediaUrl(/^https?:\/\//i.test(res.url) ? res.url : `${API_BASE}${res.url}`);
-      setMediaFilename(file.name);
+      setMediaFilename(ready.name);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : t('form.uploadFailed', { defaultValue: 'Upload failed' }));
     } finally {

@@ -65,6 +65,7 @@ import { useSession } from 'next-auth/react';
 import { useDirection } from '../../hooks/useDirection';
 import { useGlobalBot } from '../../hooks/useGlobalBot';
 import { isManager } from '../../lib/roles';
+import { prepareUpload } from '../../lib/prepare-upload';
 
 /** Where a chat's last-seen state is kept between opens (lib/api-cache). */
 const chatCacheKey = (id: string) => `chat:${id}`;
@@ -1133,12 +1134,25 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     }
   };
 
-  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setAttachment(file);
+  const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const picked = input.files?.[0] || null;
     setRecordedAudio(null);
     setShowAttachmentMenu(false);
-    if (file?.type?.startsWith('audio/')) setTypingHint(t('window.audioAttachmentReady'));
+    if (!picked) { setAttachment(null); return; }
+    try {
+      // Photos are shrunk to WhatsApp quality and every file is checked against
+      // WhatsApp's limits here, before anything is uploaded.
+      const file = await prepareUpload(picked);
+      setSendError(null);
+      setAttachment(file);
+      if (file.type.startsWith('audio/')) setTypingHint(t('window.audioAttachmentReady'));
+    } catch (err) {
+      setAttachment(null);
+      setSendError(err instanceof Error ? err.message : String(err));
+    } finally {
+      input.value = ''; // picking the same file again should still fire
+    }
   };
 
   const handleDeleteMessage = async (messageId: string) => {

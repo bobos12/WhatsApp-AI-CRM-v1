@@ -1,6 +1,6 @@
 import { HttpError } from '../../auth/authorize';
 import { Router } from 'express';
-import multer from 'multer';
+import { singleUpload } from '../upload-guard';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -11,7 +11,8 @@ import { getOrCreateConversationByPhone } from '../../conversations/conversation
 import interactiveMessageService from '../../services/interactive-message.service';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+// Size limits shared with the browser: see api/upload-guard.ts.
+const mediaUpload = singleUpload('media');
 const uploadsDir = path.resolve(process.cwd(), 'uploads');
 
 router.use(authMiddleware);
@@ -474,7 +475,7 @@ router.post('/:id/messages/:messageId/reactions', async (req, res) => {
 });
 
 // ── Send reply ────────────────────────────────────────────────────────────────
-router.post('/:id/reply', checkPermission('create', 'messages'), upload.single('media'), async (req, res) => {
+router.post('/:id/reply', checkPermission('create', 'messages'), mediaUpload, async (req, res) => {
   try {
     const { message, contactId, mediaCaption, replyToId, replyToBody, clientId } = req.body;
     const agentId = (req as any).user?.id as string | undefined;

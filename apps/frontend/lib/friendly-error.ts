@@ -100,6 +100,7 @@ export function plainKeyFor(code: string | undefined, status: number | undefined
     CLOUD_API_NOT_CONFIGURED: 'notSetUp',
     NO_TENANT: 'notSetUp',
     ENCRYPTION_NOT_CONFIGURED: 'serverNotReady',
+    FILE_TOO_LARGE: 'fileTooLargeGeneric',
   };
   if (code && byCode[code]) return byCode[code];
   // An unexplained server crash: its text is a stack-trace fragment at best.

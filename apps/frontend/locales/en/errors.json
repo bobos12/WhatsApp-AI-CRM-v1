@@ -127,6 +127,14 @@
     "notSetUp": "WhatsApp isn't connected yet. A manager can connect it in Settings → WhatsApp.",
     "serverNotReady": "This feature isn't ready on the server yet. Please contact support.",
     "network": "Can't reach the server. Check your internet connection and try again.",
-    "server": "Something went wrong on our side. Please try again."
+    "server": "Something went wrong on our side. Please try again.",
+    "fileTooLarge": "This {{kind}} is {{size}} MB. WhatsApp allows up to {{limit}} MB — please choose a smaller file.",
+    "fileTooLargeGeneric": "This file is too large to send on WhatsApp. Please choose a smaller one.",
+    "fileKinds": {
+      "image": "photo",
+      "video": "video",
+      "audio": "voice note",
+      "document": "document"
+    }
   }
 }
