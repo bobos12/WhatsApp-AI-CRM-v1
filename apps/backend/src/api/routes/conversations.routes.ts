@@ -1,3 +1,4 @@
+import { HttpError } from '../../auth/authorize';
 import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs';
@@ -538,6 +539,11 @@ router.post('/:id/reply', checkPermission('create', 'messages'), upload.single('
       });
     }
 
+    // A refusal from WhatsApp already carries the right status and a message
+    // written for the user; flattening it to 500 hid both.
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     const status = message.includes('not connected') ? 503 : 500;
     res.status(status).json({ error: message });
   }

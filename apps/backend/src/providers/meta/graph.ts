@@ -54,7 +54,7 @@ const ERROR_MAP: Record<number, MetaErrorMapping> = {
   0:      { kind: 'AUTH', retryable: false, userMessage: 'WhatsApp rejected the stored credentials. Re-enter your access token in Settings.' },
   190:    { kind: 'AUTH', retryable: false, userMessage: 'Your WhatsApp access token has expired. Generate a new permanent token and re-enter it in Settings.' },
   10:     { kind: 'AUTH', retryable: false, userMessage: 'This token is missing a permission WhatsApp requires (whatsapp_business_messaging).' },
-  200:    { kind: 'AUTH', retryable: false, userMessage: 'This token is not allowed to perform that action on your WhatsApp account.' },
+  200:    { kind: 'AUTH', retryable: false, userMessage: 'Meta is not letting this WhatsApp account send messages yet. A manager can see why in Settings → WhatsApp → Connection health.' },
 
   131047: { kind: 'TEMPLATE_REQUIRED', retryable: false, userMessage: 'This contact last messaged you more than 24 hours ago, so WhatsApp only allows an approved template message.' },
   131051: { kind: 'BAD_REQUEST', retryable: false, userMessage: 'That message type is not supported for this recipient.' },

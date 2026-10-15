@@ -95,7 +95,7 @@ export class MetaWhatsAppProvider implements MessagingProvider {
       // Record the failure so Settings can explain it instead of showing a
       // number that looks connected but silently refuses every send.
       await recordSync(tenantId, { error: meta.userMessage });
-      throw new HttpError(meta.requiresReauth ? 401 : 502, meta.userMessage, `META_${meta.kind}`);
+      throw new HttpError(502, meta.userMessage, `META_${meta.kind}`);
     }
   }
 
@@ -198,7 +198,7 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         trace: meta.traceId,
       });
       throw new HttpError(
-        meta.requiresTemplate ? 409 : meta.requiresReauth ? 401 : 502,
+        meta.requiresTemplate ? 409 : 502,
         meta.userMessage,
         `META_${meta.kind}`,
       );
