@@ -49,18 +49,25 @@ function handle(res: any, err: unknown) {
 
 // ── Read ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Every response that hands the client a channel uses this shape, so the
+ * webhook setup step after a save still knows the callback URL and token state.
+ */
+async function channelView() {
+  return {
+    ...(await getChannelForDisplay()),
+    // Surfaced so Settings can explain *why* saving credentials is refused,
+    // rather than showing an opaque failure the tenant cannot act on.
+    encryptionReady: isCredentialEncryptionConfigured(),
+    webhookUrl: `${process.env.PUBLIC_API_URL ?? ''}/api/whatsapp/meta-webhook`,
+    verifyTokenSet: Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN),
+  };
+}
+
 router.get('/', checkPermission('read', 'whatsapp'), async (_req, res) => {
   try {
     requireTenant();
-    const channel = await getChannelForDisplay();
-    res.json({
-      ...channel,
-      // Surfaced so Settings can explain *why* saving credentials is refused,
-      // rather than showing an opaque failure the tenant cannot act on.
-      encryptionReady: isCredentialEncryptionConfigured(),
-      webhookUrl: `${process.env.PUBLIC_API_URL ?? ''}/api/whatsapp/meta-webhook`,
-      verifyTokenSet: Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN),
-    });
+    res.json(await channelView());
   } catch (err) {
     handle(res, err);
   }
@@ -113,7 +120,7 @@ router.put(
         });
       }
 
-      res.json({ saved: true, verified: true, channel: await getChannelForDisplay() });
+      res.json({ saved: true, verified: true, channel: await channelView() });
     } catch (err) {
       handle(res, err);
     }
@@ -125,7 +132,7 @@ router.post('/verify', checkPermission('update', 'whatsapp'), async (_req, res) 
   try {
     requireTenant();
     await providerByName('meta').connect();
-    res.json({ verified: true, channel: await getChannelForDisplay() });
+    res.json({ verified: true, channel: await channelView() });
   } catch (err) {
     handle(res, err);
   }
@@ -135,7 +142,7 @@ router.delete('/cloud', checkPermission('update', 'whatsapp'), async (_req, res)
   try {
     requireTenant();
     await disconnectCloud();
-    res.json({ success: true, channel: await getChannelForDisplay() });
+    res.json({ success: true, channel: await channelView() });
   } catch (err) {
     handle(res, err);
   }
