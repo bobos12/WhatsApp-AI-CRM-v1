@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { PageHeader } from '@/components/ui/page';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -303,29 +304,18 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-50 dark:bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              {t('badge')}
-            </div>
-            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('users.title')}</h1>
-            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
-              {t('users.subtitle')}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => { setEditing(null); setShowForm(true); }}
-            className="btn btn-primary inline-flex self-start lg:self-auto"
-          >
+      <PageHeader
+        className="mb-0"
+        title={t('users.title')}
+        meta={<span className="chip chip-warn gap-1"><ShieldCheck className="h-3 w-3" aria-hidden="true" />{t('badge')}</span>}
+        description={t('users.subtitle')}
+        actions={
+          <button type="button" onClick={() => { setEditing(null); setShowForm(true); }} className="btn btn-primary inline-flex">
             <Plus className="h-4 w-4" />
             {t('users.newUser')}
           </button>
-        </div>
-      </section>
+        }
+      />
 
       {/* ── Table ── */}
       <div className="rounded-xl border border-line bg-surface overflow-hidden">

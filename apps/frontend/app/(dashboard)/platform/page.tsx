@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { PageHeader } from '@/components/ui/page';
 import { useRouter } from 'next/navigation';
 import {
   Building2, Plus, Trash2, Search, Users, Smartphone, CheckCircle2, PauseCircle,
@@ -199,25 +200,14 @@ export default function PlatformPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand dark:text-brand">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Operator console
-            </div>
-            <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">Client Management</h1>
-            <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
-              Every business on this deployment. Create, suspend, open, or remove a client — each one is fully isolated.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-start lg:self-auto">
-            <button
-              type="button"
-              onClick={() => loadTenants()}
-              className="btn btn-secondary inline-flex"
-            >
+      <PageHeader
+        className="mb-0"
+        title="Client Management"
+        meta={<span className="chip chip-brand gap-1"><ShieldCheck className="h-3 w-3" aria-hidden="true" />Operator console</span>}
+        description="Every business on this deployment. Create, suspend, open, or remove a client — each one is fully isolated."
+        actions={
+          <>
+            <button type="button" onClick={() => loadTenants()} className="btn btn-secondary inline-flex">
               <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} /> Refresh
             </button>
             <button
@@ -227,9 +217,9 @@ export default function PlatformPage() {
             >
               <Plus className="h-4 w-4" /> New client
             </button>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

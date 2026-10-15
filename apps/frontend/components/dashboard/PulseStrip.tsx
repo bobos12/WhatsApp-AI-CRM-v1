@@ -78,29 +78,28 @@ export default function PulseStrip({ data, series, locale }: { data: OverviewDat
   ];
 
   return (
-    <section className="grid grid-cols-2 border-y border-line lg:grid-cols-4" aria-label={t('crmOverview')}>
+    <section className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-surface lg:grid-cols-4" aria-label={t('crmOverview')}>
       {cells.map((c, i) => (
         <Link
           key={c.key}
           href={c.href}
           className={cn(
-            'group relative isolate flex min-w-0 flex-col gap-4 py-6 transition-colors duration-base sm:py-7',
-            i % 2 === 0 ? 'pe-5 sm:pe-8' : 'ps-5 sm:ps-8',
+            'group relative flex min-w-0 flex-col gap-3 p-4 outline-none transition-colors duration-base sm:p-5',
+            'hover:bg-raised/60 focus-visible:bg-raised/60 active:bg-raised',
             i % 2 === 1 && 'border-s border-line',
             i >= 2 && 'border-t border-line lg:border-t-0',
-            i === 2 && 'lg:border-s lg:ps-8',
-            i === 1 && 'lg:pe-8',
+            i === 2 && 'lg:border-s',
           )}
         >
-          {/* hover wash, kept inside the cell's own gutter */}
-          <span aria-hidden="true" className="pointer-events-none absolute inset-y-2 inset-x-0 -z-10 rounded-lg bg-raised opacity-0 transition-opacity duration-base group-hover:opacity-100" />
-          <div className="flex items-center justify-between gap-2">
-            <span className="eyebrow truncate">{c.label}</span>
-            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-4 opacity-0 transition-all duration-base group-hover:-translate-y-px group-hover:opacity-100 icon-mirror" aria-hidden="true" />
+          {/* hover: a brand rule draws in along the cell's foot */}
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-center scale-x-0 bg-brand transition-transform duration-base ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100" />
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[13px] font-medium text-ink-2">{c.label}</span>
+            <ArrowUpRight className="ms-auto h-4 w-4 shrink-0 translate-y-0.5 text-ink-3 opacity-0 transition-[opacity,transform] duration-base group-hover:translate-y-0 group-hover:opacity-100 icon-mirror" aria-hidden="true" />
           </div>
           <div className="flex items-end justify-between gap-3">
-            <AnimatedNumber value={c.value} format={fmt} className="text-[34px] font-semibold leading-none tracking-[-0.035em] text-ink sm:text-[40px]" />
-            {'spark' in c && c.spark && c.spark.length > 1 && <Sparkline points={c.spark} className="hidden xl:block" />}
+            <AnimatedNumber value={c.value} format={fmt} className="text-[30px] font-semibold leading-none tracking-[-0.03em] text-ink sm:text-[34px]" />
+            {'spark' in c && c.spark && c.spark.length > 1 && c.spark.some((p) => p > 0) && <Sparkline points={c.spark} className="hidden xl:block" />}
           </div>
           <p className="truncate text-xs text-ink-3">{c.sub}</p>
         </Link>

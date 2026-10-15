@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHeader } from '@/components/ui/page';
 import { useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
@@ -347,10 +348,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* ── Header ── */}
-      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-surface">
-        <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('title')}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-3">{t('subtitle')}</p>
-      </section>
+      <PageHeader className="mb-0" title={t('title')} description={t('subtitle')} />
 
       {/* ── Mobile nav ── */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden scrollbar-none">

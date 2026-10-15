@@ -132,12 +132,15 @@ export function ApprovalPanel({
   submitting,
   onSubmit,
   disabledReason,
+  hideSubmit,
 }: {
   template: ApprovalFields;
   submitting?: boolean;
   onSubmit: () => void;
   /** Set when submission is impossible (e.g. no number connected), with the reason. */
   disabledReason?: string | null;
+  /** The page already offers submit elsewhere (e.g. a sticky action bar). */
+  hideSubmit?: boolean;
 }) {
   const { t } = useTranslation('templates');
   const { tone, label, detail, icon: Icon, canSubmit } = describeApproval(template, t as TFn);
@@ -178,7 +181,7 @@ export function ApprovalPanel({
             </p>
           )}
 
-          {canSubmit && (
+          {canSubmit && !hideSubmit && (
             <>
               <button
                 type="button"

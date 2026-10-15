@@ -15,7 +15,7 @@ import { useDirection } from '../../../../hooks/useDirection';
 import type { CanonicalTemplate, MessageType, MediaType, TemplateCategory } from '../../../../lib/template-engine/schema';
 import { isCanonicalPayload, isLegacyPayload } from '../../../../lib/template-engine/schema';
 import { toRenderable, extractVariableNames, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType } from '../../../../lib/template-engine/compiler';
-import { ApprovalPanel, type ApprovalFields } from '../../../../components/templates/ApprovalStatus';
+import { ApprovalPanel, describeApproval, type ApprovalFields } from '../../../../components/templates/ApprovalStatus';
 import { prepareUpload } from '@/lib/prepare-upload';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -31,7 +31,6 @@ const DEFAULT_TEMPLATE: CanonicalTemplate = {
 };
 
 const COMMON_VARS = ['name', 'first_name', 'phone', 'company', 'order_id', 'date', 'amount', 'link'];
-const QUICK_EMOJI = ['😊', '👋', '🎉', '✅', '🔥', '🙏', '📦', '💳', '📅', '⭐'];
 
 const MESSAGE_TYPES: Array<{ type: MessageType; icon: typeof Type; labelKey: string; fallback: string }> = [
   { type: 'TEXT',     icon: Type,      labelKey: 'builder.typeText',     fallback: 'Text' },
@@ -110,15 +109,15 @@ function CompactPreview({ template, vars }: { template: CanonicalTemplate; vars:
   const isEmpty = !r.body.trim() && !r.media;
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-canvas bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.03)_1px,transparent_0)] [background-size:16px_16px]">
+    <div className="overflow-hidden rounded-xl border border-line bg-chat bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.03)_1px,transparent_0)] [background-size:16px_16px]">
       <div className="flex items-center gap-2 border-b border-line bg-raised px-4 py-2.5">
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/20 text-[11px]">💬</div>
-        <p className="flex-1 text-[11px] font-semibold text-white">{t('builder.previewTitle', { defaultValue: 'WhatsApp Preview' })}</p>
-        <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-medium text-green-300">✓ {t('builder.previewLive', { defaultValue: 'Live' })}</span>
+        <p className="flex-1 text-[11px] font-semibold text-ink">{t('builder.previewTitle', { defaultValue: 'WhatsApp Preview' })}</p>
+        <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-medium text-brand">✓ {t('builder.previewLive', { defaultValue: 'Live' })}</span>
       </div>
-      <div className="min-h-[92px] p-3.5">
+      <div className="min-h-[72px] p-3.5">
         {isEmpty ? (
-          <p className="py-5 text-center text-xs text-white/25">{t('builder.previewEmpty', { defaultValue: 'Start typing to see your message' })}</p>
+          <p className="py-3 text-center text-xs text-ink-4">{t('builder.previewEmpty', { defaultValue: 'Start typing to see your message' })}</p>
         ) : (
           <MessageBubble template={template} vars={vars} />
         )}
@@ -181,6 +180,36 @@ function WhatsAppPreview({ template, vars, onVarChange }: {
   );
 }
 
+// ── A numbered step: the builder reads top to bottom as a short checklist ──────
+
+function Step({ n, title, desc, done, aside, last, children }: {
+  n: number; title: string; desc?: string; done?: boolean; aside?: React.ReactNode; last?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <section className="relative flex gap-3.5 sm:gap-4">
+      {/* number + connecting rail */}
+      <div className="flex flex-col items-center">
+        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums transition-colors duration-base ${
+          done ? 'bg-brand text-brand-fg' : 'bg-raised text-ink-2 ring-1 ring-inset ring-line-strong'
+        }`}>
+          {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : n}
+        </span>
+        {!last && <span className="mt-2 w-px flex-1 bg-line" aria-hidden="true" />}
+      </div>
+      <div className={`min-w-0 flex-1 ${last ? '' : 'pb-8 sm:pb-9'}`}>
+        <div className="mb-3 flex items-start justify-between gap-3 pt-0.5">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold leading-6 text-ink">{title}</h2>
+            {desc && <p className="mt-0.5 text-[13px] leading-5 text-ink-3">{desc}</p>}
+          </div>
+          {aside}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 // ── Main builder ──────────────────────────────────────────────────────────────
 
 function BuilderContent() {
@@ -200,7 +229,6 @@ function BuilderContent() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [showTestSend, setShowTestSend] = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -427,15 +455,33 @@ function BuilderContent() {
     </>
   );
 
-  // ── Editor controls (shared by mobile + desktop) ───────────────────────────
+  const rejected = approval.metaStatus === 'REJECTED';
+  const canSubmit = describeApproval(approval, t as Parameters<typeof describeApproval>[1]).canSubmit;
+  const busy = saving || submitting;
+  const approvalPanel = (
+    <ApprovalPanel template={approval} submitting={submitting || saving} onSubmit={handleSubmitForApproval} hideSubmit />
+  );
+  const hasContent = isAudio
+    ? Boolean(template.media?.url)
+    : Boolean(template.body.text.trim()) && (!isMedia || Boolean(template.media?.url));
+
+  // ── Editor steps (shared by mobile + desktop) ───────────────────────────────
   const editorControls = (
-    <div className="space-y-6">
-      {/* 1 · Message type — segmented control */}
-      <section>
-        <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-ink-4">
-          {t('builder.messageType', { defaultValue: 'Message type' })}
-        </label>
-        <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-gray-200 bg-gray-100 p-1.5 dark:border-white/10 dark:bg-canvas">
+    <div>
+      {/* 1 · Name */}
+      <Step n={1} title={t('builder.steps.name.title')} desc={t('builder.steps.name.desc')} done={Boolean(template.name.trim())}>
+        <input
+          value={template.name}
+          onChange={e => { update({ name: e.target.value }); if (saveError) setSaveError(null); }}
+          placeholder={t('builder.namePlaceholder')}
+          aria-label={t('builder.steps.name.title')}
+          className="field h-11 w-full text-[15px]"
+        />
+      </Step>
+
+      {/* 2 · Message type */}
+      <Step n={2} title={t('builder.steps.type.title')} desc={t('builder.steps.type.desc')} done>
+        <div className="grid grid-cols-5 gap-1 rounded-xl bg-raised p-1">
           {MESSAGE_TYPES.map(({ type, icon: Icon, labelKey, fallback }) => {
             const active = messageType === type;
             return (
@@ -443,249 +489,249 @@ function BuilderContent() {
                 key={type}
                 type="button"
                 onClick={() => setMessageType(type)}
-                className={`flex flex-col items-center gap-1.5 rounded-xl px-1 py-2.5 transition-all ${
-                  active
-                    ? 'bg-white text-brand shadow-sm dark:bg-raised'
-                    : 'text-gray-400 hover:text-ink-3 dark:hover:text-white'
+                aria-pressed={active}
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-2.5 transition-[background-color,color,box-shadow,transform] duration-fast active:scale-[0.97] ${
+                  active ? 'bg-surface text-brand shadow-soft ring-1 ring-line' : 'text-ink-3 hover:text-ink'
                 }`}
               >
                 <Icon className="h-[18px] w-[18px]" />
-                <span className="text-[11px] font-medium">{t(labelKey, { defaultValue: fallback })}</span>
+                <span className="w-full truncate text-center text-xs font-medium">{t(labelKey, { defaultValue: fallback })}</span>
               </button>
             );
           })}
         </div>
-      </section>
+      </Step>
 
-      {/* 2 · Media upload (media types only) */}
-      {isMedia && (
-        <section>
-          <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-ink-4">
-            {t('builder.attachFile', { defaultValue: 'Attach file' })}
-          </label>
-          <input ref={fileRef} type="file" accept={acceptFor} onChange={handleFile} className="hidden" />
-          {template.media?.url ? (
-            <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-surface">
-              {messageType === 'IMAGE' ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={template.media.url} alt="" className="h-14 w-14 flex-shrink-0 rounded-xl object-cover"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                  {messageType === 'VIDEO' ? <Video className="h-6 w-6" />
-                    : messageType === 'AUDIO' ? <Mic className="h-6 w-6" />
-                    : <FileText className="h-6 w-6" />}
+      {/* 3 · Content: attachment and/or text */}
+      <Step
+        n={3}
+        title={t('builder.steps.content.title')}
+        desc={isAudio ? undefined : t('builder.steps.content.desc')}
+        done={hasContent}
+        aside={!isAudio && <span className="shrink-0 pt-1 text-[11px] tabular-nums text-ink-4">{charCount}/4096</span>}
+      >
+        <div className="space-y-3">
+          {isMedia && (
+            <div>
+              <input ref={fileRef} type="file" accept={acceptFor} onChange={handleFile} className="hidden" />
+              {template.media?.url ? (
+                <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3">
+                  {messageType === 'IMAGE' ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={template.media.url} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  ) : (
+                    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                      {messageType === 'VIDEO' ? <Video className="h-6 w-6" />
+                        : messageType === 'AUDIO' ? <Mic className="h-6 w-6" />
+                        : <FileText className="h-6 w-6" />}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{template.media.filename || t('builder.fileAttached', { defaultValue: 'File attached' })}</p>
+                    <button type="button" onClick={() => fileRef.current?.click()} className="mt-0.5 text-xs font-medium text-brand hover:underline">
+                      {t('builder.replaceFile', { defaultValue: 'Replace' })}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => update({ media: { type: template.media!.type } })}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-4 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink">{template.media.filename || t('builder.fileAttached', { defaultValue: 'File attached' })}</p>
-                <button type="button" onClick={() => fileRef.current?.click()} className="text-xs text-brand hover:underline">
-                  {t('builder.replaceFile', { defaultValue: 'Replace' })}
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface py-7 text-ink-3 transition-colors hover:border-brand/60 hover:bg-brand/[0.04] hover:text-brand disabled:opacity-60"
+                >
+                  {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+                  <span className="text-sm font-medium">
+                    {uploading ? t('builder.uploading', { defaultValue: 'Uploading…' }) : t('builder.tapToUpload', { defaultValue: 'Tap to upload' })}
+                  </span>
                 </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => update({ media: { type: template.media!.type } })}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-rose-500/5 hover:text-rose-500"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              )}
+              {uploadError && <p className="mt-1.5 text-xs text-rose-500">{uploadError}</p>}
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-white py-8 text-gray-500 transition-colors hover:border-brand/50 hover:text-brand disabled:opacity-60 dark:border-white/15 dark:bg-surface dark:text-ink-3"
-            >
-              {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
-              <span className="text-sm font-medium">
-                {uploading ? t('builder.uploading', { defaultValue: 'Uploading…' }) : t('builder.tapToUpload', { defaultValue: 'Tap to upload' })}
-              </span>
-            </button>
           )}
-          {uploadError && <p className="mt-1.5 text-xs text-rose-500">{uploadError}</p>}
-        </section>
-      )}
 
-      {/* 3 · Message text — WhatsApp voice messages carry no caption */}
-      {isAudio ? (
-        <section>
-          <p className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-[11px] text-gray-500 dark:border-white/10 dark:bg-surface dark:text-ink-3">
-            <Mic className="h-3.5 w-3.5 shrink-0" />
-            {t('builder.audioHint', { defaultValue: 'Sent as a WhatsApp voice message. Audio messages cannot carry a caption.' })}
-          </p>
-        </section>
-      ) : (
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-4">
-            {isMedia
-              ? t('builder.caption', { defaultValue: 'Caption' })
-              : t('builder.message', { defaultValue: 'Message' })}
-            {!isMedia && <span className="text-rose-400"> *</span>}
-          </label>
-          <span className="text-[10px] tabular-nums text-ink-4">{charCount}/4096</span>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white focus-within:border-brand dark:border-white/10 dark:bg-surface">
-          <textarea
-            ref={bodyRef}
-            value={template.body.text}
-            onChange={e => update({ body: { text: e.target.value } })}
-            placeholder={isMedia
-              ? t('builder.captionPlaceholder', { defaultValue: 'Add a caption… (optional)' })
-              : t('builder.messagePlaceholder2', { defaultValue: 'Write your message… use *bold*, _italic_ and emojis 😊' })}
-            rows={6}
-            maxLength={4096}
-            className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-[15px] leading-relaxed text-gray-900 placeholder:text-gray-400 focus:outline-none dark:text-white"
-          />
-          {/* Toolbar: emoji + variables */}
-          <div className="flex flex-wrap items-center gap-1 border-t border-gray-100 px-2 py-2 dark:border-white/5">
-            {QUICK_EMOJI.map(e => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => insertAtCursor(e)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-colors hover:bg-raised"
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Variable chips */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-ink-4">{t('builder.insert', { defaultValue: 'Personalize:' })}</span>
-          {COMMON_VARS.map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => insertAtCursor(`{{${v}}}`)}
-              className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 font-mono text-[11px] text-brand transition-colors hover:bg-brand/20"
-            >
-              {`{{${v}}}`}
-            </button>
-          ))}
-        </div>
-      </section>
-      )}
-
-      {/* 4 · Test send */}
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-surface">
-        <button
-          type="button"
-          onClick={() => { setShowTestSend(v => !v); setTestResult(null); }}
-          className="flex w-full items-center gap-2 text-sm font-medium text-ink-2"
-        >
-          <Smartphone className="h-4 w-4 text-brand" />
-          {t('builder.testSendTitleNew', { defaultValue: 'Send a test to your own number' })}
-        </button>
-        {showTestSend && (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="tel"
-                value={testPhone}
-                onChange={e => setTestPhone(e.target.value)}
-                placeholder="+1 234 567 8900"
-                className="field flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleTestSend}
-                disabled={testSending || !testPhone.trim()}
-                className="btn btn-primary inline-flex disabled:opacity-50"
-              >
-                {testSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                {t('builder.sendTest', { defaultValue: 'Send' })}
-              </button>
-            </div>
-            {testResult && (
-              <div className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs ${
-                testResult.ok
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-              }`}>
-                {testResult.ok ? <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" /> : <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />}
-                {testResult.message}
+          {isAudio ? (
+            <p className="flex items-center gap-2 rounded-xl bg-raised px-3.5 py-3 text-[13px] text-ink-3">
+              <Mic className="h-4 w-4 shrink-0" />
+              {t('builder.audioHint', { defaultValue: 'Sent as a WhatsApp voice message. Audio messages cannot carry a caption.' })}
+            </p>
+          ) : (
+            <>
+              {isMedia && (
+                <p className="text-xs font-medium text-ink-3">
+                  {t('builder.caption', { defaultValue: 'Caption' })} · <span className="font-normal text-ink-4">{t('builder.optional')}</span>
+                </p>
+              )}
+              <div className="overflow-hidden rounded-xl border border-line bg-surface transition-[border-color,box-shadow] duration-fast focus-within:border-brand/60 focus-within:ring-[3px] focus-within:ring-brand/10">
+                <textarea
+                  ref={bodyRef}
+                  value={template.body.text}
+                  onChange={e => update({ body: { text: e.target.value } })}
+                  placeholder={isMedia
+                    ? t('builder.captionPlaceholder', { defaultValue: 'Add a caption… (optional)' })
+                    : t('builder.messagePlaceholder2', { defaultValue: 'Write your message… use *bold*, _italic_ and emojis 😊' })}
+                  rows={6}
+                  maxLength={4096}
+                  aria-label={isMedia ? t('builder.caption', { defaultValue: 'Caption' }) : t('builder.message', { defaultValue: 'Message' })}
+                  className="block min-h-[150px] w-full resize-y bg-transparent px-4 py-3 text-[15px] leading-relaxed text-ink placeholder:text-ink-4 focus:outline-none"
+                />
               </div>
-            )}
+
+              {/* Personalisation */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="me-1 text-xs font-medium text-ink-3">{t('builder.insert', { defaultValue: 'Personalize:' })}</span>
+                {COMMON_VARS.map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => insertAtCursor(`{{${v}}}`)}
+                    dir="ltr"
+                    className="h-7 rounded-full border border-line bg-surface px-2.5 font-mono text-[11px] text-ink-2 transition-[background-color,border-color,color,transform] duration-fast hover:border-brand/40 hover:bg-brand/10 hover:text-brand active:scale-95"
+                  >
+                    {`{{${v}}}`}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </Step>
+
+      {/* 4 · Test send (optional) */}
+      <Step
+        n={4}
+        title={t('builder.steps.test.title')}
+        desc={t('builder.steps.test.desc')}
+        done={Boolean(testResult?.ok)}
+        last={rejected}
+      >
+        <div className="space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="tel"
+              dir="ltr"
+              value={testPhone}
+              onChange={e => setTestPhone(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void handleTestSend(); }}
+              placeholder="+966 5x xxx xxxx"
+              aria-label={t('builder.testSendTitleNew', { defaultValue: 'Send a test to your own number' })}
+              className="field h-11 min-w-0 flex-1"
+            />
+            <button
+              type="button"
+              onClick={handleTestSend}
+              disabled={testSending || !testPhone.trim()}
+              className="btn btn-secondary h-11 shrink-0 justify-center disabled:opacity-50"
+            >
+              {testSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
+              {t('builder.sendTest', { defaultValue: 'Send' })}
+            </button>
           </div>
-        )}
-      </section>
+          {testResult && (
+            <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+              testResult.ok ? 'bg-brand/10 text-brand' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+            }`}>
+              {testResult.ok ? <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" /> : <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />}
+              {testResult.message}
+            </div>
+          )}
+        </div>
+      </Step>
+
+      {/* 5 · WhatsApp approval — the last step. A rejection moves to the top of
+          the page instead, because Meta's reason dictates what to change. */}
+      {!rejected && (
+        <Step
+          n={5}
+          title={t('builder.steps.approval.title')}
+          done={approval.metaStatus === 'APPROVED'}
+          last
+        >
+          {approvalPanel}
+        </Step>
+      )}
     </div>
   );
 
   return (
     // Full-bleed: fill the padded <main> exactly (main is `relative`), so the page's
     // own top/side padding never shows above the editor. The editor scrolls internally.
-    <div className="absolute inset-0 flex flex-col overflow-hidden bg-gray-50 lg:flex-row dark:bg-canvas">
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-canvas lg:flex-row">
 
       {/* ── Left: editor ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Top bar — flush to the very top, no gap */}
-        <header className="z-20 flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-white/85 px-3 py-2.5 backdrop-blur-xl sm:px-5 sm:py-3 dark:border-white/10 dark:bg-surface/85">
+        <header className="z-20 flex h-14 flex-shrink-0 items-center gap-2 border-b border-line bg-surface px-3 sm:gap-3 sm:px-5">
           <button
             type="button"
             onClick={() => router.push('/templates')}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 dark:text-ink-3 dark:hover:bg-white/5"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-raised hover:text-ink"
             aria-label={t('title')}
           >
             <BackIcon className="h-5 w-5" />
           </button>
           <div className="min-w-0 flex-1">
-            <input
-              value={template.name}
-              onChange={e => update({ name: e.target.value })}
-              placeholder={t('builder.templateNamePlaceholder', { defaultValue: 'Template name' })}
-              className="w-full truncate bg-transparent text-[15px] font-bold text-gray-900 placeholder:font-medium placeholder:text-gray-400 focus:outline-none sm:text-base dark:text-white"
-            />
-            <p className="text-[11px] text-ink-4">
-              {templateId ? t('builder.editing', { defaultValue: 'Editing template' }) : t('builder.newDraft', { defaultValue: 'New template' })}
-            </p>
+            <h1 className="truncate text-[15px] font-semibold text-ink sm:text-base">
+              {template.name.trim() || (templateId ? t('builder.editing', { defaultValue: 'Editing template' }) : t('builder.newDraft', { defaultValue: 'New template' }))}
+            </h1>
+            {template.name.trim() && (
+              <p className="text-[11px] text-ink-4">
+                {templateId ? t('builder.editing', { defaultValue: 'Editing template' }) : t('builder.newDraft', { defaultValue: 'New template' })}
+              </p>
+            )}
           </div>
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
-            className="btn btn-primary hidden disabled:opacity-60 sm:inline-flex"
+            disabled={busy}
+            className={`btn hidden disabled:opacity-60 sm:inline-flex ${canSubmit ? 'btn-secondary' : 'btn-primary'}`}
           >
             {SaveButtonInner}
           </button>
+          {canSubmit && (
+            <button
+              type="button"
+              onClick={handleSubmitForApproval}
+              disabled={busy}
+              className="btn btn-primary hidden disabled:opacity-60 sm:inline-flex"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
+              {submitting ? t('approval.submitting') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
+            </button>
+          )}
         </header>
 
-        {saveError && (
-          <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {saveError}
-          </div>
-        )}
+        {/* Form (scrolls). Extra bottom padding on phones for the sticky save bar. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto w-full max-w-[640px] px-4 pb-32 pt-5 sm:px-6 sm:pb-10 sm:pt-8">
+            {saveError && (
+              <div role="alert" className="mb-5 flex items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-700 dark:text-rose-300">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {saveError}
+              </div>
+            )}
 
-        {/* Form (scrolls). Extra bottom padding on mobile for the sticky save bar. */}
-        <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-5 pb-28 sm:px-5 sm:pb-6 lg:mx-0">
-          {/* Compact live preview — mobile only */}
-          <div className="mb-6 lg:hidden">
-            <CompactPreview template={template} vars={previewVars} />
-          </div>
+            {rejected && <div className="mb-8">{approvalPanel}</div>}
 
-          {/* Approval state sits above the editor, not below it: on a rejected
-              template Meta's reason is the first thing that should be read,
-              because it dictates what to change. */}
-          <div className="mb-6">
-            <ApprovalPanel
-              template={approval}
-              submitting={submitting || saving}
-              onSubmit={handleSubmitForApproval}
-            />
-          </div>
+            {editorControls}
 
-          {editorControls}
+            {/* Compact live preview — phones and tablets, after the steps */}
+            <div className="mt-8 ps-[42px] sm:ps-11 lg:hidden">
+              <CompactPreview template={template} vars={previewVars} />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ── Right: preview (desktop only) ── */}
-      <aside className="hidden w-[380px] flex-shrink-0 flex-col border-s border-gray-200 bg-white lg:flex dark:border-white/10 dark:bg-surface">
+      <aside className="hidden w-[380px] flex-shrink-0 flex-col border-s border-line bg-surface lg:flex xl:w-[420px]">
         <WhatsAppPreview
           template={template}
           vars={previewVars}
@@ -693,16 +739,27 @@ function BuilderContent() {
         />
       </aside>
 
-      {/* ── Mobile sticky save bar ── */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:hidden dark:border-white/10 dark:bg-surface">
+      {/* ── Mobile sticky action bar: save, and send for review when allowed ── */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-line bg-surface/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-sm font-semibold text-brand-fg transition-colors hover:bg-brand-strong active:scale-[0.99] disabled:opacity-60"
+          disabled={busy}
+          className={`btn h-12 flex-1 justify-center text-sm font-semibold active:scale-[0.98] disabled:opacity-60 ${canSubmit ? 'btn-secondary' : 'btn-primary'}`}
         >
           {SaveButtonInner}
         </button>
+        {canSubmit && (
+          <button
+            type="button"
+            onClick={handleSubmitForApproval}
+            disabled={busy}
+            className="btn btn-primary h-12 flex-[1.3] justify-center text-sm font-semibold active:scale-[0.98] disabled:opacity-60"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
+            {submitting ? t('approval.submitting') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
+          </button>
+        )}
       </div>
       {/* Mobile bottom-nav spacer */}
       <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />

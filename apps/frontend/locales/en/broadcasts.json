@@ -193,7 +193,9 @@
     "waNotConnected": "No WhatsApp number is connected, so there is nothing to send from.",
     "waConnecting": "WhatsApp is still connecting — this will be ready in a moment.",
     "waGateHint": "You can still schedule this campaign for later — switch off \"Send now\" to save it.",
-    "waConnectCta": "Connect WhatsApp"
+    "waConnectCta": "Connect WhatsApp",
+    "hintName": "Give the campaign a name to continue.",
+    "hintMessage": "Choose a template or write a message to continue."
   },
   "interactive": {
     "tabButtons": "Quick Reply",

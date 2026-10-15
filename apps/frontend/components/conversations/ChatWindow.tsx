@@ -1756,7 +1756,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                 onKeyDown={onComposerKeyDown}
                 placeholder={t('composer.placeholder')}
                 dir="auto"
-                className="block max-h-[140px] min-h-[40px] w-full resize-none rounded-xl border border-transparent bg-raised px-4 py-2.5 text-[14px] leading-5 text-ink outline-none transition-[border-color,box-shadow,background-color] placeholder:text-ink-4 focus:border-line focus:bg-surface focus:ring-[3px] focus:ring-brand/10"
+                className="block max-h-[140px] min-h-[40px] w-full resize-none rounded-[20px] border border-transparent bg-raised px-4 py-2.5 text-[14.5px] leading-5 text-ink outline-none transition-[border-color,box-shadow,background-color] placeholder:text-ink-4 focus:border-line focus:bg-surface focus:ring-[3px] focus:ring-brand/10"
                 rows={1}
               />
               {typingHint && (

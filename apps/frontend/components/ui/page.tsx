@@ -40,11 +40,13 @@ export function PageHeader({
             {back.label}
           </Link>
         )}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {/* Top-level pages: the phone app bar already shows the title, so it isn't repeated here. */}
+        <div className={cn('flex min-w-0 flex-wrap items-center gap-2', !back && 'max-sm:hidden')}>
           <h1 className="truncate text-xl font-semibold tracking-[-0.01em] text-ink">{title}</h1>
           {meta}
         </div>
-        {description && <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">{description}</p>}
+        {/* Phones keep the description to two lines so the content starts above the fold. */}
+        {description && <p className="mt-1 line-clamp-2 max-w-2xl text-[13px] leading-5 text-ink-3 sm:line-clamp-none">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>

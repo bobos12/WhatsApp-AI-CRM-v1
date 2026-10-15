@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui/page';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import {
@@ -378,26 +379,19 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Header */}
-      <section className="rounded-xl border border-line bg-white dark:bg-raised p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="mt-2 text-2xl font-semibold text-ink">{t('title')}</h1>
-            <p className="mt-1 text-sm text-ink-3">
-              {t('mergedSubtitle', { defaultValue: 'Design once — text, media and tappable buttons — then send to anyone. Delivered exactly as previewed.' })}
-            </p>
-            {templates.length > 0 && (
-              <p className="mt-2 text-xs text-ink-4">
-                {templates.length} template{templates.length !== 1 ? 's' : ''} in your library
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+      <PageHeader
+        className="mb-0"
+        title={t('title')}
+        meta={templates.length > 0 ? <span className="chip chip-neutral tabular-nums">{templates.length}</span> : undefined}
+        description={t('mergedSubtitle', { defaultValue: 'Design once — text, media and tappable buttons — then send to anyone. Delivered exactly as previewed.' })}
+        actions={
+          <>
             <button
               type="button"
               onClick={handleSync}
               disabled={syncing}
               title={t('approval.syncTitle')}
+              aria-label={t('approval.sync')}
               className="btn btn-secondary inline-flex disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -410,9 +404,9 @@ export default function TemplatesPage() {
             >
               <Plus className="h-4 w-4" /> {t('newTemplate')}
             </button>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-xl border border-red-300 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200 flex items-center justify-between">

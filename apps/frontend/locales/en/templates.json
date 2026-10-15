@@ -78,7 +78,7 @@
     "saving": "Saving…",
     "saved": "Saved!",
     "required": "required",
-    "optional": "optional",
+    "optional": "Optional",
     "uploadFile": "Upload file",
     "pickFromDevice": "Pick from device",
     "uploading": "Uploading…",
@@ -138,7 +138,32 @@
     "editing": "Editing template",
     "newDraft": "New template",
     "typeAudio": "Audio",
-    "audioHint": "Sent as a WhatsApp voice message. Audio messages cannot carry a caption."
+    "audioHint": "Sent as a WhatsApp voice message. Audio messages cannot carry a caption.",
+    "steps": {
+      "name": {
+        "title": "Name your template",
+        "desc": "So you can find it later when sending a campaign or reply."
+      },
+      "type": {
+        "title": "Choose the message type",
+        "desc": "Text only, or a file with an optional caption."
+      },
+      "content": {
+        "title": "Write the message",
+        "desc": "Add personal details like the customer's name — they're filled in for each person."
+      },
+      "test": {
+        "title": "Try it on your phone",
+        "desc": "Optional. Send yourself a copy to see it exactly as customers will."
+      },
+      "approval": {
+        "title": "Get WhatsApp approval",
+        "desc": "Needed to message people who haven't written to you in the last 24 hours."
+      }
+    },
+    "namePlaceholder": "e.g. Order ready for pickup",
+    "nameRequired": "Required",
+    "submitShort": "Submit for review"
   },
   "send": {
     "action": "Send",

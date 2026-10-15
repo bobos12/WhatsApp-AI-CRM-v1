@@ -126,9 +126,22 @@ export default function Sidebar() {
             <span className="mt-1 block text-2xs text-nav-muted">{t('appSubtitle')}</span>
           </span>
         </Link>
-        <div className={cn('ms-auto hidden', wide && 'lg:block')}>
+        <div className={cn('ms-auto hidden items-center gap-0.5', wide && 'lg:flex')}>
           <NotificationBell placement="nav" />
+          <button type="button" onClick={toggleCollapsed} aria-label={t('collapse')} title={t('collapse')} className="flex h-8 w-8 items-center justify-center rounded-lg text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink">
+            <PanelLeftClose className="h-4 w-4 icon-mirror" aria-hidden="true" />
+          </button>
         </div>
+      </div>
+
+      {/* Rail: notifications and the expand toggle stack under the logo. */}
+      <div className={cn('flex flex-col items-center gap-1 pb-2', wide && 'lg:hidden')}>
+        {collapsed && (
+          <button type="button" onClick={toggleCollapsed} aria-label={t('expand')} title={t('expand')} className="hidden h-8 w-8 items-center justify-center rounded-lg text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink lg:flex">
+            <PanelLeftOpen className="h-4 w-4 icon-mirror" aria-hidden="true" />
+          </button>
+        )}
+        <NotificationBell placement="nav" />
       </div>
 
       {/* Search / command palette */}
@@ -146,19 +159,6 @@ export default function Sidebar() {
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className={cn('flex-1 text-start', label)}>{t('search')}</span>
           <kbd className={cn('hidden rounded border border-nav-line px-1 font-mono text-[10px] text-nav-muted', wide && 'lg:inline')}>⌘K</kbd>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => document.dispatchEvent(new CustomEvent('toggle-crm-assistant'))}
-          title={t('askAi')}
-          className={cn(
-            'mt-1 flex h-9 w-full items-center justify-center gap-3 rounded-lg px-2.5 text-[13px] font-medium text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink',
-            wide && 'lg:justify-start',
-          )}
-        >
-          <Sparkles className="h-[18px] w-[18px] shrink-0 text-brand-400" strokeWidth={1.9} aria-hidden="true" />
-          <span className={cn('flex-1 text-start', label)}>{t('askAi')}</span>
         </button>
       </div>
 
@@ -179,27 +179,24 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
-      </nav>
-
-      {/* Footer: connection, account, collapse */}
-      <div className="space-y-1 border-t border-nav-line p-3">
-        <SidebarConnect compact={wide ? 'below-lg' : true} />
-        {/* Notifications live up top when wide; in the rail they join the footer. */}
-        <div className={cn('flex justify-center', wide && 'lg:hidden')}>
-          <NotificationBell placement="nav" />
-        </div>
-        <AccountMenu variant="nav" compact={wide ? 'below-lg' : true} />
         <button
           type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? t('expand') : t('collapse')}
-          title={collapsed ? t('expand') : t('collapse')}
-          className="hidden h-8 w-full items-center justify-center rounded-lg text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink lg:flex"
+          onClick={() => document.dispatchEvent(new CustomEvent('toggle-crm-assistant'))}
+          title={t('askAi')}
+          className={cn(
+            'mt-5 flex h-9 w-full items-center justify-center gap-3 rounded-lg px-2.5 text-[13px] font-medium text-nav-muted transition-colors hover:bg-nav-hover hover:text-nav-ink',
+            wide && 'lg:justify-start',
+          )}
         >
-          {collapsed
-            ? <PanelLeftOpen className="h-4 w-4 icon-mirror" aria-hidden="true" />
-            : <PanelLeftClose className="h-4 w-4 icon-mirror" aria-hidden="true" />}
+          <Sparkles className="h-[18px] w-[18px] shrink-0 text-brand-400" strokeWidth={1.9} aria-hidden="true" />
+          <span className={cn('flex-1 text-start', label)}>{t('askAi')}</span>
         </button>
+      </nav>
+
+      {/* Footer: connection, account */}
+      <div className="space-y-1 border-t border-nav-line p-3">
+        <SidebarConnect compact={wide ? 'below-lg' : true} />
+        <AccountMenu variant="nav" compact={wide ? 'below-lg' : true} />
       </div>
     </aside>
   );

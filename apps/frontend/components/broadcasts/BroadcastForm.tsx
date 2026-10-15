@@ -34,7 +34,6 @@ import { prepareUpload } from '../../lib/prepare-upload';
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-const QUICK_EMOJI = ['😊', '👋', '🎉', '✅', '🔥', '🙏', '📦', '💳', '📅', '⭐'];
 
 type MsgType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'VOICE';
 const MESSAGE_TYPES: Array<{ type: MsgType; icon: typeof Type; labelKey: string; fallback: string }> = [
@@ -241,8 +240,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-5 sm:p-6">
-      <div className="mb-5 flex items-start gap-3">
+    <div className="sm:rounded-xl sm:border sm:border-line sm:bg-surface sm:p-6">
+      <p className="mb-5 text-[13px] leading-5 text-ink-3 sm:hidden">{subtitle}</p>
+      <div className="mb-5 hidden items-start gap-3 sm:flex">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-brand/10">
           <span className="text-[11px] font-bold text-brand">{step}</span>
         </div>
@@ -775,6 +775,15 @@ export default function BroadcastForm({
   const previewText = formData.message;
 
   const BackIcon = isRtl ? ChevronRight : ChevronLeft;
+  const NextIcon = isRtl ? ChevronLeft : ChevronRight;
+  // Why "Next" is disabled, so a greyed-out button never leaves someone guessing.
+  const stepHints = [
+    t('form.hintName'),
+    t('form.hintMessage'),
+    t('form.errorNoRecipients'),
+    t('form.errorNoSchedule'),
+    '',
+  ];
 
   // ── Live safety analysis ───────────────────────────────────────────────────
   // The exact recipient list that would be posted, so the report describes the
@@ -1418,36 +1427,41 @@ export default function BroadcastForm({
   );
 
   return (
-    <form onSubmit={(e) => e.preventDefault()} onKeyDown={handleFormKeyDown} className="relative pb-24 sm:pb-0">
+    <form onSubmit={(e) => e.preventDefault()} onKeyDown={handleFormKeyDown} className="relative pb-32 sm:pb-0">
 
       {/* ── Mobile wizard header ── */}
-      <div className="sm:hidden mb-6">
+      <div className="mb-5 sm:hidden">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={mobileStep === 1 ? onBack : () => setMobileStep((s) => s - 1)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-raised text-ink transition hover:bg-raised"
+            aria-label={t('form.back')}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-raised active:bg-raised"
           >
-            <BackIcon className="h-4 w-4" />
+            <BackIcon className="h-5 w-5" />
           </button>
-          <div className="flex-1 min-w-0">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-semibold text-ink">{stepTitles[mobileStep - 1]}</span>
-              <span className="shrink-0 text-[11px] text-ink-3">{mobileStep}/{TOTAL_STEPS}</span>
-            </div>
-            <div className="h-1 w-full rounded-full bg-raised">
-              <div
-                className="h-1 rounded-full bg-brand transition-all duration-300"
-                style={{ width: `${(mobileStep / TOTAL_STEPS) * 100}%` }}
-              />
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium tabular-nums text-ink-4">
+              {mobileStep} / {TOTAL_STEPS}
+            </p>
+            <h2 className="truncate text-lg font-semibold leading-6 text-ink">{stepTitles[mobileStep - 1]}</h2>
           </div>
+        </div>
+        <div className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden="true">
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            <span key={i} className="h-1 overflow-hidden rounded-full bg-raised">
+              <span
+                className="block h-full origin-left rounded-full bg-brand transition-transform duration-base ease-out rtl:origin-right"
+                style={{ transform: `scaleX(${i < mobileStep ? 1 : 0})` }}
+              />
+            </span>
+          ))}
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
         {/* ── Left: form sections ── */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
 
           {/* 1 · Campaign name */}
           <div className={mobileStep === 1 ? 'block' : 'hidden sm:block'}>
@@ -1665,13 +1679,13 @@ export default function BroadcastForm({
                   {/* Personalization variables */}
                   <div className="mb-2.5">
                     <p className="mb-1.5 text-[10px] text-ink-3">{t('form.insertVariable')}</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
                       {variables.map((v) => (
                         <button
                           key={v.key}
                           type="button"
                           onClick={() => insertVariable(v.key)}
-                          className="flex flex-col items-center rounded-xl border border-brand/20 bg-brand/8 px-3 py-1.5 transition hover:bg-brand/15 active:scale-95"
+                          className="flex shrink-0 flex-col items-center rounded-xl border border-brand/20 bg-brand/8 px-3 py-1.5 transition hover:bg-brand/15 active:scale-95"
                         >
                           <span className="font-mono text-[11px] font-semibold text-brand">{v.key}</span>
                           <span className="mt-0.5 text-[9px] text-ink-3">{v.label}</span>
@@ -1699,18 +1713,6 @@ export default function BroadcastForm({
                         ? t('form.captionPlaceholder', { defaultValue: 'Add a caption… (optional)' })
                         : t('form.messagePlaceholder')}
                     />
-                    <div className="flex flex-wrap items-center gap-1 border-t border-line px-2 py-2">
-                      {QUICK_EMOJI.map((e) => (
-                        <button
-                          key={e}
-                          type="button"
-                          onClick={() => insertAtCursor(e)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-raised"
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   <div className="mt-1.5 flex items-center justify-between">
@@ -1728,6 +1730,14 @@ export default function BroadcastForm({
                   )}
                   </>
                   )}
+
+                  <div className="mt-6 border-t border-line pt-5 lg:hidden">
+                    <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-ink-3">
+                      <Smartphone className="h-3.5 w-3.5" />
+                      {t('form.livePreview')}
+                    </p>
+                    <PhonePreview message={previewText} mediaType={messageType} mediaUrl={mediaUrl} mediaFilename={mediaFilename} />
+                  </div>
             </SectionCard>
           </div>
 
@@ -1907,13 +1917,16 @@ export default function BroadcastForm({
       </div>
 
       {/* ── Mobile fixed bottom action bar ── */}
-      <div className="fixed bottom-0 inset-x-0 z-30 sm:hidden border-t border-line bg-gray-50 dark:bg-canvas px-4 py-3">
-        <div className="flex gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:hidden">
+        {mobileStep < TOTAL_STEPS && !stepValid[mobileStep - 1] && stepHints[mobileStep - 1] && (
+          <p className="mb-2 text-center text-[11px] text-ink-3">{stepHints[mobileStep - 1]}</p>
+        )}
+        <div className="flex gap-2">
           {mobileStep > 1 && (
             <button
               type="button"
               onClick={() => setMobileStep((s) => s - 1)}
-              className="h-12 rounded-xl border border-gray-200 dark:border-white/15 bg-raised px-5 text-sm font-semibold text-ink transition hover:bg-raised active:scale-95"
+              className="btn btn-secondary h-12 px-5 text-sm font-semibold active:scale-[0.98]"
             >
               {t('form.back')}
             </button>
@@ -1923,18 +1936,19 @@ export default function BroadcastForm({
               type="button"
               onClick={() => { if (stepValid[mobileStep - 1]) setMobileStep((s) => s + 1); }}
               disabled={!stepValid[mobileStep - 1]}
-              className="flex flex-1 h-12 items-center justify-center rounded-xl bg-brand text-sm font-bold text-brand-fg transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
+              className="btn btn-primary h-12 flex-1 justify-center text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t('form.next')}
+              <NextIcon className="h-4 w-4" />
             </button>
           ) : (
             <button
               type="button"
               onClick={submitBroadcast}
               disabled={!isValid || submitting || Boolean(blockedReason)}
-              className="flex flex-1 h-12 items-center justify-center gap-2 rounded-xl bg-brand text-sm font-bold text-brand-fg transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
+              className="btn btn-primary h-12 flex-1 justify-center gap-2 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
               {submitLabel ?? t('form.createTitle')}
             </button>
           )}

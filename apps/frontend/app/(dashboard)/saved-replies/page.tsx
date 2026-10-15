@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui/page';
 import { Plus, Trash2, MessageSquareReply, AtSign } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
@@ -74,18 +75,7 @@ export default function SavedRepliesPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-xl border border-line bg-white dark:bg-raised p-6 ">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 dark:border-brand/30 bg-brand/10 dark:bg-brand/15 px-3 py-1.5 text-xs font-medium text-brand">
-            <MessageSquareReply className="h-3.5 w-3.5" />
-            {t('settings:tabs.savedReplies')}
-          </div>
-          <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">{t('settings:savedReplies.title')}</h1>
-          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-3">
-            {t('settings:savedReplies.description')}
-          </p>
-        </div>
-      </section>
+      <PageHeader className="mb-0" title={t('settings:savedReplies.title')} description={t('settings:savedReplies.description')} />
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-xl border border-white/10 bg-surface p-5">

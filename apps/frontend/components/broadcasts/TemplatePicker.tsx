@@ -173,7 +173,7 @@ export default function TemplatePicker({
             />
           </div>
 
-          <div className="mt-3 max-h-72 space-y-1.5 overflow-y-auto">
+          <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
             {filtered.length === 0 && (
               <div className="rounded-xl bg-gray-50 p-4 text-center dark:bg-white/5">
                 <AlertTriangle className="mx-auto h-5 w-5 text-amber-500" />
@@ -204,24 +204,26 @@ export default function TemplatePicker({
                     onMappingChange({});
                     setOpen(false);
                   }}
-                  className={`flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors ${
+                  aria-pressed={isSelected}
+                  className={`flex w-full items-start gap-3 rounded-xl border p-3 text-start transition-colors duration-fast ${
                     isSelected
-                      ? 'border-brand bg-brand/10'
-                      : 'border-transparent hover:border-gray-200 hover:bg-gray-50 dark:hover:border-white/10 dark:hover:bg-white/5'
+                      ? 'border-brand bg-brand/10 ring-1 ring-inset ring-brand'
+                      : 'border-line bg-canvas hover:border-line-strong hover:bg-raised/60'
                   }`}
                 >
                   <span
-                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                       isSelected ? 'border-brand bg-brand' : 'border-line-strong'
                     }`}
                   >
-                    {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+                    {isSelected && <Check className="h-3 w-3 text-brand-fg" strokeWidth={3} />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">
+                    <span dir="auto" className="block truncate text-sm font-semibold text-ink">
                       {tpl.name}
                     </span>
-                    <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-ink-3">
+                    {/* No `block` here: it overrides line-clamp's display and shows the whole body. */}
+                    <span dir="auto" className="mt-1 line-clamp-2 text-xs leading-5 text-ink-3">
                       {tpl.content}
                     </span>
                   </span>

@@ -42,10 +42,9 @@ module.exports = {
         98: '0.98',
       },
       fontFamily: {
-        // Plex Sans and Plex Sans Arabic are one family drawn to shared metrics,
-        // so a mixed Arabic/English line sits on one baseline at one weight.
-        sans: ['"IBM Plex Sans"', '"IBM Plex Sans Arabic"', '"Segoe UI"', 'system-ui', 'sans-serif'],
-        arabic: ['"IBM Plex Sans Arabic"', '"IBM Plex Sans"', '"Segoe UI"', 'system-ui', 'sans-serif'],
+        // The system UI font carries both scripts at shared metrics.
+        sans: ['"Segoe UI"', 'system-ui', '-apple-system', '"SF Arabic"', '"Geeza Pro"', 'sans-serif'],
+        arabic: ['"Segoe UI"', 'system-ui', '-apple-system', '"SF Arabic"', '"Geeza Pro"', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {

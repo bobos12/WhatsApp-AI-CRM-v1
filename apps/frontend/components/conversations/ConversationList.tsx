@@ -386,7 +386,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
 
         {/* ── Search + quick chips ── */}
         <div className="shrink-0 space-y-2.5 px-3 pb-2.5">
-          <SearchField value={search} onChange={setSearch} placeholder={t('searchPlaceholder')} inputClassName="border-transparent bg-raised hover:border-line focus:bg-surface" />
+          <SearchField value={search} onChange={setSearch} placeholder={t('searchPlaceholder')} inputClassName="h-10 rounded-full border-transparent bg-raised hover:border-transparent focus:border-line focus:bg-surface" />
           <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
             {chips.map((c) => (
               <button
@@ -394,8 +394,10 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
                 type="button"
                 onClick={() => selectChip(c.key)}
                 className={cn(
-                  'h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors duration-fast',
-                  activeChip === c.key ? 'bg-brand/12 text-brand' : 'bg-raised text-ink-2 hover:bg-overlay hover:text-ink',
+                  'h-8 shrink-0 rounded-full border px-3.5 text-[13px] font-medium transition-colors duration-fast',
+                  activeChip === c.key
+                    ? 'border-transparent bg-brand-soft text-brand-strong dark:text-[#D9FDD3]'
+                    : 'border-line-strong text-ink-3 hover:bg-raised hover:text-ink',
                 )}
               >
                 {c.label}
@@ -419,7 +421,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
         </div>
 
         {/* ── Rows ── own scroll; reserves the phone tab bar's footprint (0 on sm+). */}
-        <div className="flex-1 overflow-y-auto border-t border-line pb-[var(--bottom-nav-space)]">
+        <div className="flex-1 overflow-y-auto px-2 pb-[var(--bottom-nav-space)]">
           {loading && sorted.length === 0 && <ConversationListSkeleton />}
 
           {!loading && sorted.length === 0 && (
@@ -455,13 +457,12 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(conv.id); } }}
                     aria-current={selected ? 'true' : undefined}
                     className={cn(
-                      'group flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-start outline-none transition-colors duration-fast focus-visible:bg-raised',
-                      selected ? 'bg-raised' : 'hover:bg-raised/60',
+                      'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-3 text-start outline-none transition-colors duration-fast focus-visible:bg-raised',
+                      selected ? 'bg-raised' : 'hover:bg-raised/70',
                     )}
                   >
-                    {selected && <span className="absolute inset-y-2 start-0 w-[3px] rounded-e-full bg-brand" aria-hidden="true" />}
                     <div className="relative shrink-0">
-                      <Avatar src={contact.customFields?.avatarUrl} name={displayName} contactId={contact.id} size={44} />
+                      <Avatar src={contact.customFields?.avatarUrl} name={displayName} contactId={contact.id} size={48} />
                       {isSnoozed && (
                         <span className="absolute -bottom-0.5 -end-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-surface">
                           <BellOff className="h-2.5 w-2.5 text-white" aria-hidden="true" />
@@ -471,11 +472,11 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
-                        <span className={cn('min-w-0 flex-1 truncate text-[14px] text-ink', showUnread ? 'font-semibold' : 'font-medium')}>
+                        <span className={cn('min-w-0 flex-1 truncate text-[15px] text-ink', showUnread ? 'font-semibold' : 'font-normal')}>
                           {displayName.startsWith('+') ? <span dir="ltr">{displayName}</span> : <bdi>{displayName}</bdi>}
                         </span>
                         {conv.lastMessageAt && (
-                          <span className={cn('shrink-0 text-[11px] tabular-nums', showUnread ? 'font-semibold text-brand' : 'text-ink-4')}>
+                          <span className={cn('shrink-0 text-xs tabular-nums', showUnread ? 'font-medium text-brand' : 'text-ink-3')}>
                             {formatListTime(conv.lastMessageAt, locale, t('window.yesterday'))}
                           </span>
                         )}
@@ -492,7 +493,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
                             </span>
                           </span>
                         ) : (
-                          <span className={cn('min-w-0 flex-1 truncate text-[13px]', showUnread ? 'text-ink-2' : 'text-ink-3')}>
+                          <span className={cn('min-w-0 flex-1 truncate text-[13.5px]', showUnread ? 'text-ink-2' : 'text-ink-3')}>
                             <bdi>{(conv.lastMessagePreview ?? conv.lastMessage) || t('window.noMessages')}</bdi>
                           </span>
                         )}
