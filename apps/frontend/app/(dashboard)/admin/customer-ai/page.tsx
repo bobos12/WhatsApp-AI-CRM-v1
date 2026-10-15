@@ -886,7 +886,7 @@ export default function CustomerAiPage() {
           <>
             <motion.div className="fixed inset-0 z-40 bg-[rgb(8_12_10/0.35)] xl:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setTestOpen(false)} />
             <motion.div
-              className="fixed inset-y-0 end-0 z-50 flex w-full flex-col bg-surface p-3 shadow-pop sm:w-[400px] xl:hidden"
+              className="fixed inset-y-0 end-0 z-50 flex w-full flex-col bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] shadow-pop sm:w-[400px] xl:hidden"
               initial={{ x: isRTL ? '-100%' : '100%' }} animate={{ x: 0 }} exit={{ x: isRTL ? '-100%' : '100%' }}
               transition={{ type: 'spring', stiffness: 420, damping: 42 }}
             >

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState, useRef } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import ConversationList from '../../../components/conversations/ConversationList';
 import ChatWindow from '../../../components/conversations/ChatWindow';
 import { api } from '../../../lib/api';
@@ -16,7 +16,6 @@ interface Contact {
 
 function ConversationsPageContent() {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // The open conversation lives in the URL (?c=<id>) so the browser Back/Forward
@@ -51,8 +50,17 @@ function ConversationsPageContent() {
     conversationListRef.current?.refetch?.();
   }, [fetchContacts]);
 
+  // Only the forward / save-contact dialogs need the full contact list. Loading
+  // it up front competed with the inbox itself for the first second, so it waits
+  // until the screen is idle.
   useEffect(() => {
-    fetchContacts();
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => void fetchContacts());
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const timer = setTimeout(() => void fetchContacts(), 1500);
+    return () => clearTimeout(timer);
   }, [fetchContacts]);
 
   // Build a /conversations URL with `c` set (and one-time deep-link params dropped).
@@ -72,18 +80,23 @@ function ConversationsPageContent() {
   // Select (or switch) the open conversation via the URL. Opening from the list
   // pushes a history entry; switching between chats replaces it, so Back always
   // returns to the list (not the previously-viewed chat) — like WhatsApp Web.
+  //
+  // The browser's own history API, not router.push: Next keeps useSearchParams
+  // in sync with it, and it changes the URL without asking the server for the
+  // page again — router.push cost a network round trip on every tap, which is
+  // most of why opening a chat felt like loading a website.
   const selectConversation = useCallback(
     (conversationId: string) => {
       if (!conversationId || conversationId === selectedConversationId) return;
       const url = buildUrl(conversationId);
       if (selectedConversationId) {
-        router.replace(url, { scroll: false });
+        window.history.replaceState(null, '', url);
       } else {
         pushedFromListRef.current = true;
-        router.push(url, { scroll: false });
+        window.history.pushState(null, '', url);
       }
     },
-    [router, buildUrl, selectedConversationId],
+    [buildUrl, selectedConversationId],
   );
 
   // Close the open conversation (mobile back arrow / conversation-not-found).
@@ -91,12 +104,12 @@ function ConversationsPageContent() {
     if (pushedFromListRef.current) {
       // Pop the entry we pushed — clean Back with no phantom forward entry.
       pushedFromListRef.current = false;
-      router.back();
+      window.history.back();
     } else {
       // Deep-linked straight into a chat: just drop `c` to reveal the list.
-      router.replace(buildUrl(null), { scroll: false });
+      window.history.replaceState(null, '', buildUrl(null));
     }
-  }, [router, buildUrl]);
+  }, [buildUrl]);
 
   useEffect(() => {
     const resolveConversation = async () => {
@@ -105,7 +118,7 @@ function ConversationsPageContent() {
         const result = await api.get(`/api/conversations/by-phone/${encodeURIComponent(targetPhone)}`);
         if (result?.conversation?.id) {
           // Normalise ?phone=… into the canonical ?c=… (replace: no extra entry).
-          router.replace(buildUrl(result.conversation.id), { scroll: false });
+          window.history.replaceState(null, '', buildUrl(result.conversation.id));
         }
       } catch (error) {
         console.error('Failed to resolve conversation from phone:', error);
@@ -113,15 +126,15 @@ function ConversationsPageContent() {
     };
 
     void resolveConversation();
-  }, [targetPhone, router, buildUrl]);
+  }, [targetPhone, buildUrl]);
 
   // Deep-link straight to a conversation by id (e.g. from a notification):
   // normalise ?conversationId=… into ?c=… without adding a history entry.
   useEffect(() => {
     if (targetConversationId) {
-      router.replace(buildUrl(targetConversationId), { scroll: false });
+      window.history.replaceState(null, '', buildUrl(targetConversationId));
     }
-  }, [targetConversationId, router, buildUrl]);
+  }, [targetConversationId, buildUrl]);
 
   // Full-bleed, follows the document direction: in Arabic the list sits on the
   // right and the chat on the left, exactly as WhatsApp does it.

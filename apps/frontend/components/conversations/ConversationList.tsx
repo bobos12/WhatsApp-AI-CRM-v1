@@ -67,7 +67,9 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     ];
 
     const [search, setSearch] = useState('');
-    const [loading, setLoading] = useState(true);
+    // Skeleton only on a true first load; the shared store already holds the
+    // list when the inbox is reopened, so that shows immediately instead.
+    const [loading, setLoading] = useState(() => useMessagingStore.getState().conversationOrder.length === 0);
     const [activeView, setActiveView] = useState<InboxView>('all');
     const [unreadOnly, setUnreadOnly] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
@@ -128,7 +130,8 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
         const list = Array.isArray(data) ? data : [];
         seedConversations(list);
       } catch {
-        seedConversations([]);
+        // Keep what's on screen: a dropped request on a weak connection used to
+        // wipe the whole inbox.
       } finally {
         setLoading(false);
       }
@@ -287,7 +290,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     return (
       <div className="flex h-full flex-col bg-surface">
         {/* ── Header ── */}
-        <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4">
+        <div className="box-content flex h-14 shrink-0 items-center justify-between gap-2 px-4 pt-safe">
           <h1 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink">
             {t('list.inbox')}
             {totalUnread > 0 && <span className="chip chip-brand tabular-nums">{totalUnread}</span>}

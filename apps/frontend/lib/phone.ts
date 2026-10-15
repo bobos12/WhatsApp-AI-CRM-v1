@@ -17,6 +17,24 @@ export function formatPhone(phone?: string | null): string {
 
   const intl = `+${digits}`;
 
+  // The countries this CRM's customers actually dial, grouped the way people
+  // there write them. The generic split below put "+96 692 003 3077" on a
+  // Saudi 9200 number.
+  if (digits.startsWith('966') && digits.length === 12) {
+    const n = digits.slice(3);
+    if (n.startsWith('9200')) return `+966 ${n.slice(0, 4)} ${n.slice(4)}`;
+    if (n.startsWith('800')) return `+966 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
+    return `+966 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5)}`;
+  }
+  if (digits.startsWith('971') && digits.length === 12) {
+    const n = digits.slice(3);
+    return `+971 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5)}`;
+  }
+  if (digits.startsWith('20') && digits.length === 12) {
+    const n = digits.slice(2);
+    return `+20 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
+  }
+
   if (digits.length === 10) {
     return `+${digits.slice(0, 1)} ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
   }

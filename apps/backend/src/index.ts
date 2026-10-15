@@ -279,8 +279,29 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 
 const PORT = config.port;
 
+/**
+ * Render's free tier stops a service after 15 minutes without a request, and the
+ * next visitor (or Meta webhook) then waits up to a minute for a cold start —
+ * the single biggest reason the CRM felt slow. A request to our own public URL
+ * every 10 minutes counts as traffic and keeps it awake. Render sets RENDER=true;
+ * KEEP_ALIVE=false turns it off, KEEP_ALIVE=true forces it on elsewhere.
+ */
+function startKeepAlive() {
+  const enabled = process.env.KEEP_ALIVE ? process.env.KEEP_ALIVE === 'true' : process.env.RENDER === 'true';
+  const base = process.env.PUBLIC_API_URL?.replace(/\/$/, '');
+  if (!enabled || !base) return;
+  const ping = () => {
+    fetch(`${base}/health`, { signal: AbortSignal.timeout(15_000) }).catch(() => {
+      /* a missed ping just means the next one tries again */
+    });
+  };
+  setInterval(ping, 10 * 60 * 1000).unref();
+  logger.info('keep_alive.enabled', { target: `${base}/health` });
+}
+
 server.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
+  startKeepAlive();
 
   // Boot-time work runs above any single tenant (guard bypassed): it provisions
   // platform identities, reads shared settings, and starts schedulers that must

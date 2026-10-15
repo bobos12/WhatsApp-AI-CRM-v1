@@ -66,6 +66,8 @@ export const viewport: Viewport = {
   userScalable: true,
   // Extend under the notch / home indicator so env(safe-area-*) padding engages.
   viewportFit: 'cover',
+  // Android: the keyboard shrinks the page instead of covering the composer.
+  interactiveWidget: 'resizes-content',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

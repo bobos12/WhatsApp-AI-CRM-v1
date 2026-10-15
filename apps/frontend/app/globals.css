@@ -937,12 +937,14 @@ html.pwa-standalone .select-text * {
   user-select: text;
   -webkit-touch-callout: default;
 }
-/* Keep mobile inputs ≥16px so iOS doesn't auto-zoom when focusing a field. */
+/* Keep phone inputs ≥16px so iOS never auto-zooms when a field is focused —
+   in Safari as well as the installed app; a zoomed page is what makes the CRM
+   feel like a website rather than an app. */
 @media (max-width: 640px) {
-  html.pwa-standalone input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  html.pwa-standalone textarea,
-  html.pwa-standalone select {
-    font-size: 16px;
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

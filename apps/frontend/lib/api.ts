@@ -2,6 +2,7 @@ import { getSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import i18n from './i18n';
 import { plainKeyFor } from './friendly-error';
+import { cachedGet, invalidateReference } from './api-cache';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -190,6 +191,9 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
     }
   }
 
+  // Anything that changes data may have changed reference data too.
+  if (options.method && options.method !== 'GET') invalidateReference();
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     throw apiError(
@@ -206,6 +210,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
 }
 
 export async function apiForm(endpoint: string, formData: FormData, retry = true) {
+  invalidateReference();
   const token = await getAccessToken();
   let response = await send(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
@@ -241,6 +246,9 @@ export async function apiForm(endpoint: string, formData: FormData, retry = true
 
 export const api = {
   get: <T = any>(endpoint: string): Promise<T> => apiRequest(endpoint),
+  /** For reference data that rarely changes — see lib/api-cache.ts. */
+  getCached: <T = any>(endpoint: string, maxAgeMs?: number): Promise<T> =>
+    cachedGet<T>(endpoint, (url) => apiRequest(url), maxAgeMs),
   post: <T = any>(endpoint: string, data: any): Promise<T> => apiRequest(endpoint, {
     method: 'POST',
     body: JSON.stringify(data),

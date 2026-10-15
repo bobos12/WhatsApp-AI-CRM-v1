@@ -14,6 +14,8 @@ interface SyncStatus {
   sync: () => Promise<void>;
 }
 
+let autoSyncScheduled = false;
+
 export function useSyncStatus(): SyncStatus {
   // Always start as 'connecting' so server and client first renders match.
   // A useEffect reads the real socket state after hydration.
@@ -98,14 +100,24 @@ export function useSyncStatus(): SyncStatus {
   // time. Deferred to idle: this fetches the FULL conversation list, and firing
   // it immediately on cold start competes with the visible screen's critical
   // requests. Real-time socket events cover the gap until it runs.
+  //
+  // Once per app session, not once per component: two surfaces use this hook,
+  // and each used to download the whole conversation list on every page load.
   useEffect(() => {
+    if (autoSyncScheduled) return;
+    autoSyncScheduled = true;
+    let fired = false;
+    const run = () => { fired = true; void sync(); };
     const hasIdle = typeof window.requestIdleCallback === 'function';
     const id = hasIdle
-      ? window.requestIdleCallback(() => { void sync(); }, { timeout: 4000 })
-      : window.setTimeout(() => { void sync(); }, 2500);
+      ? window.requestIdleCallback(run, { timeout: 4000 })
+      : window.setTimeout(run, 2500);
     return () => {
       if (hasIdle) window.cancelIdleCallback(id);
       else window.clearTimeout(id);
+      // Unmounted before it ran (e.g. the phone header hides on the inbox): let
+      // the next instance schedule it instead of skipping the sync entirely.
+      if (!fired) autoSyncScheduled = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

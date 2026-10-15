@@ -64,7 +64,7 @@ export default function MobileDrawer({ open, onClose }: { open: boolean; onClose
             key="drawer-sheet"
             role="dialog"
             aria-modal="true"
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] flex-col rounded-t-2xl bg-surface shadow-pop"
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] flex-col rounded-t-2xl bg-surface pb-safe shadow-pop"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}

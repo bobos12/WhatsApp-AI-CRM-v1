@@ -56,6 +56,7 @@ import ContactTagSelector from '../contacts/ContactTagSelector';
 import QualificationPanel from '../leads/QualificationPanel';
 import { useTranslation } from 'react-i18next';
 import { api, apiForm } from '../../lib/api';
+import { peek, remember } from '../../lib/api-cache';
 import { useSocket } from '../../hooks/useSocket';
 import { useToast } from '../../hooks/useToast';
 import { getSocket } from '../../lib/socket';
@@ -64,6 +65,9 @@ import { useSession } from 'next-auth/react';
 import { useDirection } from '../../hooks/useDirection';
 import { useGlobalBot } from '../../hooks/useGlobalBot';
 import { isManager } from '../../lib/roles';
+
+/** Where a chat's last-seen state is kept between opens (lib/api-cache). */
+const chatCacheKey = (id: string) => `chat:${id}`;
 
 interface Message {
   id: string;
@@ -379,6 +383,16 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
 
+  // Keep the last-seen state of this chat for the next time it opens. Messages
+  // still being sent are left out so a reopen never shows a stale "sending".
+  useEffect(() => {
+    if (!conversationId || !conversation || conversation.id !== conversationId) return;
+    remember(chatCacheKey(conversationId), {
+      ...conversation,
+      messages: (conversation.messages ?? []).filter((m) => !String(m.id).startsWith('optimistic-')),
+    });
+  }, [conversation, conversationId]);
+
   const isLoadingOlderRef = useRef(false);
   const isAtBottomRef = useRef(true);
 
@@ -435,7 +449,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
 
   const fetchAgents = useCallback(async () => {
     try {
-      const data = await api.get('/api/teams/agents');
+      const data = await api.getCached('/api/teams/agents');
       setAgents(Array.isArray(data) ? data : []);
     } catch {
       setAgents([]);
@@ -447,10 +461,10 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     const isAdmin = isManager(role);
     try {
       if (isAdmin) {
-        const data = await api.get('/api/teams/all');
+        const data = await api.getCached('/api/teams/all');
         setTeams(Array.isArray(data) ? data : []);
       } else {
-        const data = await api.get('/api/teams');
+        const data = await api.getCached('/api/teams');
         if (data?.team) setTeams([data.team]);
       }
     } catch {
@@ -460,7 +474,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
 
   const fetchSavedReplies = useCallback(async () => {
     try {
-      const data = await api.get('/api/saved-replies');
+      const data = await api.getCached('/api/saved-replies');
       setSavedReplies(Array.isArray(data) ? data : []);
     } catch {
       setSavedReplies([]);
@@ -469,7 +483,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const data = await api.get('/api/templates');
+      const data = await api.getCached('/api/templates');
       setTemplates(Array.isArray(data) ? data : []);
     } catch {
       setTemplates([]);
@@ -478,7 +492,14 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
 
   useEffect(() => {
     if (conversationId) {
-      setConversation(null);
+      // Show what we had for this chat straight away; fetchConversation then
+      // replaces it with the latest. A blank screen on every open is what made
+      // the inbox feel like a website.
+      setConversation(peek<Conversation>(chatCacheKey(conversationId)) ?? null);
+      // Every chat opens at its newest message, as WhatsApp does. The flag is a
+      // ref, so without this reset a chat inherited "scrolled up" from the last
+      // one and opened at the top of its history.
+      isAtBottomRef.current = true;
       setIsScrolledToBottom(true);
       setUnreadWhileScrolled(0);
       setPaginationCursor(null);
@@ -512,6 +533,26 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     // arrive, not when the user manually scrolls to the bottom.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.messages?.length]);
+
+  // Photos and videos finish loading after the text and push the chat taller,
+  // which left a just-opened chat parked mid-history. While the reader is at the
+  // newest message, keep them there as media arrives. (`load` doesn't bubble, so
+  // listen in the capture phase.)
+  const hasConversation = conversation != null;
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const keepPinned = () => {
+      if (isAtBottomRef.current) el.scrollTop = el.scrollHeight;
+    };
+    el.addEventListener('load', keepPinned, true);
+    el.addEventListener('loadedmetadata', keepPinned, true);
+    return () => {
+      el.removeEventListener('load', keepPinned, true);
+      el.removeEventListener('loadedmetadata', keepPinned, true);
+    };
+    // Re-attach once the message list exists (it isn't rendered while loading).
+  }, [conversationId, hasConversation]);
 
   const scrollToBottom = useCallback(() => {
     isAtBottomRef.current = true;
@@ -1241,7 +1282,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
       {/* ===== MAIN CHAT AREA ===== */}
       <div className="relative flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <header className="relative z-20 flex h-[60px] shrink-0 items-center gap-1.5 border-b border-line bg-surface px-2 sm:gap-2 sm:px-3">
+        <header className="relative z-20 box-content flex h-[60px] shrink-0 items-center gap-1.5 border-b border-line bg-surface px-2 pt-safe sm:gap-2 sm:px-3">
           {onBack && (
             <button type="button" onClick={onBack} className={`${iconBtn} md:hidden`} aria-label={t('common:actions.back', 'Back')}>
               <ArrowLeft className="h-5 w-5 icon-mirror" />
@@ -1755,7 +1796,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: isRTL ? '-100%' : '100%', opacity: 0.6 }}
               transition={{ type: 'spring', stiffness: 420, damping: 42 }}
-              className="absolute inset-y-0 end-0 z-50 flex w-[min(92vw,360px)] flex-col border-s border-line bg-surface shadow-pop min-[1440px]:relative min-[1440px]:z-0 min-[1440px]:w-[340px] min-[1440px]:shadow-none"
+              className="absolute inset-y-0 end-0 z-50 flex w-[min(92vw,360px)] flex-col border-s border-line bg-surface pb-safe pt-safe shadow-pop min-[1440px]:relative min-[1440px]:z-0 min-[1440px]:w-[340px] min-[1440px]:shadow-none"
             >
               {showInteractiveSidebar ? (
                 <div className="flex h-full flex-col overflow-hidden">

@@ -69,7 +69,7 @@ function Frame({ children }: { children: ReactNode }) {
       {/* A single soft wash of the brand colour behind the header — enough to say
           "this is the start of something", not enough to decorate. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(60%_100%_at_50%_0%,rgb(var(--brand)/0.10),transparent)]" />
-      <header className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+      <header className="relative mx-auto box-content flex h-16 max-w-6xl pt-safe items-center justify-between gap-3 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/logo-tight.png" alt="" className="h-7 w-7 shrink-0" />
@@ -179,7 +179,7 @@ function Splash() {
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-canvas px-6" role="status" aria-live="polite">
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-canvas px-6 pt-safe pb-safe" role="status" aria-live="polite">
       <div className="flex max-w-xs flex-col items-center text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/logo-tight.png" alt="" className="h-10 w-10 animate-pulse-slow motion-reduce:animate-none" />

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronDown, Copy, Forward, Reply, Smile, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type {
   MessageDTO,
@@ -901,6 +902,52 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Phone action sheet (rendered at the top level of the page, see below).
+  const sheetRootRef = useRef<HTMLDivElement>(null);
+  const sheetOpenedAt = useRef(0);
+  const [isTouch, setIsTouch] = useState(false);
+  // The sheet opens under the finger that held the bubble; lifting that finger
+  // would otherwise "tap" whichever row slid under it (it opened Forward).
+  const sheetTap = (fn: () => void) => () => {
+    if (Date.now() - sheetOpenedAt.current < 450) return;
+    fn();
+  };
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: none)');
+    const update = () => setIsTouch(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  // Press-and-hold opens the actions on a touch screen, as in WhatsApp. A finger
+  // that moves (scrolling the chat) cancels it, so it never fires by accident.
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdStart = useRef<{ x: number; y: number } | null>(null);
+  const cancelHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    holdStart.current = null;
+  };
+  const touchHold = variant === 'chat' ? {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      holdStart.current = { x: e.clientX, y: e.clientY };
+      holdTimer.current = setTimeout(() => {
+        holdTimer.current = null;
+        try { navigator.vibrate?.(12); } catch { /* not supported */ }
+        setPickerOpen(false);
+        sheetOpenedAt.current = Date.now();
+        setShowMenu(true);
+      }, 450);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const s0 = holdStart.current;
+      if (s0 && Math.hypot(e.clientX - s0.x, e.clientY - s0.y) > 10) cancelHold();
+    },
+    onPointerUp: cancelHold,
+    onPointerCancel: cancelHold,
+  } : {};
 
   const reactionsSig = reactionsProp.map(r => `${r.id}${r.emoji}`).join('|');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -909,15 +956,16 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   useEffect(() => {
     if (!showMenu && !pickerOpen) return;
     const close = (e: MouseEvent) => {
+      if (sheetRootRef.current?.contains(e.target as Node)) return;
       if (!containerRef.current?.contains(e.target as Node)) {
         setShowMenu(false);
         setPickerOpen(false);
       }
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowMenu(false); setPickerOpen(false); } };
-    document.addEventListener('mousedown', close);
+    document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
   }, [showMenu, pickerOpen]);
 
   async function toggleReaction(emoji: string) {
@@ -963,6 +1011,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
     setShowMenu(false);
   }
 
+  const sheetItemCls = 'flex h-12 w-full items-center gap-3.5 rounded-xl px-3 text-start text-[15px] text-ink active:bg-raised';
   const menuItemCls = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-raised hover:text-ink text-start';
 
   const grouped = reactions.reduce<Record<string, number>>((acc, r) => { acc[r.emoji] = (acc[r.emoji] ?? 0) + 1; return acc; }, {});
@@ -1005,8 +1054,9 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
     <div className={`group/msg w-full min-w-0 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
       <div
         ref={containerRef}
-        className={`relative flex min-w-0 max-w-[88%] items-center gap-1.5 sm:max-w-[70%] ${isFromMe ? 'flex-row-reverse' : ''}`}
+        className={`relative flex min-w-0 max-w-[88%] items-center gap-1.5 sm:max-w-[70%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${isFromMe ? 'flex-row-reverse' : ''}`}
         onContextMenu={variant === 'chat' ? (e) => { e.preventDefault(); setShowMenu(true); setPickerOpen(false); } : undefined}
+        {...touchHold}
       >
         <div className="relative min-w-0">
           {/* Quick reaction picker — floats above bubble, within bounds */}
@@ -1019,7 +1069,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
             </div>
           )}
 
-          {variant === 'chat' && showMenu && (
+          {variant === 'chat' && showMenu && !isTouch && (
             <div className={`pop-enter absolute top-7 z-30 min-w-[180px] rounded-lg bg-surface p-1 shadow-pop ${isFromMe ? 'end-0' : 'start-0'}`}>
               {conversationId && (
                 <button type="button" onClick={() => { setShowMenu(false); setPickerOpen(true); }} className={menuItemCls}>
@@ -1060,12 +1110,13 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
 
           {/* Bubble */}
           <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-lg shadow-[0_1px_0.5px_rgb(11_20_16/0.10)] ${mediaOnly ? 'p-1' : 'px-2.5 pb-1.5 pt-1.5'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
-            {/* Menu chevron: appears on hover where hovering exists; always reachable on touch. */}
+            {/* Menu chevron for mouse users, on hover. Touch screens use press-and-hold
+                instead — a chevron on every bubble covered text and timestamps. */}
             {variant === 'chat' && (
               <button
                 type="button"
                 onClick={() => { setShowMenu(v => !v); setPickerOpen(false); }}
-                className={`absolute end-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-ink-3 transition-opacity hover:text-ink [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 ${isFromMe ? 'bg-bubble-out/90' : 'bg-bubble-in/90'} ${showMenu ? '!opacity-100' : ''}`}
+                className={`absolute end-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-ink-3 transition-opacity hover:text-ink [@media(hover:none)]:hidden [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 ${isFromMe ? 'bg-bubble-out/90' : 'bg-bubble-in/90'} ${showMenu ? '!opacity-100' : ''}`}
                 title={t('message.moreOptions')}
                 aria-label={t('message.moreOptions')}
               >
@@ -1098,6 +1149,62 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
           {/* Reaction pills — hang off the bottom edge, as on WhatsApp */}
           <ReactionPills grouped={grouped} isFromMe={isFromMe} onReact={toggleReaction} />
         </div>
+
+        {/* Phone: actions as a bottom sheet, the way WhatsApp and every native
+            chat app do it. The dropdown opened beneath the bubble and, for the
+            newest messages, disappeared behind the composer. */}
+        {variant === 'chat' && showMenu && isTouch && typeof document !== 'undefined' && createPortal(
+          <div ref={sheetRootRef} className="fixed inset-0 z-[70]" role="presentation">
+            <div
+              className="absolute inset-0 bg-[rgb(8_12_10/0.35)] animate-fade-in"
+              onClick={(e) => { e.stopPropagation(); sheetTap(() => setShowMenu(false))(); }}
+              aria-hidden="true"
+            />
+            <div
+              role="dialog"
+              aria-label={t('message.moreOptions')}
+              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop animate-slide-up"
+            >
+              <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong" aria-hidden="true" />
+              {messageText && (
+                <p dir="auto" className="mx-4 mt-3 line-clamp-2 border-s-2 border-brand/60 ps-2.5 text-[13px] leading-5 text-ink-3">{messageText}</p>
+              )}
+              {conversationId && (
+                <div className="mx-3 mt-3 flex justify-between rounded-2xl bg-raised px-2 py-1.5">
+                  {QUICK_REACTIONS.map((e) => (
+                    <button key={e} type="button" onClick={sheetTap(() => { setShowMenu(false); toggleReaction(e); })}
+                      className="press flex h-11 w-11 items-center justify-center rounded-full text-2xl leading-none active:bg-surface"
+                      aria-label={e}>{e}</button>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 px-2">
+                {onReply && (
+                  <button type="button" onClick={sheetTap(() => { setShowMenu(false); onReply(message); })} className={sheetItemCls}>
+                    <Reply className="h-5 w-5 shrink-0 text-ink-3" /><span>{t('message.replyMessage')}</span>
+                  </button>
+                )}
+                {onForward && (
+                  <button type="button" onClick={sheetTap(() => { setShowMenu(false); onForward(message); })} className={sheetItemCls}>
+                    <Forward className="h-5 w-5 shrink-0 text-ink-3" /><span>{t('message.forwardMessage')}</span>
+                  </button>
+                )}
+                {messageText && (
+                  <button type="button" onClick={sheetTap(handleCopy)} className={sheetItemCls}>
+                    <Copy className="h-5 w-5 shrink-0 text-ink-3" /><span>{t('message.copyMessage')}</span>
+                  </button>
+                )}
+                {isFromMe && onDelete && message.id && (
+                  <button type="button" onClick={sheetTap(() => { setShowMenu(false); if (message.id) onDelete(message.id); })}
+                    className={`${sheetItemCls} text-red-600 dark:text-red-400`}>
+                    <Trash2 className="h-5 w-5 shrink-0" /><span>{t('message.deleteMessage')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
         {/* Hover actions beside the bubble: the two things people do most. */}
         {variant === 'chat' && (

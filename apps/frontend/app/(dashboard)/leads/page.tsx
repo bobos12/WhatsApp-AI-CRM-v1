@@ -19,6 +19,7 @@ import {
   StatusBadge, PriorityBadge, FlagChips, SignalChips,
   scoreColor, localizedText, LeadAvatar, STATUS_CFG,
 } from '../../../components/leads/lead-ui';
+import { peek, remember } from '@/lib/api-cache';
 
 // Sidebar/tab views → underlying canonical statuses (reconciled 9-status set).
 const TABS: Array<{ key: string; statuses: LeadStatus[] | null }> = [
@@ -50,9 +51,10 @@ export default function LeadsPage() {
   const { t, i18n } = useTranslation('leads');
   const lang = i18n.language;
 
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Last visit's data first, then refreshed — no skeleton on every return.
+  const [leads, setLeads] = useState<Lead[]>(() => peek<Lead[]>('leads') ?? []);
+  const [stats, setStats] = useState<Stats | null>(() => peek<Stats>('leads:stats') ?? null);
+  const [loading, setLoading] = useState(() => peek('leads') === undefined);
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
@@ -66,8 +68,11 @@ export default function LeadsPage() {
         api.get('/api/leads'),
         api.get('/api/leads/stats'),
       ]);
-      setLeads(Array.isArray(leadData) ? leadData : []);
+      const list = Array.isArray(leadData) ? leadData : [];
+      setLeads(list);
       setStats(statData ?? null);
+      remember('leads', list);
+      if (statData) remember('leads:stats', statData);
     } catch (err) {
       toastError(err instanceof Error ? err.message : t('toast.loadFailed'));
     } finally {

@@ -33,6 +33,7 @@ import { Modal } from '../../../components/ui/modal';
 import { cn } from '../../../lib/utils';
 import { AnimatePresence, motion } from 'motion/react';
 import { PageHeader, SearchField } from '../../../components/ui/page';
+import { peek, remember } from '@/lib/api-cache';
 
 interface ContactTagRef {
   tag: { id: string; name: string; color: string };
@@ -92,7 +93,8 @@ export default function ContactsPage() {
   const searchParams = useSearchParams();
 
   // — data —
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  // The unfiltered list from the last visit shows immediately; the fetch below refreshes it.
+  const [contacts, setContacts] = useState<Contact[]>(() => peek<Contact[]>('contacts') ?? []);
   const allTags = useTags();   // live tag list — auto-updates via socket
 
   // — search & server-side filters —
@@ -168,10 +170,12 @@ export default function ContactsPage() {
       // audience uses, so both surfaces agree on who matches.
       if (filterQuery) params.append('filter', filterQuery);
       const data = await api.get(`/api/contacts?${params}`);
-      setContacts(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setContacts(list);
+      if (!search && !tagFilter && !filterQuery) remember('contacts', list);
       setPage(1);
     } catch {
-      setContacts([]);
+      // Keep what's on screen rather than blanking the list on a dropped request.
     }
   }, [search, tagFilter, filterQuery]);
 
