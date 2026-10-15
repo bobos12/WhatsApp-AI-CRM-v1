@@ -31,6 +31,47 @@ import { HttpError } from '../../auth/authorize';
  * working immediately — a provider instance holding stale credentials would keep
  * failing until the process restarted.
  */
+/**
+ * Meta media IDs for template headers, reused across a broadcast.
+ *
+ * A template's header (usually a video) is the same file for every recipient,
+ * but it used to be downloaded from storage and uploaded to Meta once per
+ * recipient: a 1,000-person video broadcast moved ~10 GB, took over an hour and
+ * used a month of the storage provider's free bandwidth. Meta keeps an uploaded
+ * file for 30 days, so one upload per file per number is enough; 25 days leaves
+ * margin. Concurrent workers share one in-flight upload.
+ */
+const HEADER_MEDIA_TTL_MS = 25 * 24 * 60 * 60 * 1000;
+const headerMediaCache = new Map<string, { id: string; at: number }>();
+const headerMediaInflight = new Map<string, Promise<string | null>>();
+
+async function headerMediaId(
+  media: { storageRef?: string | null; format: 'IMAGE' | 'VIDEO' | 'DOCUMENT'; filename?: string | null },
+  cloud: CloudApiConfig,
+): Promise<string | null> {
+  const key = `${cloud.phoneNumberId}:${media.storageRef}`;
+  const hit = headerMediaCache.get(key);
+  if (hit && Date.now() - hit.at < HEADER_MEDIA_TTL_MS) return hit.id;
+  const pending = headerMediaInflight.get(key);
+  if (pending) return pending;
+
+  const upload = (async () => {
+    const loaded = await loadMedia(media.storageRef!, media.format, media.filename);
+    if (!loaded) return null;
+    const id = await uploadMedia({
+      buffer: loaded.buffer,
+      mimetype: loaded.mimetype,
+      filename: media.filename ?? undefined,
+      phoneNumberId: cloud.phoneNumberId,
+      accessToken: cloud.accessToken,
+    });
+    headerMediaCache.set(key, { id, at: Date.now() });
+    return id;
+  })().finally(() => headerMediaInflight.delete(key));
+  headerMediaInflight.set(key, upload);
+  return upload;
+}
+
 export class MetaWhatsAppProvider implements MessagingProvider {
   readonly name: ProviderName = 'meta';
 
@@ -75,12 +116,25 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         accessToken: cloud.accessToken,
       });
 
+      // Meta moved the daily cap from the number to the account; read it there
+      // when the number no longer reports one.
+      let tier = info.messaging_limit_tier ?? null;
+      if (!tier && cloud.wabaId) {
+        tier = await graphRequest<{ whatsapp_business_manager_messaging_limit?: string }>({
+          path: `/${cloud.wabaId}?fields=whatsapp_business_manager_messaging_limit`,
+          accessToken: cloud.accessToken,
+          maxAttempts: 1,
+        })
+          .then((r) => r.whatsapp_business_manager_messaging_limit ?? null)
+          .catch(() => null);
+      }
+
       const rating = (info.quality_rating ?? '').toUpperCase();
       await recordSync(tenantId, {
         displayPhoneNumber: normalizePhone(info.display_phone_number ?? '') ?? info.display_phone_number ?? null,
         verifiedName: info.verified_name ?? null,
         qualityRating: rating === 'GREEN' || rating === 'YELLOW' || rating === 'RED' ? rating : 'UNKNOWN',
-        messagingLimit: info.messaging_limit_tier ?? null,
+        messagingLimit: tier,
         error: null,
       });
 
@@ -88,7 +142,7 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         tenantId,
         phone: info.display_phone_number,
         quality: rating,
-        tier: info.messaging_limit_tier,
+        tier,
       });
     } catch (err) {
       const meta = asMetaError(err);
@@ -287,19 +341,8 @@ export class MetaWhatsAppProvider implements MessagingProvider {
     let headerMedia: { mediaId?: string; format: 'IMAGE' | 'VIDEO' | 'DOCUMENT'; filename?: string } | null = null;
 
     if (template.headerMedia?.storageRef) {
-      const loaded = await loadMedia(
-        template.headerMedia.storageRef,
-        template.headerMedia.format,
-        template.headerMedia.filename,
-      );
-      if (loaded) {
-        const mediaId = await uploadMedia({
-          buffer: loaded.buffer,
-          mimetype: loaded.mimetype,
-          filename: template.headerMedia.filename ?? undefined,
-          phoneNumberId: cloud.phoneNumberId,
-          accessToken: cloud.accessToken,
-        });
+      const mediaId = await headerMediaId(template.headerMedia, cloud);
+      if (mediaId) {
         headerMedia = {
           mediaId,
           format: template.headerMedia.format,
