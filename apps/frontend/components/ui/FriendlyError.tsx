@@ -19,7 +19,10 @@ import { useTranslation } from 'react-i18next';
 import {
   WifiOff, PhoneOff, MessageSquareDashed, ShieldAlert, Users, Timer,
   Lock, ImageOff, CloudOff, AlertTriangle, ChevronRight, RotateCw, ChevronDown,
+  Ban, FileWarning, Hourglass, MessageSquareX, ShieldOff, UserCog, Unplug,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { isManager } from '../../lib/roles';
 import { cn } from '../../lib/utils';
 import { classifyError, type ClassifiedError, type FriendlyCode, type FriendlySeverity } from '../../lib/friendly-error';
 
@@ -35,6 +38,14 @@ const ICONS: Record<FriendlyCode, typeof WifiOff> = {
   mediaFailed:          ImageOff,
   auth:                 Lock,
   network:              CloudOff,
+  whatsappBlocked:      Ban,
+  needsTemplate:        Hourglass,
+  templateProblem:      FileWarning,
+  accountRestricted:    ShieldOff,
+  whatsappBusy:         CloudOff,
+  notDelivered:         MessageSquareX,
+  managerOnly:          UserCog,
+  notSetUp:             Unplug,
   generic:              AlertTriangle,
 };
 
@@ -43,7 +54,13 @@ const ACTIONS: Partial<Record<FriendlyCode, string>> = {
   warmupLimit:          '/settings?section=whatsapp',
   tooManyRecipients:    '/broadcasts',
   auth:                 '/login',
+  whatsappBlocked:      '/settings?section=whatsapp',
+  notSetUp:             '/settings?section=whatsapp',
+  templateProblem:      '/templates',
 };
+
+/** Fixes only a manager can carry out — an employee is told who to ask instead. */
+const MANAGER_ACTIONS = new Set<FriendlyCode>(['whatsappBlocked', 'notSetUp', 'warmupLimit']);
 
 // ── Severity → colour system (light + dark) ───────────────────────────────────
 const SEVERITY: Record<FriendlySeverity, {
@@ -108,6 +125,8 @@ export default function FriendlyError({
   error, classified, onRetry, hideAction, compact, count, className,
 }: FriendlyErrorProps) {
   const { t } = useTranslation('errors');
+  const { data: session } = useSession();
+  const manager = isManager((session?.user as { role?: string } | undefined)?.role);
   const [showDetails, setShowDetails] = useState(false);
 
   const result = classified ?? (error !== undefined ? classifyError(error) : null);
@@ -116,13 +135,14 @@ export default function FriendlyError({
   const { code, severity, values, raw } = result;
   const Icon = ICONS[code];
   const s = SEVERITY[severity];
-  const actionHref = !hideAction ? ACTIONS[code] : undefined;
+  const actionHref = !hideAction && (manager || !MANAGER_ACTIONS.has(code)) ? ACTIONS[code] : undefined;
   const actionLabel = t(`friendly.${code}.action`, { defaultValue: '' });
   const title = t(`friendly.${code}.title`);
   const body = resolveBody(t, code, values);
   // Only offer the raw technical detail for the catch-all, where the friendly
   // copy can't say anything specific and the underlying message may help.
-  const canShowDetails = code === 'generic' && !!raw && raw.toLowerCase() !== title.toLowerCase();
+  // Employees never see it: Meta's wording means nothing to them and only alarms.
+  const canShowDetails = manager && code === 'generic' && !!raw && raw.toLowerCase() !== title.toLowerCase();
 
   return (
     <div

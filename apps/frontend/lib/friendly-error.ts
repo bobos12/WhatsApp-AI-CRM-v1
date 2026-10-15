@@ -4,10 +4,9 @@
  *
  * The classifier is pure (no i18n/React) so it can be reused anywhere. It returns
  * a stable `code` plus interpolation `values`; the <FriendlyError> component maps
- * that code to a localized title/body/action. Matching is done on the raw error
- * MESSAGE because the API layer collapses backend errors into `new Error(body.error)`
- * (see lib/api.ts) — the structured `.code` from the server is not preserved, so we
- * fingerprint the text instead.
+ * that code to a localized title/body/action. The server's structured `code` is
+ * trusted first; matching on the message text is the fallback for errors that
+ * carry none.
  */
 
 export type FriendlyCode =
@@ -21,6 +20,14 @@ export type FriendlyCode =
   | 'mediaFailed'
   | 'auth'
   | 'network'
+  | 'whatsappBlocked'
+  | 'needsTemplate'
+  | 'templateProblem'
+  | 'accountRestricted'
+  | 'whatsappBusy'
+  | 'notDelivered'
+  | 'managerOnly'
+  | 'notSetUp'
   | 'generic';
 
 export type FriendlySeverity = 'error' | 'warning' | 'info';
@@ -40,6 +47,7 @@ function unpack(err: unknown): { message: string; status?: number; code?: string
   if (typeof err === 'string') return { message: err };
   const anyErr = err as Record<string, any>;
   const message: string =
+    (typeof anyErr.raw === 'string' && anyErr.raw) ||
     (typeof anyErr.message === 'string' && anyErr.message) ||
     (typeof anyErr?.data?.error === 'string' && anyErr.data.error) ||
     (typeof anyErr?.error === 'string' && anyErr.error) ||
@@ -53,6 +61,50 @@ function unpack(err: unknown): { message: string; status?: number; code?: string
     (typeof anyErr?.data?.code === 'string' && anyErr.data.code) ||
     undefined;
   return { message, status, code };
+}
+
+/** Server error codes (see backend HttpError / MetaApiError kinds) → friendly cause. */
+const CODE_TO_FRIENDLY: Record<string, [FriendlyCode, FriendlySeverity]> = {
+  META_AUTH: ['whatsappBlocked', 'error'],
+  META_TEMPLATE_REQUIRED: ['needsTemplate', 'warning'],
+  TEMPLATE_REQUIRED: ['needsTemplate', 'warning'],
+  META_UNDELIVERABLE: ['notOnWhatsapp', 'warning'],
+  META_NOT_DELIVERED: ['notDelivered', 'warning'],
+  META_RATE_LIMITED: ['rateLimited', 'warning'],
+  META_TEMPLATE_ERROR: ['templateProblem', 'warning'],
+  META_ACCOUNT_RESTRICTED: ['accountRestricted', 'error'],
+  META_TRANSIENT: ['whatsappBusy', 'warning'],
+  MANAGER_ONLY: ['managerOnly', 'info'],
+  CLOUD_API_NOT_CONFIGURED: ['notSetUp', 'error'],
+  NO_TENANT: ['notSetUp', 'error'],
+  WARMUP_DAILY_LIMIT: ['warmupLimit', 'warning'],
+};
+
+/**
+ * Key under `errors:plain.*` for a one-line, jargon-free version of a server
+ * error, or null when the server's own message is already fit to show. Used by
+ * lib/api.ts so every `error.message` in the app reads like a person wrote it.
+ */
+export function plainKeyFor(code: string | undefined, status: number | undefined): string | null {
+  const byCode: Record<string, string> = {
+    META_AUTH: 'whatsappBlocked',
+    META_TEMPLATE_REQUIRED: 'needsTemplate',
+    TEMPLATE_REQUIRED: 'needsTemplate',
+    META_UNDELIVERABLE: 'notOnWhatsapp',
+    META_NOT_DELIVERED: 'notDelivered',
+    META_RATE_LIMITED: 'rateLimited',
+    META_TEMPLATE_ERROR: 'templateProblem',
+    META_ACCOUNT_RESTRICTED: 'accountRestricted',
+    META_TRANSIENT: 'whatsappBusy',
+    MANAGER_ONLY: 'managerOnly',
+    CLOUD_API_NOT_CONFIGURED: 'notSetUp',
+    NO_TENANT: 'notSetUp',
+    ENCRYPTION_NOT_CONFIGURED: 'serverNotReady',
+  };
+  if (code && byCode[code]) return byCode[code];
+  // An unexplained server crash: its text is a stack-trace fragment at best.
+  if (!code && status !== undefined && status >= 500) return 'server';
+  return null;
 }
 
 function firstMatch(text: string, re: RegExp): string | undefined {
@@ -70,6 +122,10 @@ export function classifyError(err: unknown): ClassifiedError {
   const lower = raw.toLowerCase();
   const values: Record<string, string | number> = {};
 
+  // The server names the cause outright; that beats any guess from the wording.
+  const fromCode = code ? CODE_TO_FRIENDLY[code] : undefined;
+  if (fromCode) return { code: fromCode[0], severity: fromCode[1], values, raw };
+
   // Warm-up daily limit — a "good news" throttle, not a real failure.
   if (code === 'WARMUP_DAILY_LIMIT' || /warm[\s-]?up|daily (warm|limit)/.test(lower)) {
     const pair = raw.match(/(\d+)\s*\/\s*(\d+)/);
@@ -77,7 +133,8 @@ export function classifyError(err: unknown): ClassifiedError {
     return { code: 'warmupLimit', severity: 'warning', values, raw };
   }
 
-  // Session / auth expiry.
+  // Session / auth expiry. (A 403 that means "not allowed" carries MANAGER_ONLY
+  // and was handled above — only an unexplained one lands here.)
   if (status === 401 || status === 403 || /unauthor|forbidden|authentication required|not authorized|session expired/.test(lower)) {
     return { code: 'auth', severity: 'error', values, raw };
   }

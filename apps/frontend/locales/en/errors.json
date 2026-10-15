@@ -76,6 +76,57 @@
     "generic": {
       "title": "Something went wrong",
       "body": "The action didn't go through. Please try again — if it keeps happening, contact support."
+    },
+    "whatsappBlocked": {
+      "title": "WhatsApp isn't sending right now",
+      "body": "Your WhatsApp connection needs attention before messages can go out. A manager can see the reason and fix it in Settings → WhatsApp.",
+      "action": "Open WhatsApp settings"
+    },
+    "needsTemplate": {
+      "title": "This chat needs a template",
+      "body": "This customer hasn't messaged you in the last 24 hours, so WhatsApp only allows a pre-approved template message. Send a template to start the conversation."
+    },
+    "templateProblem": {
+      "title": "This template can't be sent",
+      "body": "It may be paused, not approved yet, or missing information. Pick another template or check this one on the Templates page.",
+      "action": "Open Templates"
+    },
+    "accountRestricted": {
+      "title": "WhatsApp has limited this account",
+      "body": "Meta has temporarily restricted sending from your WhatsApp number. A manager can see the details in WhatsApp Manager."
+    },
+    "whatsappBusy": {
+      "title": "WhatsApp is having a temporary problem",
+      "body": "This usually clears up within a minute. Please try again shortly."
+    },
+    "notDelivered": {
+      "title": "WhatsApp didn't deliver this message",
+      "body": "WhatsApp limits how many promotional messages one person receives. Try again later or send something more personal."
+    },
+    "managerOnly": {
+      "title": "Only a manager can do this",
+      "body": "Your account doesn't have permission for this action. Ask a manager if it needs to be done."
+    },
+    "notSetUp": {
+      "title": "WhatsApp isn't connected yet",
+      "body": "A manager needs to connect your company's WhatsApp number in Settings → WhatsApp first.",
+      "action": "Open WhatsApp settings"
     }
+  },
+  "plain": {
+    "whatsappBlocked": "WhatsApp isn't sending right now. A manager can see why in Settings → WhatsApp.",
+    "needsTemplate": "This customer hasn't messaged you in the last 24 hours, so WhatsApp only allows a pre-approved template. Send a template to start the conversation.",
+    "notOnWhatsapp": "This number doesn't have WhatsApp, so the message couldn't be delivered.",
+    "notDelivered": "WhatsApp didn't deliver this promotional message. Try again later.",
+    "rateLimited": "Sending a little too fast — messages will continue in a moment.",
+    "templateProblem": "This template can't be sent right now. Try another template.",
+    "accountRestricted": "WhatsApp has temporarily limited this account. A manager can check WhatsApp Manager.",
+    "whatsappBusy": "WhatsApp is having a temporary problem. Please try again in a minute.",
+    "whatsappRejected": "WhatsApp couldn't accept this message. Please try again — if it keeps happening, let a manager know.",
+    "managerOnly": "Only a manager can do this.",
+    "notSetUp": "WhatsApp isn't connected yet. A manager can connect it in Settings → WhatsApp.",
+    "serverNotReady": "This feature isn't ready on the server yet. Please contact support.",
+    "network": "Can't reach the server. Check your internet connection and try again.",
+    "server": "Something went wrong on our side. Please try again."
   }
 }

@@ -1,5 +1,7 @@
 import { getSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
+import i18n from './i18n';
+import { plainKeyFor } from './friendly-error';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -119,6 +121,34 @@ async function getValidAccessToken() {
   return refreshed;
 }
 
+/**
+ * The error every screen ends up showing. Technical causes — a WhatsApp refusal,
+ * a crash, an unreachable server — are reworded for the person using the CRM;
+ * the server's original text stays on `raw` for managers and support.
+ */
+function apiError(message: string, status?: number, data?: any): Error {
+  const code: string | undefined = data?.code;
+  const key = plainKeyFor(code, status);
+  const error = new Error(key ? i18n.t(`errors:plain.${key}`) : message);
+  (error as any).status = status;
+  (error as any).data = data;
+  (error as any).code = code;
+  (error as any).raw = message;
+  return error;
+}
+
+/** fetch() that turns "the network failed" into a sentence instead of `TypeError: Failed to fetch`. */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    const error = new Error(i18n.t('errors:plain.network'));
+    (error as any).code = 'NETWORK';
+    (error as any).raw = err instanceof Error ? err.message : String(err);
+    throw error;
+  }
+}
+
 export async function apiRequest(endpoint: string, options: RequestInit = {}, retry = true) {
   const token = await getValidAccessToken();
   const config: RequestInit = {
@@ -131,7 +161,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
     },
   };
 
-  let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  let response = await send(`${API_BASE_URL}${endpoint}`, config);
 
   // While impersonating we must never refresh into the operator's own token —
   // that would switch the request back to platform scope. Let it fail instead.
@@ -142,7 +172,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
         window.localStorage.setItem('accessToken', newToken);
       }
 
-      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      response = await send(`${API_BASE_URL}${endpoint}`, {
         ...config,
         headers: {
           'Content-Type': 'application/json',
@@ -162,16 +192,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    const error = new Error(
+    throw apiError(
       errorData?.error ||
         (response.status === 401 || response.status === 403
           ? 'Authentication required'
           : `API request failed: ${response.statusText}`),
+      response.status,
+      errorData,
     );
-    (error as any).status = response.status;
-    (error as any).data = errorData;
-    (error as any).code = errorData?.code;
-    throw error;
   }
 
   return response.json();
@@ -179,7 +207,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}, re
 
 export async function apiForm(endpoint: string, formData: FormData, retry = true) {
   const token = await getAccessToken();
-  let response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  let response = await send(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     body: formData,
     credentials: 'include',
@@ -192,7 +220,7 @@ export async function apiForm(endpoint: string, formData: FormData, retry = true
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('accessToken', newToken);
       }
-      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      response = await send(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -205,10 +233,7 @@ export async function apiForm(endpoint: string, formData: FormData, retry = true
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    const error = new Error(errorData?.error || `API request failed: ${response.statusText}`);
-    (error as any).status = response.status;
-    (error as any).data = errorData;
-    throw error;
+    throw apiError(errorData?.error || `API request failed: ${response.statusText}`, response.status, errorData);
   }
 
   return response.json();
