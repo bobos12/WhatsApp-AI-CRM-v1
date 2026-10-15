@@ -27,6 +27,7 @@ import SafetyReport from './SafetyReport';
 import { blockers, type PreflightFinding } from '../../lib/preflight';
 import TemplatePicker from './TemplatePicker';
 import type { MetaStatus } from '../templates/ApprovalStatus';
+import { useRouter } from 'next/navigation';
 
 /** Slowest → fastest, so a user's choice can be compared against the safe cap. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -265,6 +266,7 @@ export default function BroadcastForm({
   onBack,
   onSave,
 }: BroadcastFormProps) {
+  const router = useRouter();
   const { t } = useTranslation('broadcasts');
   const { isRTL: isRtl } = useDirection();
   const setNavHidden = useChatOpen((s) => s.setOpen);
@@ -820,7 +822,7 @@ export default function BroadcastForm({
         });
         break;
       case 'connect_channel':
-        window.location.href = '/settings?section=whatsapp';
+        router.push('/settings?section=whatsapp');
         break;
       // `exclude_already_received` is in the action union but no finding
       // currently emits it — the server would have to name *which* prior
@@ -831,7 +833,7 @@ export default function BroadcastForm({
         break;
     }
     if (finding.fix) setAppliedFixes((prev) => new Set(prev).add(finding.key));
-  }, []);
+  }, [router]);
 
   /**
    * The one hard stop in the composer: a server-side blocker. Warnings never

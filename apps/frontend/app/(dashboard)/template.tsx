@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 
 /**
  * Page transition. A Next.js `template` re-mounts on every navigation (unlike
- * `layout`), so each screen arrives with a short fade and a 6px rise — enough to
- * register as "new place", short enough (≈250ms) never to feel like waiting.
+ * `layout`), so each screen settles in with a 4px rise — enough to register as
+ * "new place" without the blank frame a fade-in shows.
  * Vertical, so it reads the same in Arabic as in English.
  *
  * Once the entrance finishes the motion wrapper is dropped for a plain div: a
@@ -30,9 +30,11 @@ export default function DashboardTemplate({ children }: { children: React.ReactN
   return (
     <motion.div
       className={wrapperClass}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      // Movement only, no fade: starting from transparent flashed a blank frame
+      // on every navigation, which read as the page reloading.
+      initial={{ y: 4 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       onAnimationComplete={() => setEntered(true)}
     >
       {children}

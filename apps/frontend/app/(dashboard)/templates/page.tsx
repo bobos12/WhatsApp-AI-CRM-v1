@@ -14,6 +14,7 @@ import type { CanonicalTemplate } from '../../../lib/template-engine/schema';
 import { isCanonicalPayload, TEMPLATE_CATEGORIES } from '../../../lib/template-engine/schema';
 import SendTemplateDialog from '../../../components/templates/SendTemplateDialog';
 import { ApprovalBadge, describeApproval, type MetaStatus } from '../../../components/templates/ApprovalStatus';
+import { useRemembered } from '@/hooks/useRemembered';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -194,8 +195,8 @@ export default function TemplatesPage() {
   const { status } = useSession();
   const { t } = useTranslation('templates');
 
-  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates, firstTemplates] = useRemembered<MessageTemplate[]>('templates', []);
+  const [loading, setLoading] = useState(firstTemplates);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -214,7 +215,6 @@ export default function TemplatesPage() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await api.get('/api/templates');
       setTemplates(Array.isArray(data) ? data : []);
     } catch {

@@ -5,6 +5,7 @@ import { Plus, Trash2, MessageSquareReply, AtSign } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
+import { useRemembered } from '@/hooks/useRemembered';
 
 interface SavedReply {
   id: string;
@@ -16,15 +17,14 @@ interface SavedReply {
 export default function SavedRepliesPage() {
   const { t } = useTranslation(['settings', 'common']);
   const { status } = useSession();
-  const [savedReplies, setSavedReplies] = useState<SavedReply[]>([]);
+  const [savedReplies, setSavedReplies, firstSavedReplies] = useRemembered<SavedReply[]>('saved-replies', []);
   const [shortcut, setShortcut] = useState('');
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(firstSavedReplies);
   const [error, setError] = useState<string | null>(null);
 
   const fetchReplies = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await api.get('/api/saved-replies');
       setSavedReplies(Array.isArray(data) ? data : []);
     } catch (err) {

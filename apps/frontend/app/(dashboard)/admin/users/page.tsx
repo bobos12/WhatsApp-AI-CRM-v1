@@ -22,6 +22,7 @@ import {
   simpleRoleToStored,
   isManager,
 } from '../../../../lib/roles';
+import { useRemembered } from '@/hooks/useRemembered';
 
 type UserSortKey = 'name' | 'email' | 'role' | 'createdAt';
 
@@ -59,9 +60,9 @@ export default function AdminUsersPage() {
   const role = (session?.user as any)?.role;
 
   // ─── data ─────────────────────────────────────────────────────────────────
-  const [users, setUsers]   = useState<User[]>([]);
-  const [teams, setTeams]   = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers, firstUsers]   = useRemembered<User[]>('admin:users', []);
+  const [teams, setTeams]   = useRemembered<Team[]>('admin:teams', []);
+  const [loading, setLoading] = useState(firstUsers);
 
   // ─── form ─────────────────────────────────────────────────────────────────
   const [showForm, setShowForm]   = useState(false);
@@ -105,7 +106,6 @@ export default function AdminUsersPage() {
 
   const loadData = useCallback(async () => {
     try {
-      setLoading(true);
       const [usersData, teamsData] = await Promise.all([
         api.get('/api/users'),
         api.get('/api/teams/all'),

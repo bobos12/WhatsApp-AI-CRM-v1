@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import { formatPhone } from '../../../lib/phone';
+import { useRemembered } from '@/hooks/useRemembered';
 
 interface Tag {
   id: string;
@@ -34,17 +35,16 @@ const COLOR_PRESETS = ['#6366f1', '#25D366', '#f59e0b', '#ef4444', '#8b5cf6', '#
 export default function TagsPage() {
   const { t } = useTranslation(['common', 'chat']);
   const { status } = useSession();
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [tags, setTags, firstTags] = useRemembered<Tag[]>('tags', []);
+  const [contacts, setContacts] = useRemembered<Contact[]>('tags:contacts', []);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(firstTags);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(COLOR_PRESETS[0]);
   const [creating, setCreating] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
       const [tagData, contactData] = await Promise.all([
         api.get('/api/tags'),
         api.get('/api/contacts'),

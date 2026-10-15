@@ -195,7 +195,7 @@ export default function ContactProfilePage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
+                onClick={() => { router.push(`/conversations?phone=${encodeURIComponent(contact.phone)}`); }}
                 className="btn btn-primary inline-flex"
               >
                 <MessageSquare className="h-4 w-4" />
@@ -301,7 +301,7 @@ export default function ContactProfilePage() {
             action={
               <button
                 type="button"
-                onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
+                onClick={() => { router.push(`/conversations?phone=${encodeURIComponent(contact.phone)}`); }}
                 className="text-xs font-semibold text-brand hover:underline"
               >
                 {t('openConversation')}
@@ -314,7 +314,7 @@ export default function ContactProfilePage() {
                   <button
                     key={conv.id}
                     type="button"
-                    onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(contact.phone)}`; }}
+                    onClick={() => { router.push(`/conversations?phone=${encodeURIComponent(contact.phone)}`); }}
                     className="flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-raised px-3 py-2.5 text-start transition hover:border-brand/40 hover:bg-brand/5"
                   >
                     <div className="min-w-0">

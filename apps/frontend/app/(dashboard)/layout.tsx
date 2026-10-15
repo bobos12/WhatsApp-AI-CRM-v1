@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
@@ -16,6 +16,7 @@ import SetupGate from '../../components/whatsapp/setup/SetupGate';
 import AppUpdateBanner from '../../components/layout/AppUpdateBanner';
 import ImpersonationBanner from '../../components/layout/ImpersonationBanner';
 import ViewportFit from '../../components/layout/ViewportFit';
+import NavigationProgress from '../../components/layout/NavigationProgress';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
@@ -23,6 +24,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // the window *is* the app, and every pixel of it goes to the work.
     <div className="flex h-[var(--app-h,100dvh)] overflow-hidden overscroll-none bg-canvas text-ink">
       <ViewportFit />
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
       <NotificationProvider />
       <RealtimeProvider>
         {/* One status read for the whole shell — the gate, sidebar line, banner

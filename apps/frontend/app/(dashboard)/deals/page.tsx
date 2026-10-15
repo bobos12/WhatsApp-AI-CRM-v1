@@ -16,6 +16,7 @@ import { STAGE_TONE } from '../../../lib/format';
 import { PageHeader } from '../../../components/ui/page';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import Avatar from '../../../components/ui/Avatar';
+import { useRemembered } from '@/hooks/useRemembered';
 
 type Stage = 'NEW' | 'INTERESTED' | 'NEGOTIATION' | 'CLOSED';
 
@@ -159,15 +160,15 @@ export default function DealsPage() {
   const { t } = useTranslation('deals');
   const { t: tc } = useTranslation('common');
 
-  const [deals, setDeals]               = useState<Deal[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const [deals, setDeals, firstDeals]               = useRemembered<Deal[]>('deals', []);
+  const [loading, setLoading]           = useState(firstDeals);
   const [editingDeal, setEditingDeal]   = useState<Deal | null>(null);
   const [showForm, setShowForm]         = useState(false);
   const [saving, setSaving]             = useState(false);
   const [deletingId, setDeletingId]     = useState<string | null>(null);
   const [confirmDeleteId, setConfirmId] = useState<string | null>(null);
-  const [contacts, setContacts]         = useState<ContactOption[]>([]);
-  const [members, setMembers]           = useState<MemberOption[]>([]);
+  const [contacts, setContacts]         = useRemembered<ContactOption[]>('deals:contacts', []);
+  const [members, setMembers]           = useRemembered<MemberOption[]>('deals:members', []);
   const [formData, setFormData]         = useState(emptyForm);
 
   const presetContactId = searchParams.get('contactId');

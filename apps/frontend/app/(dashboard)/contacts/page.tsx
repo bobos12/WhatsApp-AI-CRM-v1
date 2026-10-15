@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Plus, Upload, Search, Users2, Filter, X, BriefcaseBusiness,
   CheckSquare, MessageSquare, PlusCircle, SlidersHorizontal,
@@ -87,6 +87,7 @@ interface ContactDetails {
 }
 
 export default function ContactsPage() {
+  const router = useRouter();
   const { status } = useSession();
   const { t } = useTranslation('contacts');
   const { t: tc } = useTranslation('common');
@@ -816,7 +817,7 @@ export default function ContactsPage() {
                     <div className="mb-3">
                       <button
                         type="button"
-                        onClick={() => { window.location.href = `/conversations?phone=${encodeURIComponent(selectedContact.phone)}`; }}
+                        onClick={() => { router.push(`/conversations?phone=${encodeURIComponent(selectedContact.phone)}`); }}
                         className="inline-flex items-center rounded-full bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-slate-950"
                       >
                         {t('openConversation')}

@@ -16,6 +16,7 @@ import { cn } from '../../../lib/utils';
 import { PageHeader } from '../../../components/ui/page';
 import { useSocket } from '../../../hooks/useSocket';
 import { useToast } from '../../../hooks/useToast';
+import { useRemembered } from '@/hooks/useRemembered';
 
 type TaskStatus   = 'OPEN' | 'IN_PROGRESS' | 'DONE';
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -88,10 +89,10 @@ export default function TasksPage() {
   const isAdmin = ADMIN_ROLES.includes(role);
 
   // ─── data ─────────────────────────────────────────────────────────────────
-  const [tasks, setTasks]       = useState<Task[]>([]);
-  const [contacts, setContacts] = useState<ContactOption[]>([]);
-  const [members, setMembers]   = useState<MemberOption[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [tasks, setTasks, firstTasks]       = useRemembered<Task[]>('tasks', []);
+  const [contacts, setContacts] = useRemembered<ContactOption[]>('tasks:contacts', []);
+  const [members, setMembers]   = useRemembered<MemberOption[]>('tasks:members', []);
+  const [loading, setLoading]   = useState(firstTasks);
 
   // ─── form ─────────────────────────────────────────────────────────────────
   const [editingTask, setEditing] = useState<Task | null>(null);
@@ -132,7 +133,6 @@ export default function TasksPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      setLoading(true);
       const [taskData, contactData, agentData] = await Promise.all([
         api.get('/api/tasks'),
         api.get('/api/contacts'),

@@ -24,6 +24,7 @@ import {
   RiskBadge, deliveryStats, useCountdownLabel, type BroadcastSummary as Broadcast,
 } from '../../../components/broadcasts/shared';
 import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
+import { useRemembered } from '@/hooks/useRemembered';
 
 type BroadcastSortKey = 'name' | 'status' | 'recipientCount' | 'totalSent' | 'progress' | 'createdAt';
 
@@ -123,8 +124,8 @@ export default function BroadcastsPage() {
   const explainToast = (err: unknown) => toastError(tErr(`friendly.${classifyError(err).code}.title`));
 
   // ─── data ─────────────────────────────────────────────────────────────────
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [broadcasts, setBroadcasts, firstBroadcasts] = useRemembered<Broadcast[]>('broadcasts', []);
+  const [loading, setLoading]       = useState(firstBroadcasts);
 
   // ─── row actions ──────────────────────────────────────────────────────────
   const [sendingId, setSendingId]             = useState<string | null>(null);
@@ -402,7 +403,6 @@ export default function BroadcastsPage() {
     try {
       await api.delete(`/api/broadcasts/${id}`);
       success(wasLive ? 'Broadcast stopped and deleted.' : 'Broadcast deleted.');
-      router.refresh();
     } catch (err) {
       setBroadcasts(snapshot);
       explainToast(err);
