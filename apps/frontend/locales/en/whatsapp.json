@@ -109,14 +109,15 @@
     },
     "register": {
       "title": "Move your number to this CRM",
-      "body": "Your number is still registered with another app or provider (for example 360dialog), so WhatsApp won't let this CRM send from it. Enter the number's two-step verification PIN to move it here.",
+      "body": "Meta won't let this CRM send from your number yet. If it's still registered with another app or provider (for example 360dialog), enter the number's two-step verification PIN to move it here. If two-step verification is off, the 6 digits you enter become the new PIN.",
       "where": "Don't know the PIN? Set a new one in WhatsApp Manager → Phone numbers → your number → Two-step verification.",
       "openManager": "Open WhatsApp Manager",
       "label": "6-digit PIN",
       "submit": "Move number",
       "working": "Moving…",
       "done": "Done — this CRM can now send from your number.",
-      "stillBlocked": "The number moved, but Meta still refuses sends. Check the system user has Full control of the WhatsApp account."
+      "stillBlocked": "The number is now registered here, but Meta still refuses sends. That usually means the WhatsApp account is still billed through another provider's credit line (for example 360dialog) — add your own payment method in Meta to replace it.",
+      "digits": "{{n}} of 6 digits"
     },
     "webhook": {
       "title": "Connect incoming messages by hand",
@@ -192,7 +193,7 @@
       "NO_APP_SECRET": "App Secret missing — reconnect to add it",
       "APP_SECRET_INVALID": "App Secret doesn't match the app — reconnect",
       "SENDING_OK": "This CRM can send from your number",
-      "NOT_REGISTERED_HERE": "Registered with another app or provider — move it here with your PIN",
+      "NOT_REGISTERED_HERE": "Meta won't let this app send from your number yet — usually because it's still billed through another provider's credit line, or registered with their app",
       "SENDING_UNKNOWN": "Couldn't confirm — Meta didn't respond"
     },
     "fix": {

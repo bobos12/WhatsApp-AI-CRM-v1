@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { CopyField, META_LINKS, Notice, errorText } from './shared';
 
 /**
@@ -59,10 +60,14 @@ export function RegisterNumberCard({ onDone }: { onDone: (canSend: boolean) => v
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="••••••"
             aria-invalid={Boolean(error)}
+            aria-describedby="wa-pin-count"
             className="field text-center font-mono text-base tracking-[0.5em]"
           />
+          <p id="wa-pin-count" className={cn('hint tabular-nums', pin.length === 6 && 'text-brand')}>
+            {t('setup.register.digits', { n: pin.length })}
+          </p>
         </div>
-        <button type="submit" disabled={pin.length !== 6 || busy} className="btn btn-primary">
+        <button type="submit" disabled={pin.length !== 6 || busy} className="btn btn-primary sm:mb-5">
           {busy && <Loader2 className="animate-spin" aria-hidden="true" />}
           {busy ? t('setup.register.working') : t('setup.register.submit')}
         </button>
