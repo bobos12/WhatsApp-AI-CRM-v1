@@ -16,6 +16,7 @@ import { Loader2, Phone, Repeat, Unplug, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { isManager } from '@/lib/roles';
+import { formatPhone } from '@/lib/phone';
 import { Modal } from '@/components/ui/modal';
 import { useWhatsAppConnection } from './WhatsAppConnectProvider';
 import HealthChecklist from './setup/HealthChecklist';
@@ -72,7 +73,7 @@ export default function WhatsAppLinkPanel(_props: { size?: 'sm' | 'md' }) {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p dir="ltr" className="font-mono text-base font-semibold tabular-nums text-ink">{connectedPhone ?? '—'}</p>
+              <p dir="ltr" className="font-mono text-base font-semibold tabular-nums text-ink">{connectedPhone ? formatPhone(connectedPhone) : '—'}</p>
               <span className={cn('chip', live ? 'chip-brand' : 'chip-danger')}>
                 <span className={cn('h-1.5 w-1.5 rounded-full', live ? 'bg-brand' : 'bg-red-500')} aria-hidden="true" />
                 {live ? t('panel.live') : t('panel.offline')}
