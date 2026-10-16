@@ -31,6 +31,8 @@ export interface PreflightDraft {
    * reading them, so sending them only made the request look meaningful.
    */
   templateId?: string | null;
+  /** How the template's blanks are filled — an unfilled blank blocks sending. */
+  templateVariables?: Record<string, string> | null;
   /** Server-resolved audience exclusion applied by the report's one-tap fix. */
   excludeReceivedFrom?: string | null;
 }
@@ -64,6 +66,9 @@ export function usePreflight(draft: PreflightDraft, options: { enabled?: boolean
         mediaUrl: draft.mediaUrl || undefined,
         interactiveContent: draft.interactiveContent,
         templateId: draft.templateId || undefined,
+        templateVariables: draft.templateVariables && Object.keys(draft.templateVariables).length
+          ? draft.templateVariables
+          : undefined,
         excludeReceivedFrom: draft.excludeReceivedFrom || undefined,
       }),
     [

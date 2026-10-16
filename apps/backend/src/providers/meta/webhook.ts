@@ -8,6 +8,7 @@ import { processIncomingMessage } from '../../workflow/inbound-workflow';
 import { findTenantByPhoneNumberId, recordSync, type ResolvedChannel } from '../channel.service';
 import { downloadMedia } from './media';
 import { applyTemplateStatusUpdate } from './templates';
+import { MetaApiError } from './graph';
 
 /**
  * Inbound webhook from Meta.
@@ -416,6 +417,65 @@ async function applyStatus(status: MetaStatus): Promise<void> {
     status: next,
     ...(isFailure ? { error: error?.title ?? 'Delivery failed' } : {}),
   });
+
+  await applyCampaignStatus(status.id, next, at, error?.code ?? null);
+}
+
+/**
+ * Mirror a delivery status onto the campaign recipient it belongs to, if any.
+ *
+ * Meta accepts most messages at send time and reports the real outcome here a
+ * second later — "not on WhatsApp", "held back by Meta's marketing limit", "this
+ * person stopped marketing messages". Without this a campaign counted those as
+ * sent, and its report could never explain why people didn't get it.
+ */
+async function applyCampaignStatus(
+  wamid: string,
+  next: MsgStatus,
+  at: Date,
+  errorCode: number | null,
+): Promise<void> {
+  const recipient = await prisma.broadcastRecipient.findFirst({
+    where: { messageId: wamid },
+    select: { id: true, broadcastId: true, status: true, contactId: true },
+  });
+  if (!recipient) return;
+
+  if (next === MsgStatus.FAILED) {
+    const code = errorCode ?? -1;
+    const moved = await prisma.broadcastRecipient.updateMany({
+      where: { id: recipient.id, status: 'sent' },
+      data: {
+        status: 'failed',
+        errorCode: String(code),
+        lastError: new MetaApiError({ code, message: 'Delivery failed', httpStatus: 400 }).userMessage.slice(0, 500),
+      },
+    });
+    if (moved.count > 0) {
+      await prisma.broadcast.update({
+        where: { id: recipient.broadcastId },
+        data: { totalSent: { decrement: 1 }, totalFailed: { increment: 1 } },
+      });
+    }
+    // They switched off marketing messages in WhatsApp. Respect it everywhere,
+    // so no later campaign spends money on a message Meta will refuse anyway.
+    if (code === 131050 && recipient.contactId) {
+      await prisma.contact.updateMany({ where: { id: recipient.contactId }, data: { marketingOptOut: true } });
+    }
+    return;
+  }
+
+  if (next === MsgStatus.DELIVERED) {
+    await prisma.broadcastRecipient.updateMany({
+      where: { id: recipient.id, deliveredAt: null },
+      data: { deliveredAt: at },
+    });
+  } else if (next === MsgStatus.READ) {
+    await prisma.broadcastRecipient.updateMany({
+      where: { id: recipient.id, readAt: null },
+      data: { readAt: at, deliveredAt: at },
+    });
+  }
 }
 
 // ── account + quality updates ────────────────────────────────────────────────

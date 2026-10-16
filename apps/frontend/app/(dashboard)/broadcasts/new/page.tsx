@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -36,16 +36,28 @@ export default function NewBroadcastPage() {
     fetchContacts();
   }, [fetchContacts]);
 
+  // Set once the campaign exists. If sending it then fails (no connection, a
+  // template that just lost approval…), tapping Send again updates and retries
+  // this campaign instead of creating a second copy of it.
+  const savedId = useRef<string | null>(null);
+
   const handleSave = async (broadcast: BroadcastPayload) => {
-    const createdBroadcast = await api.post('/api/broadcasts', broadcast);
+    if (savedId.current) {
+      await api.put(`/api/broadcasts/${savedId.current}`, broadcast);
+    } else {
+      const created = await api.post<{ id: string }>('/api/broadcasts', broadcast);
+      savedId.current = created?.id ?? null;
+    }
+    const id = savedId.current;
 
     // A scheduled broadcast is dispatched by the backend scheduler when its time
     // comes; only an immediate one is sent from here.
-    if (!broadcast.scheduledAtLocal && createdBroadcast?.id) {
-      await api.post(`/api/broadcasts/${createdBroadcast.id}/send`, {});
+    if (!broadcast.scheduledAtLocal && id) {
+      await api.post(`/api/broadcasts/${id}/send`, {});
     }
 
-    router.push('/broadcasts');
+    // Straight to the campaign, where its progress is live.
+    router.push(id ? `/broadcasts/${id}` : '/broadcasts');
   };
 
   const BackIcon = isRtl ? ArrowRight : ArrowLeft;
@@ -71,6 +83,7 @@ export default function NewBroadcastPage() {
         contacts={contacts}
         onBack={() => router.push('/broadcasts')}
         onSave={handleSave}
+        confirmBeforeSave
       />
       {/* Mobile bottom-nav spacer */}
       <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />

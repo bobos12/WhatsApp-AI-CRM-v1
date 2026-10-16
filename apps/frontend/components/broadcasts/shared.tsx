@@ -127,7 +127,7 @@ export const STATUS_DOTS: Record<string, string> = {
 export const ALL_STATUSES = ['DRAFT', 'SCHEDULED', 'SENDING', 'PAUSED', 'SENT', 'FAILED', 'CANCELLED'];
 
 /** Statuses whose content may still be edited — mirrors the server's rule. */
-export const EDITABLE_STATUSES = ['DRAFT', 'SCHEDULED', 'FAILED'];
+export const EDITABLE_STATUSES = ['DRAFT', 'SCHEDULED', 'FAILED', 'PAUSED'];
 
 export function StatusPill({ status, size = 'sm' }: { status: string; size?: 'sm' | 'md' }) {
   const { t } = useTranslation('broadcasts');

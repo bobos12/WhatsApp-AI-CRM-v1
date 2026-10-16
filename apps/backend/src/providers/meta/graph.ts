@@ -62,9 +62,13 @@ const ERROR_MAP: Record<number, MetaErrorMapping> = {
   131026: { kind: 'UNDELIVERABLE', retryable: false, userMessage: 'This number cannot receive WhatsApp messages. It may not be registered on WhatsApp.' },
   131052: { kind: 'UNDELIVERABLE', retryable: false, userMessage: 'WhatsApp couldn’t open the attached file. Try attaching it again.' },
 
+  131050: { kind: 'UNDELIVERABLE', retryable: false, userMessage: 'This person turned off marketing messages from businesses on WhatsApp. They won’t be sent campaigns again.' },
+  130472: { kind: 'NOT_DELIVERED', retryable: false, userMessage: 'WhatsApp held this marketing message back for this number as part of a Meta experiment. Nothing is wrong on your side.' },
+  131021: { kind: 'UNDELIVERABLE', retryable: false, userMessage: 'This is your own business number, so WhatsApp can’t message it.' },
   131049: { kind: 'NOT_DELIVERED', retryable: false, userMessage: 'WhatsApp chose not to deliver this marketing message to protect the recipient’s experience. It will count as failed, not as a violation.' },
   131048: { kind: 'RATE_LIMITED', retryable: true, userMessage: 'WhatsApp has temporarily limited sending from this number because of spam signals. Sending will resume automatically.' },
   131056: { kind: 'RATE_LIMITED', retryable: true, userMessage: 'Too many messages to this contact in a short period. Retrying shortly.' },
+  130429: { kind: 'RATE_LIMITED', retryable: true, userMessage: 'Sending faster than WhatsApp allows. Sending will continue automatically.' },
   80007:  { kind: 'RATE_LIMITED', retryable: true, userMessage: 'WhatsApp asked us to slow down. Sending will continue automatically.' },
   4:      { kind: 'RATE_LIMITED', retryable: true, userMessage: 'Sending a little too fast. Trying again in a moment.' },
 
@@ -78,6 +82,10 @@ const ERROR_MAP: Record<number, MetaErrorMapping> = {
   132068: { kind: 'TEMPLATE_ERROR', retryable: false, userMessage: 'This template is paused by WhatsApp. Try another template.' },
   132069: { kind: 'TEMPLATE_ERROR', retryable: false, userMessage: 'This template isn’t available right now. Try another template.' },
 
+  131042: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Meta could not charge the payment method on your WhatsApp account. A manager needs to fix billing in WhatsApp Manager → Payment settings.' },
+  131045: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Your WhatsApp number is not fully registered yet. A manager can check Settings → WhatsApp.' },
+  131057: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Your WhatsApp Business account is in maintenance mode. Sending will resume once Meta finishes.' },
+  131037: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Meta has not approved your business display name yet, so the number can’t send. Check WhatsApp Manager.' },
   368:    { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'This account is temporarily blocked by Meta for policy violations.' },
   131031: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Your WhatsApp Business account has been locked by Meta. Check WhatsApp Manager for details.' },
   133010: { kind: 'ACCOUNT_RESTRICTED', retryable: false, userMessage: 'Your WhatsApp number isn’t fully set up with WhatsApp yet. A manager can check Settings → WhatsApp.' },
@@ -173,6 +181,12 @@ export interface GraphRequest {
   /** Total attempts including the first. Only retryable failures consume one. */
   maxAttempts?: number;
   timeoutMs?: number;
+  /**
+   * Retry after a timeout or dropped connection. Off for message sends: Meta may
+   * have accepted a request whose answer never reached us, and repeating it
+   * delivers the message twice.
+   */
+  retryNetworkErrors?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -272,7 +286,7 @@ export async function graphRequest<T = any>(req: GraphRequest): Promise<T> {
       // Network failure or timeout — indistinguishable from a Meta-side blip.
       lastError = err;
       const isAbort = err instanceof Error && err.name === 'AbortError';
-      if (attempt === maxAttempts) {
+      if (attempt === maxAttempts || req.retryNetworkErrors === false) {
         throw new MetaApiError({
           code: -1,
           message: isAbort
@@ -293,6 +307,10 @@ export async function graphRequest<T = any>(req: GraphRequest): Promise<T> {
 /** Normalise anything thrown by a Meta call into a MetaApiError. */
 export function asMetaError(err: unknown): MetaApiError {
   if (err instanceof MetaApiError) return err;
+  // The provider re-throws Meta failures as HttpErrors for the API layer, with
+  // the original attached, so background callers can still read the code.
+  const cause = (err as { cause?: unknown } | null)?.cause;
+  if (cause instanceof MetaApiError) return cause;
   return new MetaApiError({
     code: -1,
     message: err instanceof Error ? err.message : String(err),

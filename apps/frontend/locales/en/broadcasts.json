@@ -98,7 +98,7 @@
     "namePlaceholder2": "e.g., Flash Sale — May 2025",
     "nameHelper": "Only you see this — it helps you find the broadcast later. Recipients never see it.",
     "messageSection": "Message",
-    "messageSubtitle": "Send text, an image, video, document or voice note — with personalization",
+    "messageSubtitle": "Choose the approved WhatsApp template to send and fill in its blanks",
     "messageType": "Message type",
     "typeText": "Text",
     "typeImage": "Image",
@@ -167,7 +167,7 @@
     "livePreview": "Live Preview",
     "recipientsReady": "recipients ready",
     "campaign": "Campaign",
-    "businessPreview": "Your Business",
+    "businessPreview": "Your business",
     "messagePreviewHint": "Your message\npreview appears here",
     "errorIncomplete": "Please complete every step before sending.",
     "errorNoRecipients": "Please select at least one recipient or enter a tag filter.",
@@ -195,7 +195,10 @@
     "waGateHint": "You can still schedule this campaign for later — switch off \"Send now\" to save it.",
     "waConnectCta": "Connect WhatsApp",
     "hintName": "Give the campaign a name to continue.",
-    "hintMessage": "Choose a template or write a message to continue."
+    "hintMessage": "Choose an approved template and fill in its blanks to continue.",
+    "reviewSend": "Review & send",
+    "reviewSchedule": "Review & schedule",
+    "readyToReceive": "will receive it"
   },
   "interactive": {
     "tabButtons": "Quick Reply",
@@ -402,12 +405,97 @@
     "assessedAt": "Checked {{time}}",
     "assessedAtSave": "From the last save",
     "recheck": "Re-check",
-    "rechecking": "Re-checking…"
+    "rechecking": "Re-checking…",
+    "noReport": "No safety check for this campaign yet.",
+    "readyToSend": "Ready to send",
+    "cannotSend": "Cannot send yet",
+    "willReceive_one": "1 person will receive this.",
+    "willReceive_other": "{{formatted}} people will receive this.",
+    "issuesFirst_one": "1 thing must be fixed first.",
+    "issuesFirst_other": "{{count}} things must be fixed first.",
+    "audience": "Audience",
+    "statSelected": "Selected",
+    "statWillReceive": "Will receive",
+    "statDuplicates": "Duplicates removed",
+    "statInvalid": "Invalid numbers",
+    "statAlreadyMessaged": "Already messaged",
+    "yourNumber": "Your number",
+    "notConnected": "Not connected",
+    "quality": "Quality",
+    "quality_GREEN": "High",
+    "quality_YELLOW": "Medium",
+    "quality_RED": "Low",
+    "quality_UNKNOWN": "Not rated yet",
+    "dailyLimit": "Daily limit",
+    "perDay": "{{limit}} new conversations/day",
+    "template": "Template",
+    "templateApproved": "Approved by WhatsApp",
+    "templatePending": "Awaiting WhatsApp review",
+    "templateNotSubmitted": "Not submitted",
+    "noTemplate": "No template selected. WhatsApp requires one for anyone who has not messaged you in the last 24 hours.",
+    "findings": {
+      "template_required": {
+        "label": "Choose an approved template",
+        "detail": "WhatsApp only delivers a template it has approved to people who haven’t messaged you in the last 24 hours.",
+        "fix": "Choose a template"
+      },
+      "template_missing": {
+        "label": "The selected template no longer exists",
+        "detail": "Choose another template for this campaign.",
+        "fix": "Choose a template"
+      },
+      "template_not_approved": {
+        "label": "“{{name}}” is not approved for sending",
+        "detail_PENDING": "WhatsApp is still reviewing this template. It usually takes minutes, sometimes up to 24 hours.",
+        "detail_PAUSED": "WhatsApp paused this template because recipients reacted badly to it. Use a different one.",
+        "detail_DISABLED": "WhatsApp turned this template off permanently. Use a different one.",
+        "detail": "This template can’t be sent right now. Choose an approved one.",
+        "fix": "Choose another template"
+      },
+      "template_blanks_unset": {
+        "label_one": "Blank {{slot}} needs a value",
+        "label_other": "{{count}} blanks need a value",
+        "detail": "For each blank, choose a contact detail such as the name, or type the same text for everyone.",
+        "fix": "Fill in the blanks"
+      },
+      "template_blank_missing": {
+        "label_one": "1 person has no {{field}} saved",
+        "label_other": "{{count}} people have no {{field}} saved",
+        "detail": "They will see “{{shown}}” in blank {{slot}} instead. You can change this backup text next to the blank."
+      },
+      "recent_repeat": {
+        "label_one": "1 of these people got this template in the last 24 hours",
+        "label_other": "{{count}} of these people got this template in the last 24 hours",
+        "detail": "WhatsApp usually holds back a repeat marketing message within a day, and people who get the same offer twice are the ones who block. Leave them out to keep your number in good standing.",
+        "fix": "Leave them out"
+      },
+      "channel_not_connected": {
+        "label": "No WhatsApp number is connected",
+        "detail": "A manager needs to connect the business number in Settings → WhatsApp.",
+        "fix": "Open WhatsApp settings"
+      },
+      "channel_unavailable": {
+        "label": "This WhatsApp number can’t send right now"
+      },
+      "empty_audience": {
+        "label": "No one would receive this campaign",
+        "detail": "Every selected contact was left out or has a phone number WhatsApp can’t use."
+      },
+      "over_messaging_tier": {
+        "label": "Your number can start {{capacity}} new conversations a day",
+        "detail": "This campaign goes to {{count}} people. WhatsApp will hold back the rest until your limit resets, and sending continues by itself the next day."
+      },
+      "quality_rating_low": {
+        "label": "WhatsApp rates your number’s quality as {{rating}}",
+        "detail": "People have been blocking or reporting your messages. Sending more marketing now could make Meta lower your daily limit."
+      }
+    },
+    "limitUnknown": "Not reported by Meta yet"
   },
   "monitor": {
-    "autoPaused": "Stopped automatically to protect your WhatsApp number",
-    "resumeAnyway": "Resume anyway",
-    "resumeWarning": "Only if you have fixed what caused it — the same refusals will otherwise repeat.",
+    "autoPaused": "Sending stopped — your attention is needed",
+    "resumeAnyway": "Resume",
+    "resumeWarning": "Fix the cause first (edit the campaign if it’s the template), then resume. Nobody gets the message twice.",
     "pilotDone": "Pilot batch delivered",
     "pilotHint": "Check for replies and blocks, then release the rest of the campaign.",
     "releaseRest": "Send to the remaining {{count}}",
@@ -448,7 +536,15 @@
     "RATE_LIMITED": "Sending too quickly — WhatsApp throttled this",
     "TIMEOUT": "WhatsApp did not respond in time",
     "INVALID_PHONE": "Not a valid phone number",
-    "UNKNOWN": "Delivery failed"
+    "UNKNOWN": "Delivery failed",
+    "131026": "This number isn’t on WhatsApp",
+    "131049": "WhatsApp held it back (too many marketing messages to this person recently)",
+    "131050": "This person turned off marketing messages",
+    "130472": "Held back by a Meta experiment — nothing wrong on your side",
+    "131047": "Needed a template (outside the 24-hour window)",
+    "131021": "This is your own business number",
+    "131042": "Meta could not charge your payment method",
+    "-1": "WhatsApp didn’t answer in time — it may still have arrived"
   },
   "template": {
     "label": "WhatsApp template",
@@ -469,6 +565,44 @@
     "fieldFirstName": "First name",
     "fieldPhone": "Phone number",
     "fieldEmail": "Email",
-    "fieldCompany": "Company"
+    "fieldCompany": "Company",
+    "changeHint": "Pick another template below",
+    "blankCount_one": "1 blank",
+    "blankCount_other": "{{count}} blanks",
+    "blanksTitle": "Fill in the blanks",
+    "blanksHint": "WhatsApp won’t send a message with an empty blank. Choose what goes in each one.",
+    "blanksLeft_one": "1 left",
+    "blanksLeft_other": "{{count}} left",
+    "blankFor": "Value for blank {{slot}}",
+    "blankChoose": "Choose what goes here…",
+    "fromContact": "From each contact",
+    "fixedText": "Same text for everyone…",
+    "fixedTextPlaceholder": "Type what everyone will see here",
+    "fallbackLabel": "If {{field}} is missing, use",
+    "previewEmpty": "Choose a template to see the message your customers will get.",
+    "needNew": "Need a different message?",
+    "createNew": "Create a template"
+  },
+  "confirm": {
+    "titleNow_one": "Send to 1 person now?",
+    "titleNow_other": "Send to {{formatted}} people now?",
+    "titleScheduled_one": "Schedule for 1 person?",
+    "titleScheduled_other": "Schedule for {{formatted}} people?",
+    "subtitle": "Check the details — a sent campaign can’t be taken back.",
+    "template": "Template",
+    "from": "From",
+    "to": "To",
+    "people_one": "1 person",
+    "people_other": "{{formatted}} people",
+    "when": "When",
+    "duration": "Takes about",
+    "minutes_one": "1 minute",
+    "minutes_other": "{{count}} minutes",
+    "dailyLimit": "Uses {{used}} of the {{capacity}} new conversations your number can start per day.",
+    "billing": "Meta bills each delivered message to the payment method on your WhatsApp account.",
+    "canPause": "You can pause or stop it at any time from the campaign page.",
+    "cancel": "Go back",
+    "sendNow": "Send now",
+    "schedule": "Schedule"
   }
 }

@@ -10,6 +10,7 @@ import { type AudienceFilter } from './audience';
 import {
   runPreflight,
   verifyAccountGate,
+  verifyCampaignContent,
   type PreflightResult,
   type PlannedRecipient,
 } from './preflight.service';
@@ -25,8 +26,12 @@ const PAST_GRACE_MS = 60_000;
 /** Guards against a fat-fingered year ("2206") parking a campaign forever. */
 const MAX_HORIZON_MS = 365 * 24 * 60 * 60 * 1000;
 
-/** Statuses from which a broadcast's content may still be edited. */
-const EDITABLE_STATUSES = ['DRAFT', 'SCHEDULED', 'FAILED'] as const;
+/**
+ * Statuses from which a broadcast's content may still be edited. A PAUSED
+ * campaign is editable too — that is how a stopped run gets a new template — but
+ * only its not-yet-reached audience is rewritten (see updateBroadcast).
+ */
+const EDITABLE_STATUSES = ['DRAFT', 'SCHEDULED', 'FAILED', 'PAUSED'] as const;
 
 /**
  * `recipientCount` must mean "how many messages this campaign will send", not
@@ -175,6 +180,7 @@ async function preflightFor(input: BroadcastInput, excludeBroadcastId?: string):
   return runPreflight({
     message: input.message ?? '',
     templateId: input.templateId ?? null,
+    templateVariables: input.templateVariables ?? null,
     recipients: input.recipients,
     tag: input.tag,
     filter: input.filter,
@@ -523,11 +529,28 @@ export class BroadcastsService {
       );
     }
 
-    const schedule = resolveSchedule(input);
+    // A paused run keeps its place: whoever was already sent to (or failed) is
+    // never written again, so editing cannot message anyone twice.
+    const midRun = existing.status === 'PAUSED';
+    const schedule = midRun ? null : resolveSchedule(input);
     const preflight = await preflightFor(input, id);
-    const { report, plan, excluded } = preflight;
+    const { report, excluded } = preflight;
+    let { plan } = preflight;
+    let remainingExcluded = excluded;
+    if (midRun) {
+      const reached = new Set(
+        (
+          await prisma.broadcastRecipient.findMany({
+            where: { broadcastId: id, status: { in: ['sent', 'failed'] } },
+            select: { phone: true },
+          })
+        ).map((row) => row.phone),
+      );
+      plan = plan.filter((row) => !reached.has(row.phone));
+      remainingExcluded = excluded.filter((row) => !reached.has(row.phone));
+    }
 
-    if (!plan.length) {
+    if (!plan.length && !midRun) {
       throw new HttpError(
         400,
         report.audience.requested > 0
@@ -549,10 +572,14 @@ export class BroadcastsService {
         ...smartColumns(input),
         ...safetyColumns(preflight),
         ...templateColumns(input),
-        status: schedule ? 'SCHEDULED' : 'DRAFT',
-        type: schedule ? 'SCHEDULED' : 'IMMEDIATE',
-        scheduledAt: schedule?.scheduledAt ?? null,
-        timezone: schedule?.timezone ?? input.timezone?.trim() ?? 'UTC',
+        ...(midRun
+          ? {}
+          : {
+              status: schedule ? 'SCHEDULED' : 'DRAFT',
+              type: schedule ? 'SCHEDULED' : 'IMMEDIATE',
+              scheduledAt: schedule?.scheduledAt ?? null,
+              timezone: schedule?.timezone ?? input.timezone?.trim() ?? 'UTC',
+            }),
         description: input.tag ? `Tag: ${input.tag}` : null,
         lastError: null,
         // Editing invalidates any prior review, and clears an auto-pause: the
@@ -566,8 +593,8 @@ export class BroadcastsService {
         queuedAt: null,
         nextBatchAt: null,
         recipients: {
-          deleteMany: {},
-          create: [...recipientRows(plan, 1), ...skippedRows(excluded)],
+          deleteMany: midRun ? { status: { in: ['pending', 'skipped'] } } : {},
+          create: [...recipientRows(plan, 1), ...skippedRows(remainingExcluded)],
         },
       },
       include: { _count: { select: { recipients: DELIVERABLE_RECIPIENTS } } },
@@ -602,6 +629,14 @@ export class BroadcastsService {
         gate.reason ?? 'Sending is currently disabled for this number.',
         gate.code ?? undefined,
       );
+    }
+
+    const notReady = await verifyCampaignContent(
+      broadcast.templateId,
+      (broadcast.templateVariables ?? null) as Record<string, string> | null,
+    );
+    if (notReady) {
+      throw new HttpError(409, `${notReady.label}. ${notReady.detail}`, 'CAMPAIGN_NOT_READY');
     }
 
     // A stored CRITICAL verdict must be acknowledged explicitly. This is the one
@@ -643,6 +678,8 @@ export class BroadcastsService {
 
     const preflight = await runPreflight({
       message: broadcast.message,
+      templateId: broadcast.templateId,
+      templateVariables: (broadcast.templateVariables ?? null) as Record<string, string> | null,
       recipients: broadcast.recipients.map((recipient) => recipient.phone),
       teamId: broadcast.teamId ?? undefined,
       mediaUrl: broadcast.mediaUrl,
@@ -694,6 +731,8 @@ export class BroadcastsService {
     // the contact cooldown is filtered out before the audience is written.
     const preflight = await runPreflight({
       message: source.message,
+      templateId: source.templateId,
+      templateVariables: (source.templateVariables ?? null) as Record<string, string> | null,
       recipients: source.recipients.map((recipient) => recipient.phone),
       teamId: source.teamId ?? undefined,
       mediaUrl: source.mediaUrl,
@@ -716,6 +755,9 @@ export class BroadcastsService {
         batchSize: source.batchSize,
         batchIntervalMinutes: source.batchIntervalMinutes,
         ...safetyColumns(preflight),
+        // The template is the message — a copy without it could never be sent.
+        templateId: source.templateId,
+        templateVariables: source.templateVariables ?? undefined,
         status: 'DRAFT',
         type: 'IMMEDIATE',
         scheduledAt: null,
@@ -792,7 +834,15 @@ export class BroadcastsService {
   static async resumeBroadcast(id: string, teamId?: string, options: { acknowledged?: boolean } = {}) {
     const broadcast = await prisma.broadcast.findFirst({
       where: teamId ? { id, teamId } : { id },
-      select: { id: true, status: true, healthPausedAt: true, healthPauseReason: true, pilotCompletedAt: true },
+      select: {
+        id: true,
+        status: true,
+        healthPausedAt: true,
+        healthPauseReason: true,
+        pilotCompletedAt: true,
+        templateId: true,
+        templateVariables: true,
+      },
     });
     if (!broadcast) throw new HttpError(404, 'Broadcast not found');
     if (broadcast.status !== 'PAUSED') throw new HttpError(409, 'Broadcast is not paused');
@@ -819,6 +869,14 @@ export class BroadcastsService {
             'This campaign was paused automatically to protect the WhatsApp number. Review the reason before resuming.',
         );
       }
+    }
+
+    const notReady = await verifyCampaignContent(
+      broadcast.templateId,
+      (broadcast.templateVariables ?? null) as Record<string, string> | null,
+    );
+    if (notReady) {
+      throw new HttpError(409, `${notReady.label}. Edit the campaign to fix it, then resume.`, 'CAMPAIGN_NOT_READY');
     }
 
     // Re-queue — the worker skips recipients already marked sent.

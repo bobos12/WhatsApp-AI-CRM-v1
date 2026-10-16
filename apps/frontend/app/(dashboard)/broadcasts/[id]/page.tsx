@@ -35,6 +35,7 @@ import FriendlyError from '../../../../components/ui/FriendlyError';
 import { classifyError } from '../../../../lib/friendly-error';
 import { formatSchedule, timeZoneLabel } from '../../../../lib/schedule';
 import { cn } from '../../../../lib/utils';
+import { formatPhone } from '../../../../lib/phone';
 import {
   BroadcastActions, MEDIA_ICONS, RiskBadge, StatusPill, SmartBatchProgress, deliveryStats, useCountdownLabel,
   type BroadcastDetail, type BroadcastRecipient,
@@ -718,16 +719,24 @@ export default function BroadcastDetailPage() {
                     <li key={recipient.id} className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
                       <span className="min-w-0">
                         <span className="block truncate font-mono text-sm text-ink" dir="ltr">
-                          {recipient.phone}
+                          {formatPhone(recipient.phone)}
                         </span>
                         {/* Why this one did not go out, in plain words. A phone
                             number next to "Excluded" with no reason is the kind
                             of gap that gets a safety feature reported as a bug. */}
                         {(recipient.skipReason || recipient.errorCode) && (
-                          <span className="mt-0.5 block truncate text-[11px] text-ink-3">
+                          <span
+                            className="mt-0.5 block text-[11px] leading-snug text-ink-3 line-clamp-2"
+                            title={recipient.lastError ?? undefined}
+                          >
                             {recipient.skipReason
                               ? t(`skipReason.${recipient.skipReason}`, { defaultValue: SKIP_REASON_FALLBACK[recipient.skipReason] ?? recipient.skipReason })
-                              : t(`errorCode.${recipient.errorCode}`, { defaultValue: ERROR_CODE_FALLBACK[recipient.errorCode!] ?? recipient.errorCode! })}
+                              // Meta's numeric codes: our wording for the common
+                              // ones, otherwise the plain sentence stored at send time.
+                              : t(`errorCode.${recipient.errorCode}`, {
+                                  defaultValue:
+                                    ERROR_CODE_FALLBACK[recipient.errorCode!] ?? recipient.lastError ?? t('errorCode.UNKNOWN'),
+                                })}
                           </span>
                         )}
                       </span>

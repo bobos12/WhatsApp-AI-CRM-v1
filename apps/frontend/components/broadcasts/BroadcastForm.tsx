@@ -1,21 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Users, MessageSquare, Calendar, Send, ChevronDown, ChevronUp,
   Tag, Search, X, Check, Clock, Zap, AlertCircle, Smartphone,
-  ChevronLeft, ChevronRight, Type, Image as ImageIcon, Video, FileText, Upload, Loader2,
-  Mic, Square, Play, Globe, Bookmark, Paperclip, ShieldCheck,
-  Moon, Gauge, FlaskConical,
+  ChevronLeft, ChevronRight, Image as ImageIcon, Video, Loader2,
+  Globe, ShieldCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { api, apiForm } from '../../lib/api';
+import { api } from '../../lib/api';
 import FriendlyError from '../ui/FriendlyError';
 import { cn } from '../../lib/utils';
 import { useTags } from '../../hooks/useTags';
 import { useDirection } from '../../hooks/useDirection';
 import { useAudienceMatches } from '../../hooks/useAudienceMatches';
-import { useCustomFields } from '../../hooks/useCustomFields';
 import AudienceFilterBuilder from '../contacts/AudienceFilterBuilder';
 import { EMPTY_FILTER, type AudienceFilter } from '../../lib/audience-filter';
 import { useChatOpen } from '../../stores/chat-open-store';
@@ -24,38 +23,14 @@ import { usePreflight } from '../../hooks/usePreflight';
 import { useWhatsAppConnection } from '../whatsapp/WhatsAppConnectProvider';
 import ConnectWhatsAppModal from '../whatsapp/ConnectWhatsAppModal';
 import SafetyReport from './SafetyReport';
+import SendConfirmDialog from './SendConfirmDialog';
 import { blockers, type PreflightFinding } from '../../lib/preflight';
-import TemplatePicker from './TemplatePicker';
+import TemplatePicker, { renderTemplatePreview, templateBlanksFilled } from './TemplatePicker';
 import type { MetaStatus } from '../templates/ApprovalStatus';
 import { useRouter } from 'next/navigation';
-import { prepareUpload } from '../../lib/prepare-upload';
 
-/** Slowest → fastest, so a user's choice can be compared against the safe cap. */
-const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-type MsgType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'VOICE';
-const MESSAGE_TYPES: Array<{ type: MsgType; icon: typeof Type; labelKey: string; fallback: string }> = [
-  { type: 'TEXT',     icon: Type,      labelKey: 'form.typeText',     fallback: 'Text' },
-  { type: 'IMAGE',    icon: ImageIcon, labelKey: 'form.typeImage',    fallback: 'Image' },
-  { type: 'VIDEO',    icon: Video,     labelKey: 'form.typeVideo',    fallback: 'Video' },
-  { type: 'DOCUMENT', icon: FileText,  labelKey: 'form.typeDocument', fallback: 'Document' },
-  { type: 'VOICE',    icon: Mic,       labelKey: 'form.typeVoice',    fallback: 'Voice' },
-];
-
-/** Pick an audio container the browser can actually record; WhatsApp gets ogg/opus after server transcode. */
-function getPreferredAudioMimeType(): string {
-  if (typeof MediaRecorder === 'undefined') return 'audio/webm';
-  const candidates = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
-}
-
-function formatDuration(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
+/** Header media a template can carry, as the preview draws it. */
+type PreviewMedia = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
 
 interface Contact {
   id: string;
@@ -89,6 +64,8 @@ interface BroadcastFormProps {
    */
   currentBroadcastId?: string;
   submitLabel?: string;
+  /** Show the send summary before saving — for creating, where saving sends. */
+  confirmBeforeSave?: boolean;
   onBack?: () => void;
   onSave: (broadcast: BroadcastPayload) => void | Promise<void>;
 }
@@ -133,92 +110,55 @@ interface TemplateSummary {
   metaRejectedReason?: string | null;
 }
 
-/**
- * The tokens the sender actually substitutes — see broadcasts/personalization.ts.
- * Anything not in that list renders as an empty string in the customer's WhatsApp,
- * which is why the old {{1}} / {{2}} chips are gone: nothing ever replaced them,
- * so they silently deleted themselves from the message.
- */
-const BUILT_IN_VARIABLES = [
-  { key: 'name',       labelKey: 'form.varName',      fallback: 'Full name' },
-  { key: 'first_name', labelKey: 'form.varFirstName', fallback: 'First name' },
-  { key: 'phone',      labelKey: 'form.varPhone',     fallback: 'Phone' },
-  { key: 'email',      labelKey: 'form.varEmail',     fallback: 'Email' },
-  { key: 'company',    labelKey: 'form.varCompany',   fallback: 'Company' },
-];
 const TOTAL_STEPS = 5;
 
-function PhonePreview({ message, mediaType, mediaUrl, mediaFilename }: {
-  message: string; mediaType?: MsgType; mediaUrl?: string; mediaFilename?: string;
+/**
+ * The message as it lands in the customer's WhatsApp: an incoming bubble on the
+ * chat wallpaper, header media on top. Uses WhatsApp's own colours in both
+ * themes so it reads as "their phone", not as part of the CRM.
+ */
+function PhonePreview({ message, mediaType, mediaUrl }: {
+  message: string; mediaType?: PreviewMedia; mediaUrl?: string;
 }) {
   const { t } = useTranslation('broadcasts');
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const hasMedia = mediaType && mediaType !== 'TEXT' && !!mediaUrl;
-  const hasContent = message.trim() || hasMedia;
+  const hasContent = message.trim() || mediaType;
   return (
-    <div className="mx-auto w-[210px] rounded-xl border-[3px] border-overlay bg-canvas p-1.5 shadow-2xl">
-      <div className="mb-1 flex items-center justify-between px-2 pt-0.5 text-[8px] text-white/40">
-        <span>9:41</span>
-        <span className="tracking-tighter">●●●</span>
-      </div>
-      <div className="flex items-center gap-1.5 rounded-t-xl bg-raised px-3 py-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/20">
-          <span className="text-[8px] font-bold text-brand">B</span>
+    <div className="mx-auto w-full max-w-[240px] overflow-hidden rounded-2xl border border-line shadow-lg">
+      <div className="flex items-center gap-2 bg-[#008069] px-3 py-2 dark:bg-[#202c33]">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
+          <span className="text-[9px] font-bold text-white">B</span>
         </div>
-        <span className="text-[10px] font-medium text-white">{t('form.businessPreview')}</span>
+        <span className="truncate text-[11px] font-medium text-white">{t('form.businessPreview')}</span>
       </div>
-      <div className="min-h-[150px] rounded-b-xl bg-canvas p-2">
+      <div className="min-h-[170px] bg-[#efeae2] p-2.5 dark:bg-[#0b141a]">
         {hasContent ? (
-          <div className="max-w-[170px] overflow-hidden rounded-[6px] rounded-tl-none bg-raised shadow-sm">
-            {hasMedia && (
-              <div className="overflow-hidden">
-                {mediaType === 'IMAGE' ? (
+          <div className="max-w-[92%] overflow-hidden rounded-lg rounded-ss-none bg-white shadow-sm dark:bg-[#202c33]">
+            {mediaType && (
+              <div className="p-1 pb-0">
+                {mediaType === 'IMAGE' && mediaUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mediaUrl} alt="" className="max-h-24 w-full object-cover"
+                  <img src={mediaUrl} alt="" className="max-h-28 w-full rounded-md object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                ) : mediaType === 'VIDEO' ? (
-                  <div className="flex h-20 items-center justify-center bg-black/40 text-white/60"><Video className="h-6 w-6" /></div>
-                ) : mediaType === 'VOICE' ? (
-                  <div className="flex items-center gap-2 px-2.5 py-2.5">
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg">
-                      <Play className="h-3 w-3" fill="currentColor" />
-                    </div>
-                    <div className="flex flex-1 items-center gap-[2px]">
-                      {[6, 11, 15, 9, 13, 7, 12, 8, 14, 6, 10, 7, 11].map((h, i) => (
-                        <span key={i} className="w-[2px] rounded-full bg-brand/70" style={{ height: `${h}px` }} />
-                      ))}
-                    </div>
-                    <Mic className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 bg-white/5 px-2 py-2">
-                    <FileText className="h-4 w-4 shrink-0 text-white/70" />
-                    <span className="truncate text-[9px] text-white/80">{mediaFilename || 'document.pdf'}</span>
+                  <div className="flex h-20 items-center justify-center rounded-md bg-black/70 text-white/80">
+                    {mediaType === 'VIDEO' ? <Video className="h-6 w-6" /> : <ImageIcon className="h-6 w-6" />}
                   </div>
                 )}
               </div>
             )}
-            <div className="p-2">
-              {message.trim() && mediaType !== 'VOICE' && (
-                <p className="whitespace-pre-wrap break-words text-[10px] leading-[1.5] text-white">
-                  {message.length > 200 ? message.slice(0, 200) + '…' : message}
+            <div className="px-2 pb-1.5 pt-1.5">
+              {message.trim() && (
+                <p dir="auto" className="whitespace-pre-wrap break-words text-[11px] leading-[1.5] text-[#111b21] dark:text-[#e9edef]">
+                  {message.length > 320 ? message.slice(0, 320) + '…' : message}
                 </p>
               )}
-              <div className="mt-1 flex items-center justify-end gap-1">
-                <span className="text-[8px] text-ink-3">{now}</span>
-                <svg className="h-3 w-3 text-brand" viewBox="0 0 18 18" fill="currentColor">
-                  <path d="M17.394 5.035l-.57-.444a.434.434 0 00-.6.076L8.175 15.35l-4.306-3.396a.434.434 0 00-.6.076l-.47.595a.434.434 0 00.076.6l5.055 3.985a.434.434 0 00.6-.076l9.44-12.5a.434.434 0 00-.076-.599z" />
-                </svg>
-              </div>
+              <p className="mt-0.5 text-end text-[9px] text-[#667781] dark:text-[#8696a0]">{now}</p>
             </div>
           </div>
         ) : (
-          <div className="flex h-[140px] items-center justify-center">
-            <p className="text-center text-[9px] leading-relaxed text-ink-3/70">
-              {t('form.messagePreviewHint').split('\n').map((line, i) => (
-                <span key={i}>{line}{i === 0 && <br />}</span>
-              ))}
-            </p>
+          <div className="flex h-[150px] items-center justify-center px-4">
+            <p className="text-center text-[10px] leading-relaxed text-[#667781]">{t('template.previewEmpty')}</p>
           </div>
         )}
       </div>
@@ -264,6 +204,7 @@ export default function BroadcastForm({
   initialValues,
   currentBroadcastId,
   submitLabel,
+  confirmBeforeSave,
   onBack,
   onSave,
 }: BroadcastFormProps) {
@@ -320,38 +261,9 @@ export default function BroadcastForm({
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Message type + media (image / video / document broadcasts)
-  const [messageType, setMessageType] = useState<MsgType>(
-    (initialValues?.mediaType as MsgType) || 'TEXT',
-  );
-  const [mediaUrl, setMediaUrl] = useState<string>(initialValues?.mediaUrl ?? '');
-  const [mediaFilename, setMediaFilename] = useState<string>(initialValues?.mediaFilename ?? '');
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const isMedia = messageType !== 'TEXT';
-  const isVoice = messageType === 'VOICE';
-  const acceptFor =
-    messageType === 'IMAGE' ? 'image/*'
-    : messageType === 'VIDEO' ? 'video/*'
-    : messageType === 'VOICE' ? 'audio/*'
-    : '*/*';
-
-  // Voice-note recording (mirrors the chat composer): capture from the mic, then
-  // upload the clip through the same /api/upload path the file picker uses.
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<BlobPart[]>([]);
-  const recordingStreamRef = useRef<MediaStream | null>(null);
-  const recordingTimerRef = useRef<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [templateSearch, setTemplateSearch] = useState('');
-  const [templateSaveState, setTemplateSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // ── The template this campaign sends ───────────────────────────────────────
   // Distinct from the "insert template text" picker above, which only copies
@@ -372,8 +284,6 @@ export default function BroadcastForm({
   // once at mount, so reconnecting re-enables the button without a reload.
   const { status: waStatus } = useWhatsAppConnection();
   const [connectOpen, setConnectOpen] = useState(false);
-
-  const messageRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api
@@ -398,7 +308,6 @@ export default function BroadcastForm({
   const normalizeTag = (value: string) => value.trim().toLowerCase();
 
   const allTags = useTags();
-  const { definitions: customFieldDefs } = useCustomFields();
 
   const contactHasTag = (c: Contact, tagName: string): boolean =>
     c.contactTags?.some((ct) => normalizeTag(ct.tag.name) === normalizeTag(tagName)) ?? false;
@@ -478,7 +387,7 @@ export default function BroadcastForm({
     }
   };
 
-  const submitBroadcast = async () => {
+  const submitBroadcast = async (confirmed = false) => {
     setError(null);
     setSubmitError(null);
 
@@ -502,19 +411,22 @@ export default function BroadcastForm({
       return;
     }
 
+    if (confirmBeforeSave && !confirmed) {
+      setConfirmOpen(true);
+      return;
+    }
+
     try {
       setSubmitting(true);
       await onSave({
         name: formData.name,
-        message: formData.message,
+        // Stored for the campaign list and history; what is sent is the template.
+        message: selectedTemplate?.content ?? formData.message,
         recipients,
         tag: formData.tag.trim() || undefined,
         // The wall clock goes out exactly as typed, with the zone it was typed in.
         scheduledAtLocal: formData.sendNow ? undefined : formData.scheduledAtLocal,
         timezone: formData.timezone,
-        mediaUrl: isMedia ? (mediaUrl || undefined) : undefined,
-        mediaType: isMedia ? messageType : undefined,
-        mediaFilename: isMedia ? (mediaFilename || undefined) : undefined,
         // Batch size and interval are no longer sent — the server derives them
         // from account health so there is exactly one pacing authority.
         excludeReceivedFrom,
@@ -523,56 +435,11 @@ export default function BroadcastForm({
       });
     } catch (err) {
       // Surface a friendly cause instead of an unhandled rejection.
+      setConfirmOpen(false);
       setSubmitError(err);
     } finally {
       setSubmitting(false);
     }
-  };
-
-  /**
-   * Save the current broadcast as a reusable template — text *and* attachment.
-   * The attachment is what used to be lost: only `content` was ever persisted.
-   */
-  const saveAsTemplate = async () => {
-    const name = formData.name.trim() || t('form.untitledTemplate', { defaultValue: 'Untitled template' });
-    setTemplateSaveState('saving');
-    try {
-      const saved = await api.post('/api/templates', {
-        name,
-        content: formData.message,
-        status: 'PUBLISHED',
-        ...(isMedia && mediaUrl
-          ? { mediaUrl, mediaType: messageType === 'VOICE' ? 'AUDIO' : messageType, mediaFilename: mediaFilename || undefined }
-          : {}),
-      });
-      setTemplates((current) => [saved, ...current]);
-      setTemplateSaveState('saved');
-      setTimeout(() => setTemplateSaveState('idle'), 2500);
-    } catch {
-      setTemplateSaveState('error');
-      setTimeout(() => setTemplateSaveState('idle'), 3000);
-    }
-  };
-
-  /** Restore a template into the composer — including its attachment. */
-  const applyTemplate = (template: TemplateSummary) => {
-    setFormData((prev) => ({ ...prev, message: template.content ?? '' }));
-
-    if (template.mediaUrl && template.mediaType) {
-      // AUDIO is stored once but surfaces as the VOICE composer, which is the
-      // only audio the broadcast form knows how to record or send.
-      const restored: MsgType = template.mediaType === 'AUDIO' ? 'VOICE' : (template.mediaType as MsgType);
-      setMessageType(restored);
-      setMediaUrl(template.mediaUrl);
-      setMediaFilename(template.mediaFilename ?? '');
-    } else {
-      setMessageType('TEXT');
-      setMediaUrl('');
-      setMediaFilename('');
-    }
-
-    setShowTemplates(false);
-    setTemplateSearch('');
   };
 
   const toggleContact = (phone: string) =>
@@ -590,160 +457,17 @@ export default function BroadcastForm({
     setSelectedContacts((prev) => prev.filter((p) => !phones.has(p)));
   };
 
-  const insertAtCursor = (token: string) => {
-    const el = messageRef.current;
-    if (!el) {
-      setFormData((prev) => ({ ...prev, message: prev.message + token }));
-      return;
-    }
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const next = formData.message.slice(0, start) + token + formData.message.slice(end);
-    setFormData((prev) => ({ ...prev, message: next }));
-    setTimeout(() => {
-      el.selectionStart = el.selectionEnd = start + token.length;
-      el.focus();
-    }, 0);
-  };
-  const insertVariable = insertAtCursor;
-
-  const stopRecording = useCallback(() => {
-    if (recordingTimerRef.current) {
-      window.clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    setIsRecording(false);
-    const recorder = mediaRecorderRef.current;
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
-    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-    recordingStreamRef.current = null;
-  }, []);
-
-  // Stop any in-flight recording and drop the mic stream when the form unmounts.
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
-      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
-
-  const uploadMediaFile = async (file: File) => {
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const ready = await prepareUpload(file);
-      const fd = new FormData();
-      fd.append('file', ready);
-      const res = await apiForm('/api/upload', fd);
-      // Local storage returns a path ("/uploads/x.jpg"); S3 returns an absolute URL.
-      // Only the former needs the API origin prepended to be loadable here.
-      setMediaUrl(/^https?:\/\//i.test(res.url) ? res.url : `${API_BASE}${res.url}`);
-      setMediaFilename(ready.name);
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : t('form.uploadFailed', { defaultValue: 'Upload failed' }));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const changeMessageType = (type: MsgType) => {
-    if (type === messageType) return;
-    if (isRecording) stopRecording();
-    setMessageType(type);
-    setUploadError(null);
-    setRecordingError(null);
-    setRecordingSeconds(0);
-    setMediaUrl('');
-    setMediaFilename('');
-  };
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadMediaFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const startRecording = async () => {
-    setRecordingError(null);
-    setUploadError(null);
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setRecordingError(t('form.audioNotSupported', { defaultValue: 'Recording is not supported on this device.' }));
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = getPreferredAudioMimeType();
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recordingChunksRef.current = [];
-      mediaRecorderRef.current = recorder;
-      recordingStreamRef.current = stream;
-      setRecordingSeconds(0);
-      setIsRecording(true);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        const mt = recorder.mimeType || 'audio/webm';
-        const blob = new Blob(recordingChunksRef.current, { type: mt });
-        const extension = mt.includes('ogg') ? 'ogg' : mt.includes('mp4') ? 'mp4' : 'webm';
-        const file = new File([blob], `voice-note-${Date.now()}.${extension}`, { type: mt });
-        void uploadMediaFile(file);
-      };
-      recordingTimerRef.current = window.setInterval(() => {
-        setRecordingSeconds((current) => current + 1);
-      }, 1000);
-      recorder.start();
-    } catch {
-      setRecordingError(t('form.micPermissionError', { defaultValue: 'Microphone access was denied. Check browser permissions.' }));
-      setIsRecording(false);
-    }
-  };
-
-  const filteredTemplates = useMemo(() => {
-    if (!templateSearch.trim()) return templates;
-    const q = templateSearch.toLowerCase();
-    return templates.filter((t) => t.name.toLowerCase().includes(q) || t.content.toLowerCase().includes(q));
-  }, [templates, templateSearch]);
-
-  // Every token the sender knows: the built-ins, then each custom field under its
-  // own key ({{tower}}). A field added in Settings shows up here with no code change.
-  const variables = useMemo(() => {
-    const builtIns = BUILT_IN_VARIABLES.map((variable) => ({
-      key: `{{${variable.key}}}`,
-      label: t(variable.labelKey, { defaultValue: variable.fallback }),
-    }));
-
-    const custom = customFieldDefs
-      .filter((definition) => definition.isActive)
-      .map((definition) => ({ key: `{{${definition.key}}}`, label: definition.label }));
-
-    return [...builtIns, ...custom];
-  }, [customFieldDefs, t]);
-
-  const charCount = formData.message.length;
-  const charWarning = charCount > 1000;
-  const charLimit = charCount > 4096;
-
   const selectedTemplate = useMemo(
     () => templates.find((tpl) => tpl.id === templateId) ?? null,
     [templates, templateId],
   );
 
   /**
-   * A chosen template IS the content, and the only content that gets delivered.
-   *
-   * The worker sends `template.content` rendered per recipient and never reads
-   * `broadcast.message` — so with a template selected, anything typed into the
-   * free-form box below would be saved, previewed, and then not sent. Rather
-   * than let that divergence exist, the editor is swapped for the template's own
-   * preview whenever one is selected.
+   * A campaign is its approved template — WhatsApp delivers nothing else to
+   * people outside the 24-hour window — so the message step is complete once a
+   * template is chosen and every one of its blanks has a value.
    */
-  const messageReady = templateId
-    ? true
-    : isMedia
-      ? mediaUrl.trim().length > 0
-      : formData.message.trim().length > 0;
+  const messageReady = Boolean(selectedTemplate) && templateBlanksFilled(selectedTemplate, templateVariables, customFields);
 
   const hasAudience =
     selectedContacts.length > 0 ||
@@ -772,7 +496,26 @@ export default function BroadcastForm({
     t('safety.section', { defaultValue: 'Safety check' }),
   ];
 
-  const previewText = formData.message;
+  // The preview shows what the first person in the audience will read, so a
+  // wrong blank is obvious before anyone receives it.
+  const sampleContact = useMemo(() => {
+    const phone = selectedContacts[0];
+    const contact = phone ? contacts.find((c) => c.phone === phone) : undefined;
+    if (!contact) return null;
+    const name = contact.name?.trim() ?? '';
+    return { name, first_name: name.split(/\s+/)[0] ?? '', phone: contact.phone };
+  }, [contacts, selectedContacts]);
+
+  const previewText = selectedTemplate
+    ? renderTemplatePreview(selectedTemplate, templateVariables, {
+        customFields,
+        labelFor: (field) => customFields.find((f) => f.key === field)?.label
+          ?? t(`template.field${field.replace(/_(.)/g, (_m, c: string) => c.toUpperCase()).replace(/^./, (c) => c.toUpperCase())}`),
+        sample: sampleContact,
+      })
+    : '';
+  const previewMediaType = (selectedTemplate?.mediaType as PreviewMedia | undefined) ?? undefined;
+  const previewMediaUrl = selectedTemplate?.mediaUrl ?? undefined;
 
   const BackIcon = isRtl ? ChevronRight : ChevronLeft;
   const NextIcon = isRtl ? ChevronLeft : ChevronRight;
@@ -796,11 +539,11 @@ export default function BroadcastForm({
 
   const { report: preflight, loading: preflightLoading, error: preflightError } = usePreflight(
     {
-      message: formData.message,
+      message: selectedTemplate?.content ?? formData.message,
       recipients: draftRecipients,
       tag: formData.tag.trim() || undefined,
-      mediaUrl: isMedia ? mediaUrl || undefined : undefined,
       excludeReceivedFrom,
+      templateVariables,
       // Without this the report would raise "needs a template" against a
       // campaign that already has one — the composer would show a blocker the
       // user had just resolved.
@@ -835,11 +578,11 @@ export default function BroadcastForm({
       case 'connect_channel':
         router.push('/settings?section=whatsapp');
         break;
-      // `exclude_already_received` is in the action union but no finding
-      // currently emits it — the server would have to name *which* prior
-      // campaign to exclude, and it does not. Guessing one here would silently
-      // drop recipients the user never asked to drop, so it stays unhandled
-      // until the server sends the id.
+      case 'exclude_already_received':
+        // The server names the earlier campaign; the next pre-flight run then
+        // leaves its recipients out and reports them as skipped.
+        if (finding.fix.broadcastId) setExcludeReceivedFrom(finding.fix.broadcastId);
+        break;
       default:
         break;
     }
@@ -922,94 +665,6 @@ export default function BroadcastForm({
       )}
     </div>
   ) : null;
-
-  // ── Template controls — available for every message type, voice notes included ──
-  const templateControls = (
-    <>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {templates.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowTemplates((v) => !v)}
-            className="btn btn-secondary btn-sm inline-flex"
-          >
-            {t('form.useTemplate')}
-            {showTemplates ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={saveAsTemplate}
-          disabled={templateSaveState === 'saving' || (!formData.message.trim() && !mediaUrl)}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40',
-            templateSaveState === 'saved'
-              ? 'border-brand/40 bg-brand/10 text-brand'
-              : templateSaveState === 'error'
-                ? 'border-red-400/40 bg-red-400/10 text-red-400'
-                : 'border-line bg-white dark:bg-raised text-ink-3 hover:bg-raised',
-          )}
-        >
-          {templateSaveState === 'saving' ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : templateSaveState === 'saved' ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Bookmark className="h-3.5 w-3.5" />
-          )}
-          {templateSaveState === 'saved'
-            ? t('form.templateSaved', { defaultValue: 'Saved as template' })
-            : templateSaveState === 'error'
-              ? t('form.templateSaveFailed', { defaultValue: 'Could not save' })
-              : t('form.saveAsTemplate', { defaultValue: 'Save as template' })}
-        </button>
-
-        {isMedia && mediaUrl && templateSaveState === 'idle' && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-ink-3">
-            <Paperclip className="h-3 w-3" />
-            {t('form.templateIncludesMedia', { defaultValue: 'Attachment included' })}
-          </span>
-        )}
-      </div>
-
-      {showTemplates && templates.length > 0 && (
-        <div className="mb-4 rounded-xl border border-line bg-gray-50 dark:bg-canvas p-3">
-          <input
-            value={templateSearch}
-            onChange={(e) => setTemplateSearch(e.target.value)}
-            placeholder={t('form.searchTemplates')}
-            className="field field-sm mb-2 w-full"
-          />
-          <div className="max-h-52 space-y-1.5 overflow-y-auto pe-1">
-            {filteredTemplates.length === 0 ? (
-              <p className="py-4 text-center text-xs text-ink-3">{t('form.noTemplates')}</p>
-            ) : (
-              filteredTemplates.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => applyTemplate(tpl)}
-                  className="w-full rounded-lg border border-line bg-white dark:bg-raised p-3 text-left transition hover:border-brand/30 hover:bg-raised"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-medium text-ink">{tpl.name}</p>
-                    {tpl.mediaUrl && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-medium text-brand">
-                        <Paperclip className="h-2.5 w-2.5" />
-                        {tpl.mediaType}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] text-ink-3">{tpl.content}</p>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
 
   // ── Audience section content (shared between mobile/desktop) ──
   const audienceContent = (
@@ -1404,7 +1059,7 @@ export default function BroadcastForm({
         <div className="mt-4 rounded-xl border border-brand/20 bg-brand/8 px-4 py-3 sm:hidden">
           <p className="text-center text-2xl font-bold text-brand">{resolvedAudience.count}</p>
           <p className="text-center text-xs text-ink-3">
-            {resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')} {t('form.recipientsReady')}
+            {t('form.readyToReceive')}
           </p>
         </div>
       )}
@@ -1511,224 +1166,13 @@ export default function BroadcastForm({
                     />
                   </div>
 
-                  {/* The free-form editor is hidden while a template is chosen:
-                      the worker transmits the template body, so leaving an
-                      editable box here would let someone write a campaign that
-                      is saved, previewed, and then never sent. */}
-                  {selectedTemplate ? (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 dark:border-white/10 dark:bg-canvas">
-                      <p className="text-[11px] leading-relaxed text-ink-3">
-                        {t('template.lockedNotice', { name: selectedTemplate.name })}
-                      </p>
-                    </div>
-                  ) : (
-                  <>
-                  {/* Message type — segmented control */}
-                  <div className="mb-4">
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-3">
-                      {t('form.messageType', { defaultValue: 'Message type' })}
+                  {!selectedTemplate && (
+                    <p className="text-[11px] leading-relaxed text-ink-3">
+                      {t('template.needNew')}{' '}
+                      <Link href="/templates/builder" className="font-semibold text-brand hover:underline">
+                        {t('template.createNew')}
+                      </Link>
                     </p>
-                    <div className="grid grid-cols-5 gap-1 rounded-xl border border-line bg-gray-50 dark:bg-canvas p-1.5">
-                      {MESSAGE_TYPES.map(({ type, icon: Icon, labelKey, fallback }) => {
-                        const active = messageType === type;
-                        return (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => changeMessageType(type)}
-                            className={cn(
-                              'flex flex-col items-center gap-1.5 rounded-xl px-0.5 py-2.5 transition-all',
-                              active ? 'bg-white dark:bg-raised text-brand shadow-sm' : 'text-ink-3 hover:text-ink',
-                            )}
-                          >
-                            <Icon className="h-[18px] w-[18px]" />
-                            <span className="text-[10px] font-medium">{t(labelKey, { defaultValue: fallback })}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Shared hidden file picker — used by voice upload and image/video/document */}
-                  {isMedia && (
-                    <input ref={fileInputRef} type="file" accept={acceptFor} onChange={handleFile} className="hidden" />
-                  )}
-
-                  {/* Voice note — record from the mic or upload an audio clip */}
-                  {isVoice && (
-                    <div className="mb-4">
-                      {mediaUrl && !isRecording ? (
-                        <div className="flex items-center gap-3 rounded-xl border border-line bg-gray-50 dark:bg-canvas p-3">
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-                            <Mic className="h-6 w-6" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-ink">{t('form.voiceNoteReady', { defaultValue: 'Voice note ready' })}</p>
-                            <p className="truncate text-xs text-ink-3">{mediaFilename || 'voice-note'}</p>
-                          </div>
-                          <button type="button" onClick={startRecording} className="text-xs font-medium text-brand hover:underline">
-                            {t('form.reRecord', { defaultValue: 'Re-record' })}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setMediaUrl(''); setMediaFilename(''); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-3 transition hover:bg-red-500/10 hover:text-red-400"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : isRecording ? (
-                        <div className="flex items-center gap-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-5">
-                          <span className="relative flex h-3 w-3 shrink-0">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
-                          </span>
-                          <span className="voice-rec-wave inline-flex h-6 items-end gap-[3px] text-red-400">
-                            {[0, 1, 2, 3, 4].map((i) => <span key={i} className="w-[3px] rounded-full bg-current" />)}
-                          </span>
-                          <span dir="ltr" className="font-mono text-lg font-semibold tabular-nums text-ink">{formatDuration(recordingSeconds)}</span>
-                          <button
-                            type="button"
-                            onClick={stopRecording}
-                            className="ms-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition hover:bg-red-600 active:scale-95"
-                            aria-label={t('form.stopRecording', { defaultValue: 'Stop recording' })}
-                          >
-                            <Square className="h-5 w-5" fill="currentColor" />
-                          </button>
-                        </div>
-                      ) : uploading ? (
-                        <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-canvas py-8 text-ink-3">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          <span className="text-sm font-medium">{t('form.uploading', { defaultValue: 'Uploading…' })}</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-canvas py-7">
-                          <button
-                            type="button"
-                            onClick={startRecording}
-                            className="flex h-16 w-16 items-center justify-center rounded-full bg-brand text-brand-fg shadow-lg transition hover:bg-brand/90 active:scale-95"
-                            aria-label={t('form.tapToRecord', { defaultValue: 'Tap to record' })}
-                          >
-                            <Mic className="h-7 w-7" />
-                          </button>
-                          <p className="text-sm font-medium text-ink">{t('form.tapToRecord', { defaultValue: 'Tap to record a voice note' })}</p>
-                          <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-medium text-brand hover:underline">
-                            {t('form.orUploadAudio', { defaultValue: 'or upload an audio file' })}
-                          </button>
-                        </div>
-                      )}
-                      {(uploadError || recordingError) && <p className="mt-1.5 text-xs text-red-400">{uploadError || recordingError}</p>}
-                      <p className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-3">
-                        <Mic className="h-3.5 w-3.5 shrink-0 text-ink-4/70" />
-                        {t('form.voiceHint', { defaultValue: 'Sent as a WhatsApp voice message. No caption.' })}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Media upload (image / video / document) */}
-                  {isMedia && !isVoice && (
-                    <div className="mb-4">
-                      {mediaUrl ? (
-                        <div className="flex items-center gap-3 rounded-xl border border-line bg-gray-50 dark:bg-canvas p-3">
-                          {messageType === 'IMAGE' ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={mediaUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          ) : (
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                              {messageType === 'VIDEO' ? <Video className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-ink">{mediaFilename || t('form.fileAttached', { defaultValue: 'File attached' })}</p>
-                            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-brand hover:underline">
-                              {t('form.replaceFile', { defaultValue: 'Replace' })}
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => { setMediaUrl(''); setMediaFilename(''); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-3 transition hover:bg-red-500/10 hover:text-red-400"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
-                          className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-canvas py-8 text-ink-3 transition hover:border-brand/50 hover:text-brand disabled:opacity-60"
-                        >
-                          {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
-                          <span className="text-sm font-medium">
-                            {uploading ? t('form.uploading', { defaultValue: 'Uploading…' }) : t('form.tapToUpload', { defaultValue: 'Tap to upload' })}
-                          </span>
-                        </button>
-                      )}
-                      {uploadError && <p className="mt-1.5 text-xs text-red-400">{uploadError}</p>}
-                    </div>
-                  )}
-
-                  {/* Templates apply to every message type, voice notes included. */}
-                  {templateControls}
-
-                  {/* Caption composer — hidden for voice notes (WhatsApp audio has no caption) */}
-                  {!isVoice && (
-                  <>
-                  {/* Personalization variables */}
-                  <div className="mb-2.5">
-                    <p className="mb-1.5 text-[10px] text-ink-3">{t('form.insertVariable')}</p>
-                    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:flex-wrap sm:px-0">
-                      {variables.map((v) => (
-                        <button
-                          key={v.key}
-                          type="button"
-                          onClick={() => insertVariable(v.key)}
-                          className="flex shrink-0 flex-col items-center rounded-xl border border-brand/20 bg-brand/8 px-3 py-1.5 transition hover:bg-brand/15 active:scale-95"
-                        >
-                          <span className="font-mono text-[11px] font-semibold text-brand">{v.key}</span>
-                          <span className="mt-0.5 text-[9px] text-ink-3">{v.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Message / caption with embedded emoji toolbar */}
-                  <div className={cn(
-                    'rounded-xl border bg-white dark:bg-raised transition focus-within:ring-1',
-                    charLimit
-                      ? 'border-red-400/50 focus-within:ring-red-400/20'
-                      : charWarning
-                        ? 'border-amber-400/40 focus-within:ring-amber-400/20'
-                        : 'border-line focus-within:border-brand/50 focus-within:ring-brand/20',
-                  )}>
-                    <textarea
-                      ref={messageRef}
-                      rows={5}
-                      value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      className="w-full resize-none rounded-t-2xl bg-transparent px-4 py-3 text-sm text-ink placeholder:text-ink-4 outline-none"
-                      placeholder={isMedia
-                        ? t('form.captionPlaceholder', { defaultValue: 'Add a caption… (optional)' })
-                        : t('form.messagePlaceholder')}
-                    />
-                  </div>
-
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <p className="text-[10px] text-ink-3">
-                      {isMedia
-                        ? t('form.captionHint', { defaultValue: 'Caption is optional · *bold* _italic_' })
-                        : t('form.variablesHint')}
-                    </p>
-                    <span className={cn('text-[10px] font-semibold tabular-nums',
-                      charLimit ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-ink-3')}>
-                      {charCount.toLocaleString()} / 4,096
-                    </span>
-                  </div>
-                  </>
-                  )}
-                  </>
                   )}
 
                   <div className="mt-6 border-t border-line pt-5 lg:hidden">
@@ -1736,7 +1180,7 @@ export default function BroadcastForm({
                       <Smartphone className="h-3.5 w-3.5" />
                       {t('form.livePreview')}
                     </p>
-                    <PhonePreview message={previewText} mediaType={messageType} mediaUrl={mediaUrl} mediaFilename={mediaFilename} />
+                    <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} />
                   </div>
             </SectionCard>
           </div>
@@ -1783,7 +1227,7 @@ export default function BroadcastForm({
           {/* API failure — friendly, actionable explanation */}
           {submitError != null && (
             <div className={mobileStep < TOTAL_STEPS ? 'hidden sm:block' : 'block'}>
-              <FriendlyError error={submitError} onRetry={submitBroadcast} />
+              <FriendlyError error={submitError} onRetry={() => void submitBroadcast(true)} />
             </div>
           )}
 
@@ -1813,12 +1257,12 @@ export default function BroadcastForm({
             </div>
             <button
               type="button"
-              onClick={submitBroadcast}
+              onClick={() => void submitBroadcast()}
               disabled={!isValid || submitting || Boolean(blockedReason)}
               className="btn btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {submitLabel ?? t('form.createTitle')}
+              {submitLabel ?? (formData.sendNow ? t('form.reviewSend') : t('form.reviewSchedule'))}
             </button>
           </div>
         </div>
@@ -1831,12 +1275,7 @@ export default function BroadcastForm({
                 <Smartphone className="h-4 w-4 text-brand" />
                 <p className="text-sm font-semibold text-ink">{t('form.livePreview')}</p>
               </div>
-              <PhonePreview
-                message={previewText}
-                mediaType={messageType}
-                mediaUrl={mediaUrl}
-                mediaFilename={mediaFilename}
-              />
+              <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} />
             </div>
 
             {resolvedAudience.count > 0 && (
@@ -1845,7 +1284,7 @@ export default function BroadcastForm({
                   {preflight ? preflight.audience.deliverable : resolvedAudience.count}
                 </p>
                 <p className="text-xs text-ink-3">
-                  {resolvedAudience.count === 1 ? t('form.recipientSingular') : t('form.recipientPlural')} {t('form.recipientsReady')}
+                  {t('form.readyToReceive')}
                 </p>
                 {preflight && preflight.audience.deliverable !== preflight.audience.requested && (
                   <p className="mt-1 text-[10px] text-ink-4/80">
@@ -1944,18 +1383,30 @@ export default function BroadcastForm({
           ) : (
             <button
               type="button"
-              onClick={submitBroadcast}
+              onClick={() => void submitBroadcast()}
               disabled={!isValid || submitting || Boolean(blockedReason)}
               className="btn btn-primary h-12 flex-1 justify-center gap-2 text-sm font-semibold active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
-              {submitLabel ?? t('form.createTitle')}
+              {submitLabel ?? (formData.sendNow ? t('form.reviewSend') : t('form.reviewSchedule'))}
             </button>
           )}
         </div>
       </div>
 
       <ConnectWhatsAppModal open={connectOpen} onClose={() => setConnectOpen(false)} />
+      <SendConfirmDialog
+        open={confirmOpen}
+        busy={submitting}
+        templateName={selectedTemplate?.name ?? ''}
+        preview={previewText}
+        recipients={preflight?.audience.deliverable ?? resolvedAudience.count}
+        fromNumber={preflight?.channel.displayPhoneNumber ?? null}
+        messagingLimit={preflight?.channel.messagingLimit ?? null}
+        scheduledFor={formData.sendNow ? null : formatSchedule(formData.scheduledAtLocal, formData.timezone)}
+        onConfirm={() => void submitBroadcast(true)}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </form>
   );
 }

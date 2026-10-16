@@ -19,9 +19,13 @@ export interface PreflightFinding {
   kind: FindingKind;
   label: string;
   detail: string;
+  /** Values for the translated wording (`safety.findings.<key>`). */
+  params?: Record<string, string | number>;
   fix?: {
     action: 'choose_template' | 'connect_channel' | 'exclude_already_received';
     label: string;
+    /** For `exclude_already_received`: the earlier campaign to leave out. */
+    broadcastId?: string;
   };
 }
 

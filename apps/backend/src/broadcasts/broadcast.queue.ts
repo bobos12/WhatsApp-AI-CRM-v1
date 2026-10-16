@@ -4,9 +4,11 @@ import { runWithTenant, runAsPlatform } from '../lib/tenant-context';
 import { providerManager } from '../providers/manager';
 import { emitRealtime } from '../realtime/socket';
 import { logger } from '../lib/logger';
-import { buildPersonalizationVars, personalize } from './personalization';
+import { CONTACT_FIELDS, fillBlank, readBlank } from '@crm/messaging-schema';
+import { buildPersonalizationVars } from './personalization';
 import { toMetaTemplateName } from '../providers/meta/templates';
-import { asMetaError } from '../providers/meta/graph';
+import { asMetaError, type MetaApiError } from '../providers/meta/graph';
+import { HttpError } from '../auth/authorize';
 
 /**
  * Broadcast delivery worker.
@@ -100,7 +102,60 @@ type StopReason =
   | 'TEMPLATE_MISSING'
   | 'TEMPLATE_NOT_APPROVED'
   | 'RATE_LIMITED'
-  | 'ACCOUNT_RESTRICTED';
+  | 'ACCOUNT_RESTRICTED'
+  | 'CAMPAIGN_PROBLEM';
+
+/** Rate limits that apply to the whole number, not to one recipient. */
+const NUMBER_RATE_LIMIT_CODES = new Set([4, 80007, 130429, 131048]);
+
+/**
+ * Template errors that would repeat for every recipient — the template is
+ * paused, gone, or shaped differently from what we send. Value-level errors
+ * (one person's name too long, …) are per recipient and are not listed.
+ */
+const CAMPAIGN_WIDE_TEMPLATE_CODES = new Set([132000, 132001, 132015, 132016, 132068, 132069]);
+
+/**
+ * Consecutive failures after which a run stops itself. A list where twenty
+ * messages in a row fail is a list, template or account problem, and carrying on
+ * only spends money and hurts the number's standing with Meta.
+ */
+const FAILURE_STREAK_LIMIT = Number(process.env.BROADCAST_FAILURE_STREAK_LIMIT ?? 20);
+
+type Verdict =
+  /** This recipient failed; carry on with the next. */
+  | 'recipient'
+  /** The number is sending too fast; wait and resume. */
+  | 'rate'
+  /** The account cannot send at all right now; wait and resume. */
+  | 'account'
+  /** Every remaining send would fail the same way; stop and tell the user. */
+  | 'campaign';
+
+function classify(error: unknown, meta: MetaApiError): Verdict {
+  if (error instanceof HttpError) {
+    if (error.code === 'CHANNEL_RESTRICTED' || error.code === 'CLOUD_API_NOT_CONFIGURED') return 'account';
+    // A header attachment that cannot be loaded fails identically for everyone.
+    if (meta.code === -1 && error.status === 400 && /header/i.test(error.message)) return 'campaign';
+  }
+  if (meta.kind === 'AUTH' || meta.kind === 'ACCOUNT_RESTRICTED') return 'account';
+  if (meta.kind === 'RATE_LIMITED' && NUMBER_RATE_LIMIT_CODES.has(meta.code)) return 'rate';
+  if (CAMPAIGN_WIDE_TEMPLATE_CODES.has(meta.code)) return 'campaign';
+  return 'recipient';
+}
+
+/** Failures that say nothing about the campaign — the person just can't get it. */
+function isRecipientSpecific(meta: MetaApiError): boolean {
+  return meta.kind === 'UNDELIVERABLE' || meta.kind === 'NOT_DELIVERED';
+}
+
+/** Replace each {{slot}} in the body with the value sent for it. */
+function renderBody(body: string, slots: string[], values: string[]): string {
+  return body.replace(/\{\{\s*(\w+)\s*\}\}/g, (all, slot: string) => {
+    const index = slots.indexOf(slot);
+    return index >= 0 ? values[index] : all;
+  });
+}
 
 let workerInitialized = false;
 
@@ -180,7 +235,13 @@ async function runSlice(broadcastId: string) {
   // the remaining audience into failures for messages Meta never received.
   const status = await providerManager.getStatus();
   if (status.status !== 'connected') {
-    await parkUntil(broadcastId, teamId, new Date(Date.now() + 60_000), 'NOT_CONNECTED');
+    await parkUntil(
+      broadcastId,
+      teamId,
+      new Date(Date.now() + 60_000),
+      'NOT_CONNECTED',
+      'Waiting for the WhatsApp connection. Sending continues by itself as soon as it is back.',
+    );
     return { broadcastId, parked: 'NOT_CONNECTED' };
   }
 
@@ -193,29 +254,44 @@ async function runSlice(broadcastId: string) {
     : null;
 
   if (!template) {
-    await parkUntil(broadcastId, teamId, new Date(Date.now() + 15 * 60_000), 'TEMPLATE_MISSING');
+    await pauseForReview(
+      broadcastId,
+      teamId,
+      'The template this campaign uses was deleted. Edit the campaign, choose another template, then press Resume.',
+    );
     logger.error('broadcast.template_missing', { broadcastId });
-    return { broadcastId, parked: 'TEMPLATE_MISSING' };
+    return { broadcastId, paused: 'TEMPLATE_MISSING' };
   }
 
   if (template.metaStatus !== 'APPROVED') {
-    await parkUntil(broadcastId, teamId, new Date(Date.now() + 30 * 60_000), 'TEMPLATE_NOT_APPROVED');
+    await pauseForReview(
+      broadcastId,
+      teamId,
+      `WhatsApp no longer allows the "${template.name}" template (status: ${(template.metaStatus ?? 'not submitted').toLowerCase()}). ` +
+        'Edit the campaign and choose an approved template, then resume.',
+    );
     logger.warn('broadcast.template_not_approved', {
       broadcastId,
       templateId: template.id,
       metaStatus: template.metaStatus,
     });
-    return { broadcastId, parked: 'TEMPLATE_NOT_APPROVED' };
+    return { broadcastId, paused: 'TEMPLATE_NOT_APPROVED' };
   }
 
   /** Positional slots the approved template expects, in order. */
   const variableOrder: string[] = Array.isArray(template.variables) ? (template.variables as string[]) : [];
-  /** Explicit position → contact-field overrides set on the campaign. */
+  /** How the campaign fills each slot — a contact field (with a backup) or fixed text. */
   const variableMap = (broadcast.templateVariables ?? null) as Record<string, string> | null;
+  const customFieldKeys = variableOrder.length
+    ? (await prisma.customFieldDefinition.findMany({ select: { key: true } })).map((f) => f.key)
+    : [];
+  const knownFields = [...CONTACT_FIELDS, ...customFieldKeys];
+  const blanks = variableOrder.map((slot) => readBlank(variableMap, slot, knownFields));
 
   // ── Recipients ─────────────────────────────────────────────────────────────
   const recipients = await prisma.broadcastRecipient.findMany({
     where: { broadcastId, status: 'pending' },
+    orderBy: { sortOrder: 'asc' },
     take: SLICE_SIZE,
     select: { id: true, phone: true, attempts: true },
   });
@@ -233,7 +309,10 @@ async function runSlice(broadcastId: string) {
   const startedAt = Date.now();
   let sent = 0;
   let failed = 0;
+  let failureStreak = 0;
   let stopReason: StopReason = 'AUDIENCE_DRAINED';
+  /** Why the run stopped itself, in words the user can act on. */
+  let stopMessage = '';
 
   for (const recipient of recipients) {
     // Time-box the job so a long run stays resumable across a deploy.
@@ -255,11 +334,10 @@ async function runSlice(broadcastId: string) {
     const contact = contactByPhone.get(recipient.phone);
     const vars = buildPersonalizationVars(contact, recipient.phone);
 
-    // Fill the approved template's positional slots. A slot maps to a contact
-    // field either through the campaign's explicit mapping or, by default,
-    // through a personalization token of the same name — so `{{name}}` in the
-    // template works without extra configuration.
-    const bodyValues = variableOrder.map((slot) => vars[variableMap?.[slot] ?? slot] ?? '');
+    // Fill the approved template's positional slots. Never with an empty value:
+    // Meta refuses the whole message when a blank is empty, so a missing field
+    // falls back to the campaign's backup text (or a neutral default).
+    const bodyValues = blanks.map((blank) => fillBlank(blank, vars, template.language));
 
     try {
       const result = await providerManager.sendMessage({
@@ -278,7 +356,7 @@ async function runSlice(broadcastId: string) {
             : null,
           // What the recipient actually reads, so the CRM transcript and the
           // conversation preview match the delivered message.
-          renderedBody: personalize(template.content ?? '', vars),
+          renderedBody: renderBody(template.content ?? '', variableOrder, bodyValues),
         },
       });
 
@@ -295,8 +373,20 @@ async function runSlice(broadcastId: string) {
         },
       });
       sent += 1;
+      failureStreak = 0;
     } catch (error) {
       const meta = asMetaError(error);
+      const verdict = classify(error, meta);
+
+      // Not this person's fault: leave them pending so they are sent to when
+      // the run resumes, rather than written off as a failure.
+      if (verdict !== 'recipient') {
+        stopReason =
+          verdict === 'rate' ? 'RATE_LIMITED' : verdict === 'account' ? 'ACCOUNT_RESTRICTED' : 'CAMPAIGN_PROBLEM';
+        stopMessage = meta.code === -1 && error instanceof Error ? error.message : meta.userMessage;
+        logger.warn('broadcast.stopped_by_error', { broadcastId, code: meta.code, verdict });
+        break;
+      }
 
       await prisma.broadcastRecipient.update({
         where: { id: recipient.id },
@@ -309,16 +399,13 @@ async function runSlice(broadcastId: string) {
         },
       });
       failed += 1;
+      if (!isRecipientSpecific(meta)) failureStreak += 1;
 
-      // Some failures are about the account, not this recipient. Continuing
-      // would convert the rest of the audience into failures for messages Meta
-      // was never going to accept — park instead and let the scheduler retry.
-      if (meta.kind === 'RATE_LIMITED') {
-        stopReason = 'RATE_LIMITED';
-        break;
-      }
-      if (meta.kind === 'ACCOUNT_RESTRICTED' || meta.kind === 'AUTH') {
-        stopReason = 'ACCOUNT_RESTRICTED';
+      if (failureStreak >= FAILURE_STREAK_LIMIT) {
+        stopReason = 'CAMPAIGN_PROBLEM';
+        stopMessage =
+          `The last ${FAILURE_STREAK_LIMIT} messages all failed, so sending was stopped to protect your number. ` +
+          `WhatsApp's reason: ${meta.userMessage}`;
         break;
       }
     }
@@ -333,6 +420,8 @@ async function runSlice(broadcastId: string) {
     data: {
       totalSent: { increment: sent },
       totalFailed: { increment: failed },
+      // Messages are flowing again, so an earlier "waiting for…" note is stale.
+      ...(sent > 0 && stopReason !== 'RATE_LIMITED' && stopReason !== 'ACCOUNT_RESTRICTED' ? { lastError: null } : {}),
     },
   });
 
@@ -344,15 +433,22 @@ async function runSlice(broadcastId: string) {
   }
 
   if (stopReason === 'RATE_LIMITED') {
-    // Meta's limits reset on a rolling window; an hour is long enough to clear a
-    // burst limit and short enough that a large campaign still finishes today.
-    await parkUntil(broadcastId, teamId, new Date(Date.now() + 60 * 60_000), 'RATE_LIMITED');
+    // A throughput limit clears within minutes; a spam limit (131048) takes
+    // longer. Either way the campaign carries on by itself.
+    await parkUntil(broadcastId, teamId, new Date(Date.now() + 15 * 60_000), 'RATE_LIMITED', stopMessage);
     return { broadcastId, sent, failed, parked: 'RATE_LIMITED' };
   }
 
   if (stopReason === 'ACCOUNT_RESTRICTED') {
-    await parkUntil(broadcastId, teamId, new Date(Date.now() + 6 * 60 * 60_000), 'ACCOUNT_RESTRICTED');
+    // Usually something a manager fixes (billing, reconnecting). Check again
+    // every half hour so the campaign resumes soon after it is fixed.
+    await parkUntil(broadcastId, teamId, new Date(Date.now() + 30 * 60_000), 'ACCOUNT_RESTRICTED', stopMessage);
     return { broadcastId, sent, failed, parked: 'ACCOUNT_RESTRICTED' };
+  }
+
+  if (stopReason === 'CAMPAIGN_PROBLEM') {
+    await pauseForReview(broadcastId, teamId, stopMessage);
+    return { broadcastId, sent, failed, paused: 'CAMPAIGN_PROBLEM' };
   }
 
   const remaining = await prisma.broadcastRecipient.count({ where: { broadcastId, status: 'pending' } });
@@ -385,15 +481,41 @@ async function parkUntil(
   teamId: string | undefined,
   at: Date,
   reason: StopReason,
+  /** Shown on the campaign while it waits; routine pauses clear it. */
+  message = '',
 ): Promise<void> {
   const parked = await prisma.broadcast.updateMany({
     where: { id: broadcastId, status: 'SENDING' },
-    data: { nextBatchAt: at, queuedAt: null },
+    data: { nextBatchAt: at, queuedAt: null, lastError: message || null },
   });
 
   if (parked.count > 0) {
     logger.info('broadcast.parked', { broadcastId, reason, resumeAt: at.toISOString() });
     emitRealtime('broadcast:parked', { broadcastId, reason, resumeAt: at.toISOString() }, teamId);
+  }
+}
+
+/**
+ * Stop a run that cannot succeed as it stands, and say why.
+ *
+ * Paused (not failed) so nothing is lost: everyone not yet reached is still
+ * pending, and Resume carries on from there once the cause is fixed.
+ */
+async function pauseForReview(broadcastId: string, teamId: string | undefined, reason: string): Promise<void> {
+  const paused = await prisma.broadcast.updateMany({
+    where: { id: broadcastId, status: 'SENDING' },
+    data: {
+      status: 'PAUSED',
+      nextBatchAt: null,
+      queuedAt: null,
+      healthPausedAt: new Date(),
+      healthPauseReason: reason,
+      lastError: reason,
+    },
+  });
+  if (paused.count > 0) {
+    logger.warn('broadcast.auto_paused', { broadcastId, reason });
+    emitRealtime('broadcast:parked', { broadcastId, reason: 'PAUSED', message: reason }, teamId);
   }
 }
 

@@ -40,3 +40,4 @@ export * from './message';
 export * from './dto';
 export * from './events';
 export * from './upload-limits';
+export * from './template-blanks';

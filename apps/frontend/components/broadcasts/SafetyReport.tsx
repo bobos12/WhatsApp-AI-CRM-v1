@@ -15,6 +15,7 @@
  * confident-looking score derived from nothing would be worse than showing less.
  */
 
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -31,6 +32,7 @@ import {
   type PreflightFinding,
   type PreflightReport,
 } from '../../lib/preflight';
+import { formatPhone } from '../../lib/phone';
 
 interface SafetyReportProps {
   report: PreflightReport | null | undefined;
@@ -47,12 +49,13 @@ const TONE_CLASSES = {
 } as const;
 
 export default function SafetyReport({ report, compact, onApplyFix }: SafetyReportProps) {
+  const { t } = useTranslation('broadcasts');
   // A campaign saved before this screen existed, or one whose report failed to
   // generate, must not blank the page.
   if (!report || !report.audience) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-ink-3">
-        No pre-flight report for this campaign yet.
+        {t('safety.noReport')}
       </div>
     );
   }
@@ -78,12 +81,12 @@ export default function SafetyReport({ report, compact, onApplyFix }: SafetyRepo
         )}
         <div className="min-w-0">
           <p className="text-sm font-bold text-ink">
-            {report.canSend ? 'Ready to send' : 'Cannot send yet'}
+            {report.canSend ? t('safety.readyToSend') : t('safety.cannotSend')}
           </p>
           <p className="mt-0.5 text-xs text-ink-2">
             {report.canSend
-              ? `${audience.deliverable.toLocaleString()} ${audience.deliverable === 1 ? 'person' : 'people'} will receive this.`
-              : `${blockers.length} ${blockers.length === 1 ? 'issue' : 'issues'} must be resolved first.`}
+              ? t('safety.willReceive', { count: audience.deliverable, formatted: audience.deliverable.toLocaleString() })
+              : t('safety.issuesFirst', { count: blockers.length })}
           </p>
         </div>
       </div>
@@ -98,16 +101,16 @@ export default function SafetyReport({ report, compact, onApplyFix }: SafetyRepo
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-gray-400" />
           <p className="text-xs font-bold uppercase tracking-wide text-ink-3">
-            Audience
+            {t('safety.audience')}
           </p>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Selected" value={audience.requested} />
-          <Stat label="Will receive" value={audience.deliverable} emphasis />
-          {audience.duplicates > 0 && <Stat label="Duplicates removed" value={audience.duplicates} />}
-          {audience.invalid > 0 && <Stat label="Invalid numbers" value={audience.invalid} />}
+          <Stat label={t('safety.statSelected')} value={audience.requested} />
+          <Stat label={t('safety.statWillReceive')} value={audience.deliverable} emphasis />
+          {audience.duplicates > 0 && <Stat label={t('safety.statDuplicates')} value={audience.duplicates} />}
+          {audience.invalid > 0 && <Stat label={t('safety.statInvalid')} value={audience.invalid} />}
           {audience.alreadyReceived > 0 && (
-            <Stat label="Already messaged" value={audience.alreadyReceived} />
+            <Stat label={t('safety.statAlreadyMessaged')} value={audience.alreadyReceived} />
           )}
         </div>
       </div>
@@ -119,23 +122,27 @@ export default function SafetyReport({ report, compact, onApplyFix }: SafetyRepo
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-gray-400" />
               <p className="text-xs font-bold uppercase tracking-wide text-ink-3">
-                Your number
+                {t('safety.yourNumber')}
               </p>
             </div>
-            <p className="mt-2 font-mono text-sm text-ink">
-              {channel.displayPhoneNumber ?? 'Not connected'}
+            <p dir="ltr" className="mt-2 text-start font-mono text-sm text-ink">
+              {channel.displayPhoneNumber ? formatPhone(channel.displayPhoneNumber) : t('safety.notConnected')}
             </p>
             <dl className="mt-2 space-y-1 text-xs">
               <div className="flex justify-between gap-2">
-                <dt className="text-ink-3">Quality</dt>
+                <dt className="text-ink-3">{t('safety.quality')}</dt>
                 <dd className={`font-semibold ${TONE_CLASSES[qualityTone(channel.qualityRating)]}`}>
-                  {qualityLabel(channel.qualityRating)}
+                  {t(`safety.quality_${channel.qualityRating}`, { defaultValue: qualityLabel(channel.qualityRating) })}
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="text-ink-3">Daily limit</dt>
+                <dt className="text-ink-3">{t('safety.dailyLimit')}</dt>
                 <dd className="font-semibold text-ink">
-                  {formatMessagingLimit(channel.messagingLimit)}
+                  {channel.messagingLimit && /^TIER_\d+K?$/.test(channel.messagingLimit)
+                    ? t('safety.perDay', { limit: channel.messagingLimit.replace(/^TIER_/, '').replace('K', ',000') })
+                    : channel.messagingLimit
+                      ? formatMessagingLimit(channel.messagingLimit)
+                      : t('safety.limitUnknown')}
                 </dd>
               </div>
             </dl>
@@ -145,12 +152,12 @@ export default function SafetyReport({ report, compact, onApplyFix }: SafetyRepo
             <div className="flex items-center gap-2">
               <Info className="h-4 w-4 text-gray-400" />
               <p className="text-xs font-bold uppercase tracking-wide text-ink-3">
-                Template
+                {t('safety.template')}
               </p>
             </div>
             {template ? (
               <>
-                <p className="mt-2 truncate text-sm font-medium text-ink">
+                <p dir="auto" className="mt-2 truncate text-sm font-medium text-ink">
                   {template.name}
                 </p>
                 <p
@@ -163,16 +170,15 @@ export default function SafetyReport({ report, compact, onApplyFix }: SafetyRepo
                   }`}
                 >
                   {template.status === 'APPROVED'
-                    ? 'Approved by WhatsApp'
+                    ? t('safety.templateApproved')
                     : template.status === 'PENDING'
-                      ? 'Awaiting WhatsApp review'
-                      : (template.status ?? 'Not submitted')}
+                      ? t('safety.templatePending')
+                      : (template.status ?? t('safety.templateNotSubmitted'))}
                 </p>
               </>
             ) : (
               <p className="mt-2 text-xs text-ink-3">
-                No template selected. WhatsApp requires one for anyone who has not messaged you in
-                the last 24 hours.
+                {t('safety.noTemplate')}
               </p>
             )}
           </div>
@@ -216,13 +222,25 @@ function FindingRow({
         ? { wrap: 'bg-amber-500/10', icon: <AlertTriangle className="h-4 w-4 text-amber-500" /> }
         : { wrap: 'bg-blue-500/10', icon: <Lightbulb className="h-4 w-4 text-blue-500" /> };
 
+  // Findings arrive in English from the server; render them in the user's
+  // language when there is a translation for the key, with the server's values.
+  const { t } = useTranslation('broadcasts');
+  const base = `safety.findings.${finding.key.split(':')[0]}`;
+  const params = finding.params ?? {};
+  const label = t(`${base}.label`, { ...params, defaultValue: finding.label });
+  const detail = t(
+    [`${base}.detail_${String(params.status ?? '')}`, `${base}.detail`],
+    { ...params, defaultValue: finding.detail },
+  );
+  const fixLabel = finding.fix ? t(`${base}.fix`, { defaultValue: finding.fix.label }) : '';
+
   return (
     <div className={`flex items-start gap-3 rounded-2xl p-3.5 ${style.wrap}`}>
       <span className="mt-0.5 shrink-0">{style.icon}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold text-ink">{finding.label}</p>
+        <p className="text-xs font-bold text-ink">{label}</p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-ink-2">
-          {finding.detail}
+          {detail}
         </p>
         {finding.fix && onApplyFix && (
           <button
@@ -230,7 +248,7 @@ function FindingRow({
             onClick={() => onApplyFix(finding)}
             className="mt-2 rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
           >
-            {finding.fix.label}
+            {fixLabel}
           </button>
         )}
       </div>

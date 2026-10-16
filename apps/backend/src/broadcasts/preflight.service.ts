@@ -3,6 +3,8 @@ import { prisma } from '../lib/prisma';
 import { providerManager } from '../providers/manager';
 import { getChannel } from '../providers/channel.service';
 import { resolveAudienceDetailed, type AudienceFilter } from './audience';
+import { buildPersonalizationVars } from './personalization';
+import { CONTACT_FIELDS, defaultFallback, readBlank } from '@crm/messaging-schema';
 
 /**
  * ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -33,6 +35,8 @@ export interface PreflightInput {
   interactiveContent?: object | null;
   /** The approved template this campaign sends. Required — see `checkTemplate`. */
   templateId?: string | null;
+  /** How the template's blanks are filled (see readBlank). */
+  templateVariables?: Record<string, string> | null;
   /** Exclude this campaign from its own duplicate check (it is the one being edited). */
   excludeBroadcastId?: string;
   /** Drop anyone who already received a given broadcast. */
@@ -45,8 +49,19 @@ export interface PreflightFinding {
   kind: 'blocker' | 'warning' | 'tip';
   label: string;
   detail: string;
+  /**
+   * Values for the translated wording. The client renders
+   * `safety.findings.<key before ':'>` with these, and falls back to
+   * label/detail (English) when it has no translation.
+   */
+  params?: Record<string, string | number>;
   /** A one-tap remedy the UI can apply to the campaign form. */
-  fix?: { action: 'choose_template' | 'connect_channel' | 'exclude_already_received'; label: string };
+  fix?: {
+    action: 'choose_template' | 'connect_channel' | 'exclude_already_received';
+    label: string;
+    /** For `exclude_already_received`: the earlier campaign to exclude. */
+    broadcastId?: string;
+  };
 }
 
 export interface PlannedRecipient {
@@ -114,6 +129,7 @@ const TIER_CAPACITY: Record<string, number> = {
   TIER_50: 50,
   TIER_250: 250,
   TIER_1K: 1_000,
+  TIER_2K: 2_000,
   TIER_10K: 10_000,
   TIER_100K: 100_000,
   TIER_UNLIMITED: Number.MAX_SAFE_INTEGER,
@@ -169,11 +185,120 @@ async function checkTemplate(templateId?: string | null): Promise<PreflightFindi
   return {
     key: 'template_not_approved',
     kind: 'blocker',
+    params: { name: template.name, status: template.metaStatus ?? 'NONE', reason: template.metaRejectedReason ?? '' },
     label: `"${template.name}" is not approved for sending`,
     detail:
       byStatus[template.metaStatus ?? ''] ??
       'This template has not been submitted to WhatsApp for review yet. Submit it, then send once approved.',
     fix: { action: 'choose_template', label: 'Choose another template' },
+  };
+}
+
+/**
+ * Every blank in the template must end up with a value — Meta refuses the whole
+ * message otherwise. An unset blank blocks; a contact field that is empty for
+ * some recipients only informs, because those people get the backup text.
+ */
+async function checkBlanks(
+  templateId: string,
+  mapping: Record<string, string> | null,
+  plan: PlannedRecipient[],
+): Promise<PreflightFinding[]> {
+  const template = await prisma.messageTemplate.findUnique({
+    where: { id: templateId },
+    select: { variables: true, language: true },
+  });
+  const slots = Array.isArray(template?.variables) ? (template!.variables as string[]) : [];
+  if (!slots.length) return [];
+
+  const customKeys = (await prisma.customFieldDefinition.findMany({ select: { key: true } })).map((f) => f.key);
+  const known = [...CONTACT_FIELDS, ...customKeys];
+  const blanks = slots.map((slot) => ({ slot, source: readBlank(mapping, slot, known) }));
+
+  const unset = blanks.filter((b) => b.source.kind === 'unset' || (b.source.kind === 'text' && !b.source.text.trim()));
+  if (unset.length) {
+    return [{
+      key: 'template_blanks_unset',
+      kind: 'blocker',
+      params: { count: unset.length, slot: unset[0].slot },
+      label: unset.length === 1
+        ? `Blank ${'{{'}${unset[0].slot}${'}}'} in the template needs a value`
+        : `${unset.length} blanks in the template need a value`,
+      detail: 'For each blank, choose what to put there: a contact detail such as the name, or the same text for everyone.',
+      fix: { action: 'choose_template', label: 'Fill in the blanks' },
+    }];
+  }
+
+  // Who would see a backup value instead of their own detail.
+  const fieldBlanks = blanks.filter((b) => b.source.kind === 'field') as Array<{
+    slot: string;
+    source: { kind: 'field'; field: string; fallback: string };
+  }>;
+  if (!fieldBlanks.length || !plan.length) return [];
+
+  const contactIds = plan.map((r) => r.contactId).filter((id): id is string => Boolean(id));
+  const contacts = contactIds.length
+    ? await prisma.contact.findMany({
+        where: { id: { in: contactIds } },
+        select: { id: true, phone: true, name: true, email: true, company: true, customFields: true },
+      })
+    : [];
+  const byId = new Map(contacts.map((c) => [c.id, c]));
+
+  const findings: PreflightFinding[] = [];
+  for (const { slot, source } of fieldBlanks) {
+    let missing = 0;
+    for (const recipient of plan) {
+      const contact = recipient.contactId ? byId.get(recipient.contactId) : undefined;
+      const vars = buildPersonalizationVars(contact, recipient.phone);
+      if (!vars[source.field]?.trim()) missing += 1;
+    }
+    if (!missing) continue;
+    const shown = source.fallback.trim() || defaultFallback(source.field, template?.language);
+    findings.push({
+      key: `template_blank_missing:${slot}`,
+      kind: 'tip',
+      params: { count: missing, field: source.field, slot, shown },
+      label: `${missing.toLocaleString()} ${missing === 1 ? 'person has' : 'people have'} no ${source.field.replace(/_/g, ' ')} saved`,
+      detail: `They will see “${shown}” in blank ${'{{'}${slot}${'}}'} instead. You can change this backup text next to the blank.`,
+    });
+  }
+  return findings;
+}
+
+/**
+ * The same template to the same people within a day is the pattern Meta's
+ * marketing limits are built to stop (131049): those messages are usually not
+ * delivered, and recipients who do get it twice are the ones who block.
+ */
+async function checkRecentRepeat(
+  templateId: string,
+  plan: PlannedRecipient[],
+  excludeBroadcastId?: string,
+): Promise<PreflightFinding | null> {
+  if (!plan.length) return null;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const overlaps = await prisma.broadcastRecipient.groupBy({
+    by: ['broadcastId'],
+    where: {
+      status: 'sent',
+      sentAt: { gte: since },
+      phone: { in: plan.map((r) => r.phone) },
+      broadcast: { templateId, ...(excludeBroadcastId ? { id: { not: excludeBroadcastId } } : {}) },
+    },
+    _count: { _all: true },
+  });
+  if (!overlaps.length) return null;
+  const top = overlaps.reduce((a, b) => (b._count._all > a._count._all ? b : a));
+  const total = overlaps.reduce((sum, row) => sum + row._count._all, 0);
+  return {
+    key: 'recent_repeat',
+    kind: 'warning',
+    params: { count: total },
+    label: `${total.toLocaleString()} of these people got this same template in the last 24 hours`,
+    detail:
+      'WhatsApp usually holds back a repeat marketing message within a day, and people who get the same offer twice are the ones who block. Leave them out to keep your number in good standing.',
+    fix: { action: 'exclude_already_received', label: 'Leave them out', broadcastId: top.broadcastId },
   };
 }
 
@@ -247,6 +372,10 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
 
   const templateFinding = await checkTemplate(input.templateId);
   if (templateFinding) findings.push(templateFinding);
+  else if (input.templateId) findings.push(...(await checkBlanks(input.templateId, input.templateVariables ?? null, plan)));
+
+  const repeat = input.templateId ? await checkRecentRepeat(input.templateId, plan, input.excludeBroadcastId) : null;
+  if (repeat) findings.push(repeat);
 
   if (plan.length === 0) {
     findings.push({
@@ -263,6 +392,7 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
     findings.push({
       key: 'over_messaging_tier',
       kind: 'warning',
+      params: { capacity, count: plan.length },
       label: `Your number can start ${capacity.toLocaleString()} conversations per day`,
       detail:
         `This campaign targets ${plan.length.toLocaleString()} people, so WhatsApp will refuse the excess until your ` +
@@ -274,6 +404,7 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
     findings.push({
       key: 'quality_rating_low',
       kind: 'warning',
+      params: { rating: channel.qualityRating },
       label: `WhatsApp rates this number's quality as ${channel.qualityRating}`,
       detail:
         'Recipients have been blocking or reporting your messages. Sending more marketing now risks Meta lowering your messaging limit or restricting the number.',
@@ -358,4 +489,21 @@ export async function verifyAccountGate(): Promise<AccountGate> {
     code: 'CHANNEL_RESTRICTED',
     reason: status.error?.message ?? 'WhatsApp is not accepting messages from this number at the moment.',
   };
+}
+
+/**
+ * The content half of pre-flight, for the moment of sending.
+ *
+ * A campaign can be saved incomplete, duplicated, or have its template change
+ * status after it was saved. Starting it anyway would only pause it a second
+ * later; refusing here keeps the user on the screen where they can fix it.
+ */
+export async function verifyCampaignContent(
+  templateId: string | null,
+  templateVariables: Record<string, string> | null,
+): Promise<PreflightFinding | null> {
+  const templateFinding = await checkTemplate(templateId);
+  if (templateFinding) return templateFinding;
+  const blanks = await checkBlanks(templateId!, templateVariables, []);
+  return blanks.find((finding) => finding.kind === 'blocker') ?? null;
 }

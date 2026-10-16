@@ -236,8 +236,10 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         // A send is not idempotent at Meta: a retried request the server did
         // receive delivers the message twice and bills two conversations.
         // Retries here are limited to failures Meta marks transient, which by
-        // definition were not accepted.
+        // definition were not accepted — never a timeout, whose request may have
+        // landed.
         maxAttempts: 2,
+        retryNetworkErrors: false,
       });
 
       wamid = result?.messages?.[0]?.id ?? '';
@@ -251,13 +253,35 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         failure: meta.kind,
         trace: meta.traceId,
       });
-      throw new HttpError(
-        meta.requiresTemplate ? 409 : 502,
-        meta.userMessage,
-        `META_${meta.kind}`,
+      throw Object.assign(
+        new HttpError(meta.requiresTemplate ? 409 : 502, meta.userMessage, `META_${meta.kind}`),
+        { cause: meta },
       );
     }
 
+    // From here the message is on its way to the customer. A failure to record
+    // it must not surface as a failed send — the caller would retry it, or a
+    // campaign would mark someone "failed" who did receive the message.
+    try {
+      await this.persistOutbound(input, built, phone, wamid, replyExternalId, cloud);
+    } catch (err) {
+      logger.error('meta.persist_after_send_failed', {
+        wamid,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return { messageId: wamid };
+  }
+
+  private async persistOutbound(
+    input: SendMessageInput,
+    built: { storedText?: string; content?: MessageContent },
+    phone: string,
+    wamid: string,
+    replyExternalId: string | null,
+    cloud: CloudApiConfig,
+  ): Promise<void> {
     // ── Persist through the shared pipeline ─────────────────────────────────
     let conversation: { id: string; teamId?: string | null };
     if (input.conversationId) {
@@ -297,8 +321,6 @@ export class MetaWhatsAppProvider implements MessagingProvider {
 
     const renderable = compileRenderable(msg, 'cloud_api');
     await persistNormalizedMessage(msg, renderable);
-
-    return { messageId: wamid };
   }
 
   /**

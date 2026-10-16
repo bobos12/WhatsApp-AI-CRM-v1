@@ -31,8 +31,9 @@ const PASS_LIMIT = 2_000;
 /**
  * Copy delivery/read timestamps from the CRM message onto the recipient row.
  *
- * Only rows that were actually linked at send time participate — a send whose
- * message id was never captured simply has no receipts, which is honest.
+ * Receipts are normally applied the moment Meta's webhook arrives; this sweep
+ * catches any that arrived before the recipient row was linked. Only rows that
+ * were linked at send time participate.
  */
 async function reconcileReceipts(since: Date): Promise<number> {
   const pending = await prisma.broadcastRecipient.findMany({
@@ -47,11 +48,14 @@ async function reconcileReceipts(since: Date): Promise<number> {
   });
   if (!pending.length) return 0;
 
+  // `messageId` holds the WhatsApp message id (wamid), which the CRM message
+  // row stores as `externalId` — matching it against `id` found nothing, so
+  // every campaign reported 0 delivered and 0 read.
   const messages = await prisma.message.findMany({
-    where: { id: { in: pending.map((row) => row.messageId as string) } },
-    select: { id: true, deliveredAt: true, readAt: true },
+    where: { externalId: { in: pending.map((row) => row.messageId as string) } },
+    select: { externalId: true, deliveredAt: true, readAt: true },
   });
-  const byId = new Map(messages.map((message) => [message.id, message]));
+  const byId = new Map(messages.map((message) => [message.externalId, message]));
 
   let updated = 0;
   for (const row of pending) {

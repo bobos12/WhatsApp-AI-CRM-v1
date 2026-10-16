@@ -18,6 +18,7 @@ interface Contact {
 
 interface Broadcast {
   id: string;
+  status?: string;
   name: string;
   message: string;
   /** The wall clock the user originally picked, e.g. "2026-07-10T14:30". */
@@ -67,7 +68,8 @@ export default function EditBroadcastPage() {
   const handleSave = async (values: BroadcastPayload) => {
     if (!params?.id) return;
     await api.put(`/api/broadcasts/${params.id}`, values);
-    router.push('/broadcasts');
+    // A paused campaign is resumed from its own page, so go back there.
+    router.push(broadcast?.status === 'PAUSED' ? `/broadcasts/${params.id}` : '/broadcasts');
   };
 
   return (

@@ -7,6 +7,7 @@ import { Check, ChevronRight, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useChatOpen } from '@/stores/chat-open-store';
 
 const STORAGE_KEY = 'crm_onboarding_dismissed';
 const OPEN_KEY = 'crm_onboarding_open';
@@ -33,6 +34,9 @@ export default function OnboardingWizard() {
   const { t } = useTranslation('common');
   const router = useRouter();
   const pathname = usePathname();
+  // Screens with their own bottom action bar (open chat, campaign wizard) hide
+  // the nav through this flag; the floating checklist must not cover them either.
+  const fullScreenTask = useChatOpen((st) => st.isOpen);
 
   const STEPS = [
     { id: 'connect_wa', title: t('onboarding.connectWa.title'), description: t('onboarding.connectWa.description'), href: '/settings' },
@@ -86,7 +90,7 @@ export default function OnboardingWizard() {
     setVisible(false);
   }
 
-  if (!visible || pathname?.startsWith('/conversations')) return null;
+  if (!visible || fullScreenTask || pathname?.startsWith('/conversations')) return null;
 
   const done = completedSteps.size;
   const total = STEPS.length;
