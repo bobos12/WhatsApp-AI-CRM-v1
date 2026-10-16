@@ -1,9 +1,7 @@
 // ─── Canonical Template Schema ────────────────────────────────────────────────
-// Single source of truth for all template operations.
-// Baileys-first: a template is either a plain text message or a media message
-// (image / video / document) with a caption. Nothing else — no buttons, no
-// footer, no interactive configuration, because Baileys cannot send those
-// reliably. This keeps creation dead-simple and delivery 100% faithful.
+// Single source of truth for all template operations. A template is a text or
+// media message with an optional footer and up to ten buttons — the shape
+// Meta's Cloud API approves and delivers. Mirrors backend lib/template-compiler.
 
 export type TemplateCategory =
   | 'GENERAL'
@@ -36,6 +34,21 @@ export interface CanonicalMedia {
   mimeType?: string
 }
 
+// ── Buttons ──────────────────────────────────────────────────────────────────
+// Meta's own vocabulary. `example` only appears on buttons imported from Meta
+// (a URL ending in {{1}}, or a coupon code) — those need a value at send time.
+
+export type TemplateButton =
+  | { type: 'QUICK_REPLY'; text: string }
+  | { type: 'URL'; text: string; url: string; example?: string }
+  | { type: 'PHONE_NUMBER'; text: string; phone_number: string }
+  | { type: 'COPY_CODE'; text?: string; example: string }
+
+export type ButtonType = TemplateButton['type']
+
+/** WhatsApp's limits — the builder and the backend enforce the same numbers. */
+export const BUTTON_LIMITS = { total: 10, URL: 2, PHONE_NUMBER: 1, COPY_CODE: 1, text: 25, footer: 60 } as const
+
 // ── Canonical Template ────────────────────────────────────────────────────────
 
 export interface CanonicalTemplate {
@@ -45,12 +58,16 @@ export interface CanonicalTemplate {
 
   media?: CanonicalMedia  // present for image/video/document messages
   body: { text: string }  // the message text (caption for media). Max 4096 chars.
+  footer?: { text: string }   // small grey line under the body. Max 60 chars.
+  buttons?: TemplateButton[]  // quick replies first, then links/call
 
   // Internal metadata — stored in DB
   _meta?: {
     variableNames?: string[]               // ordered: ["name","order_id"]
     description?: string                   // shown in presets library
     previewValues?: Record<string, string> // sample values for live preview
+    /** Footer/buttons as Meta approved them — written by the backend. */
+    meta?: { footer?: string; buttons?: TemplateButton[] }
   }
 }
 
@@ -65,6 +82,8 @@ export interface RenderableTemplate {
     mimeType?: string
   }
   body: string
+  footer?: string
+  buttons?: TemplateButton[]
 }
 
 // ── Validation types ──────────────────────────────────────────────────────────

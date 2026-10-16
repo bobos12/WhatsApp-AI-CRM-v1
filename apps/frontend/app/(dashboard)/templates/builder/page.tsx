@@ -6,15 +6,17 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, ArrowRight, Save, Loader2, Check, Smartphone, AlertTriangle, CheckCircle2,
   Type, ImageIcon, Video, FileText, Upload, X, Send, Mic, Play,
+  Reply, ExternalLink, Phone, Copy, Plus,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { api, apiForm } from '../../../../lib/api';
 import { useChatOpen } from '../../../../stores/chat-open-store';
 import { useHeaderHidden } from '../../../../stores/header-hidden-store';
 import { useDirection } from '../../../../hooks/useDirection';
-import type { CanonicalTemplate, MessageType, MediaType, TemplateCategory } from '../../../../lib/template-engine/schema';
-import { isCanonicalPayload, isLegacyPayload } from '../../../../lib/template-engine/schema';
-import { toRenderable, extractVariableNames, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType } from '../../../../lib/template-engine/compiler';
+import type { CanonicalTemplate, MessageType, MediaType, TemplateCategory, TemplateButton, ButtonType } from '../../../../lib/template-engine/schema';
+import { isCanonicalPayload, isLegacyPayload, BUTTON_LIMITS } from '../../../../lib/template-engine/schema';
+import { toRenderable, extractVariableNames, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType, buttonIssue, remainingFor, normalizeButtons, templateExtras } from '../../../../lib/template-engine/compiler';
+import TemplateButtonsPreview, { TemplateFooterLine } from '../../../../components/templates/TemplateButtonsPreview';
 import { ApprovalPanel, describeApproval, type ApprovalFields } from '../../../../components/templates/ApprovalStatus';
 import { prepareUpload } from '@/lib/prepare-upload';
 
@@ -92,10 +94,12 @@ function MessageBubble({ template, vars }: { template: CanonicalTemplate; vars: 
         {r.body.trim() && (
           <div className="px-3 pt-2 pb-1 text-sm"><WaText text={r.body} /></div>
         )}
+        <TemplateFooterLine text={r.footer} className="px-3 pt-0.5" />
         <div className="flex items-center justify-end gap-1 px-3 pb-1.5 pt-1">
           <span className="text-[10px] text-white/40">now</span>
           <span className="text-[10px] text-[#53BDEB]">✓✓</span>
         </div>
+        <TemplateButtonsPreview buttons={r.buttons} />
       </div>
     </div>
   );
@@ -210,6 +214,173 @@ function Step({ n, title, desc, done, aside, last, children }: {
   );
 }
 
+// ── Buttons editor ────────────────────────────────────────────────────────────
+// One card per button, in the order WhatsApp will show them. Limits are applied
+// at the "add" buttons (a type that is full simply can't be added) and problems
+// are shown under the card once it has been touched — never as a wall up front.
+
+const BUTTON_META: Record<ButtonType, { icon: typeof Type; key: string }> = {
+  QUICK_REPLY:  { icon: Reply,        key: 'quickReply' },
+  URL:          { icon: ExternalLink, key: 'url' },
+  PHONE_NUMBER: { icon: Phone,        key: 'phone' },
+  COPY_CODE:    { icon: Copy,         key: 'copyCodeType' },
+};
+
+function ButtonsEditor({ buttons, onChange, showAllIssues }: {
+  buttons: TemplateButton[];
+  onChange: (next: TemplateButton[]) => void;
+  showAllIssues: boolean;
+}) {
+  const { t } = useTranslation('templates');
+  const [touched, setTouched] = useState<Set<number>>(new Set());
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+
+  const add = (type: Exclude<ButtonType, 'COPY_CODE'>) => {
+    const fresh: TemplateButton =
+      type === 'QUICK_REPLY' ? { type, text: '' }
+      : type === 'URL' ? { type, text: '', url: 'https://' }
+      : { type, text: '', phone_number: '+' };
+    // Quick replies join the end of their group; links and calls go last.
+    const at = type === 'QUICK_REPLY' ? buttons.filter((b) => b.type === 'QUICK_REPLY').length : buttons.length;
+    const next = [...buttons.slice(0, at), fresh, ...buttons.slice(at)];
+    // Indices after the insert point shift by one — keep their touched state with them.
+    setTouched((prev) => new Set([...prev].map((i) => (i >= at ? i + 1 : i))));
+    setFocusIndex(at);
+    onChange(next);
+  };
+
+  const patch = (i: number, p: Partial<TemplateButton>) =>
+    onChange(buttons.map((b, j) => (j === i ? ({ ...b, ...p } as TemplateButton) : b)));
+
+  const remove = (i: number) => {
+    setTouched((prev) => new Set([...prev].filter((j) => j !== i).map((j) => (j > i ? j - 1 : j))));
+    onChange(buttons.filter((_, j) => j !== i));
+  };
+
+  const touch = (i: number) => setTouched((prev) => new Set(prev).add(i));
+  const hasBothKinds = buttons.some((b) => b.type === 'QUICK_REPLY') && buttons.some((b) => b.type !== 'QUICK_REPLY');
+
+  return (
+    <div className="space-y-3">
+      {buttons.length > 0 && (
+        <ul className="space-y-2">
+          {buttons.map((b, i) => {
+            const { icon: Icon, key } = BUTTON_META[b.type];
+            const issue = buttonIssue(b);
+            const showIssue = issue && (showAllIssues || touched.has(i));
+            const textLen = b.type === 'COPY_CODE' ? 0 : b.text.length;
+            return (
+              <li
+                key={i}
+                className={`pop-enter rounded-xl border bg-surface p-3 transition-colors ${showIssue ? 'border-rose-500/50' : 'border-line'}`}
+              >
+                <div className="mb-2.5 flex items-center gap-2">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                  <span className="text-[13px] font-medium text-ink">{t(`builder.buttons.${key}`)}</span>
+                  <button
+                    type="button"
+                    onClick={() => remove(i)}
+                    aria-label={t('builder.buttons.remove')}
+                    className="ms-auto flex h-8 w-8 items-center justify-center rounded-lg text-ink-4 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {b.type === 'COPY_CODE' ? (
+                  <p className="rounded-lg bg-raised px-3 py-2 text-[13px] text-ink-2">
+                    <span dir="ltr" className="font-mono font-semibold text-ink">{b.example}</span>
+                    <span className="mt-0.5 block text-xs text-ink-4">{t('builder.buttons.importedNote')}</span>
+                  </p>
+                ) : (
+                  <div className={b.type === 'QUICK_REPLY' ? '' : 'grid gap-2 sm:grid-cols-2'}>
+                    <div className="relative">
+                      <input
+                        value={b.text}
+                        autoFocus={focusIndex === i}
+                        onFocus={() => setFocusIndex(null)}
+                        onChange={(e) => patch(i, { text: e.target.value })}
+                        onBlur={() => touch(i)}
+                        maxLength={BUTTON_LIMITS.text}
+                        dir="auto"
+                        placeholder={t(`builder.buttons.${key}Placeholder`)}
+                        aria-label={t('builder.buttons.labelPlaceholder')}
+                        className="field h-10 w-full pe-12"
+                      />
+                      <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-ink-4">
+                        {textLen}/{BUTTON_LIMITS.text}
+                      </span>
+                    </div>
+                    {b.type === 'URL' && (
+                      <input
+                        value={b.url}
+                        onChange={(e) => patch(i, { url: e.target.value.trim() })}
+                        onBlur={() => touch(i)}
+                        dir="ltr"
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://example.com"
+                        aria-label={t('builder.buttons.url')}
+                        className="field h-10 w-full font-mono text-[13px]"
+                      />
+                    )}
+                    {b.type === 'PHONE_NUMBER' && (
+                      <input
+                        value={b.phone_number}
+                        onChange={(e) => patch(i, { phone_number: e.target.value })}
+                        onBlur={() => touch(i)}
+                        dir="ltr"
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="+966 5x xxx xxxx"
+                        aria-label={t('builder.buttons.phone')}
+                        className="field h-10 w-full"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {showIssue && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    {t(`builder.buttons.issues.${issue}`)}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Add — a type that is full can't be added, so the limit is never an error */}
+      <div className="flex flex-wrap gap-2">
+        {(['QUICK_REPLY', 'URL', 'PHONE_NUMBER'] as const).map((type) => {
+          const { icon: Icon, key } = BUTTON_META[type];
+          const left = remainingFor(buttons, type);
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => add(type)}
+              disabled={left === 0}
+              title={left === 0 ? t('builder.buttons.limitReached') : undefined}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-line-strong px-3.5 text-[13px] font-medium text-ink-2 transition-[background-color,border-color,color,transform] duration-fast hover:border-brand/50 hover:bg-brand/[0.06] hover:text-brand active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line-strong disabled:hover:bg-transparent disabled:hover:text-ink-2"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {t(`builder.buttons.${key}`)}
+            </button>
+          );
+        })}
+      </div>
+
+      {hasBothKinds && <p className="text-xs text-ink-4">{t('builder.buttons.groupHint')}</p>}
+    </div>
+  );
+}
+
 // ── Main builder ──────────────────────────────────────────────────────────────
 
 function BuilderContent() {
@@ -235,6 +406,8 @@ function BuilderContent() {
   /** WhatsApp's verdict on the saved version of this template. */
   const [approval, setApproval] = useState<ApprovalFields>({});
   const [submitting, setSubmitting] = useState(false);
+  /** Show every button problem at once — set when a save is blocked by them. */
+  const [showButtonIssues, setShowButtonIssues] = useState(false);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -257,8 +430,20 @@ function BuilderContent() {
   useEffect(() => {
     if (!templateId || status !== 'authenticated' || loadedRef.current) return;
     loadedRef.current = true;
-    api.get('/api/templates').then((templates: any[]) => {
-      const found = templates.find((x: any) => x.id === templateId);
+    (async () => {
+      let templates: any[] = await api.get('/api/templates');
+      let found = templates.find((x: any) => x.id === templateId);
+      // Known to Meta but never synced since buttons were tracked: fetch Meta's
+      // approved footer/buttons first, so the editor opens with them.
+      if (found?.metaTemplateId && !found.payload?._meta?.meta) {
+        try {
+          await api.post('/api/channel/templates/sync', {});
+          templates = await api.get('/api/templates');
+          found = templates.find((x: any) => x.id === templateId) ?? found;
+        } catch { /* offline or no channel — open with what we have */ }
+      }
+      return found;
+    })().then((found: any) => {
       if (!found) return;
       let canonical: CanonicalTemplate;
       if (isLegacyPayload(found.payload)) {
@@ -282,7 +467,16 @@ function BuilderContent() {
         };
       }
 
+      // A template made or edited in WhatsApp Manager carries its footer and
+      // buttons only in the approved snapshot. Open it with them — otherwise the
+      // editor shows none, and saving + resubmitting would delete them at Meta.
+      const approved = templateExtras(found.payload);
+      if (!canonical.buttons?.length && approved.buttons?.length) canonical.buttons = approved.buttons;
+      if (!canonical.footer?.text && approved.footer) canonical.footer = { text: approved.footer };
+
       canonical._meta = {
+        // Keep the approved snapshot through a save; it is what campaigns send.
+        ...(found.payload?._meta ?? {}),
         ...canonical._meta,
         variableNames: extractVariableNames(canonical),
         previewValues: canonical._meta?.previewValues ?? {},
@@ -356,10 +550,26 @@ function BuilderContent() {
     if (!template.body.text.trim() && !template.media?.url) {
       setSaveError(t('builder.errBodyRequired', { defaultValue: 'Write a message or attach a file first' })); return null;
     }
+    // WhatsApp rejects a template with one bad button, so nothing half-valid is saved.
+    if ((template.buttons ?? []).some((b) => buttonIssue(b))) {
+      setShowButtonIssues(true);
+      setSaveError(t('builder.buttons.fixErrors')); return null;
+    }
     setSaving(true);
     setSaveError(null);
     const varNames = extractVariableNames(template);
-    const canonical: CanonicalTemplate = { ...template, _meta: { ...template._meta, variableNames: varNames, previewValues: previewVars } };
+    const buttons = normalizeButtons(template.buttons).map((b) =>
+      b.type === 'URL' ? { ...b, text: b.text.trim(), url: b.url.trim() }
+      : b.type === 'PHONE_NUMBER' ? { ...b, text: b.text.trim(), phone_number: b.phone_number.replace(/[\s()-]/g, '') }
+      : b.type === 'QUICK_REPLY' ? { ...b, text: b.text.trim() }
+      : b);
+    const footerText = template.footer?.text?.trim();
+    const canonical: CanonicalTemplate = {
+      ...template,
+      footer: footerText ? { text: footerText } : undefined,
+      buttons: buttons.length ? buttons : undefined,
+      _meta: { ...template._meta, variableNames: varNames, previewValues: previewVars },
+    };
     try {
       const body = {
         name: template.name.trim(),
@@ -600,14 +810,50 @@ function BuilderContent() {
                   </button>
                 ))}
               </div>
+
+              {/* Footer — the small grey line WhatsApp shows under the message */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label htmlFor="tpl-footer" className="text-xs font-medium text-ink-3">
+                    {t('builder.buttons.footer')} · <span className="font-normal text-ink-4">{t('builder.optional')}</span>
+                  </label>
+                  <span className="text-[11px] tabular-nums text-ink-4">{(template.footer?.text ?? '').length}/{BUTTON_LIMITS.footer}</span>
+                </div>
+                <input
+                  id="tpl-footer"
+                  value={template.footer?.text ?? ''}
+                  onChange={e => update({ footer: { text: e.target.value.replace(/\{\{|\}\}/g, '') } })}
+                  maxLength={BUTTON_LIMITS.footer}
+                  placeholder={t('builder.buttons.footerPlaceholder')}
+                  dir="auto"
+                  className="field h-10 w-full"
+                />
+              </div>
             </>
           )}
         </div>
       </Step>
 
-      {/* 4 · Test send (optional) */}
+      {/* 4 · Buttons (optional) */}
       <Step
         n={4}
+        title={t('builder.buttons.title')}
+        desc={t('builder.buttons.desc')}
+        done={(template.buttons?.length ?? 0) > 0 && !(template.buttons ?? []).some((b) => buttonIssue(b))}
+        aside={(template.buttons?.length ?? 0) > 0 && (
+          <span className="shrink-0 pt-1 text-[11px] tabular-nums text-ink-4">{template.buttons!.length}/{BUTTON_LIMITS.total}</span>
+        )}
+      >
+        <ButtonsEditor
+          buttons={template.buttons ?? []}
+          onChange={(buttons) => update({ buttons })}
+          showAllIssues={showButtonIssues}
+        />
+      </Step>
+
+      {/* 5 · Test send (optional) */}
+      <Step
+        n={5}
         title={t('builder.steps.test.title')}
         desc={t('builder.steps.test.desc')}
         done={Boolean(testResult?.ok)}
@@ -646,11 +892,11 @@ function BuilderContent() {
         </div>
       </Step>
 
-      {/* 5 · WhatsApp approval — the last step. A rejection moves to the top of
+      {/* 6 · WhatsApp approval — the last step. A rejection moves to the top of
           the page instead, because Meta's reason dictates what to change. */}
       {!rejected && (
         <Step
-          n={5}
+          n={6}
           title={t('builder.steps.approval.title')}
           done={approval.metaStatus === 'APPROVED'}
           last

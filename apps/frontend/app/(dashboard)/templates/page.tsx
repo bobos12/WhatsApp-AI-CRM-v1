@@ -14,6 +14,7 @@ import PRESETS from '../../../lib/template-engine/presets';
 import type { CanonicalTemplate } from '../../../lib/template-engine/schema';
 import { isCanonicalPayload, TEMPLATE_CATEGORIES } from '../../../lib/template-engine/schema';
 import SendTemplateDialog from '../../../components/templates/SendTemplateDialog';
+import { Modal } from '../../../components/ui/modal';
 import { ApprovalBadge, describeApproval, type MetaStatus } from '../../../components/templates/ApprovalStatus';
 import { useRemembered } from '@/hooks/useRemembered';
 import { useLiveData } from '../../../hooks/useLiveData';
@@ -205,6 +206,8 @@ export default function TemplatesPage() {
   const [tab, setTab] = useState<Tab>('library');
   const [addingPreset, setAddingPreset] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** The template awaiting "are you sure?" — deletion is permanent. */
+  const [confirmDelete, setConfirmDelete] = useState<MessageTemplate | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [sendTarget, setSendTarget] = useState<MessageTemplate | null>(null);
@@ -229,6 +232,18 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     if (status === 'authenticated') fetchTemplates();
+  }, [fetchTemplates, status]);
+
+  // Quietly re-read Meta on open (at most every 10 minutes per tab), so approval
+  // states and approved buttons are current without anyone pressing Sync.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const KEY = 'nx-templates-synced-at';
+    let last = 0;
+    try { last = Number(sessionStorage.getItem(KEY)) || 0; } catch { /* storage blocked */ }
+    if (Date.now() - last < 10 * 60_000) return;
+    try { sessionStorage.setItem(KEY, String(Date.now())); } catch { /* storage blocked */ }
+    api.post('/api/channel/templates/sync', {}).then(() => fetchTemplates()).catch(() => {});
   }, [fetchTemplates, status]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
@@ -514,7 +529,7 @@ export default function TemplatesPage() {
                   onSend={() => setSendTarget(tpl)}
                   onEdit={() => router.push(`/templates/builder?id=${tpl.id}`)}
                   onDuplicate={() => handleDuplicate(tpl)}
-                  onDelete={() => handleDelete(tpl.id)}
+                  onDelete={() => setConfirmDelete(tpl)}
                   onSubmit={() => handleSubmit(tpl)}
                   deleting={deletingId === tpl.id}
                   submitting={submittingId === tpl.id}
@@ -633,6 +648,40 @@ export default function TemplatesPage() {
           ))}
         </div>
       )}
+
+      {/* ── Delete confirmation ── */}
+      <Modal
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        aria-labelledby="delete-template-title"
+        className="pop-enter w-full max-w-sm rounded-xl border border-line bg-surface p-5 shadow-pop"
+      >
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/10 text-red-500">
+            <Trash2 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 id="delete-template-title" className="text-base font-semibold text-ink">{t('deleteConfirm.title')}</h2>
+            <p className="mt-1 text-[13px] leading-5 text-ink-3">{t('deleteConfirm.message')}</p>
+            {confirmDelete && (
+              <p dir="auto" className="mt-2 truncate rounded-lg bg-raised px-2.5 py-1.5 text-[13px] font-medium text-ink">{confirmDelete.name}</p>
+            )}
+          </div>
+        </div>
+        <div className="mt-5 flex gap-2">
+          <button type="button" onClick={() => setConfirmDelete(null)} className="btn btn-secondary h-10 flex-1 justify-center">
+            {t('deleteConfirm.cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={() => { if (confirmDelete) void handleDelete(confirmDelete.id); setConfirmDelete(null); }}
+            className="btn h-10 flex-1 justify-center bg-red-600 text-white hover:bg-red-700"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {t('deleteConfirm.confirm')}
+          </button>
+        </div>
+      </Modal>
 
       {/* ── Send dialog — the single place to send any template ── */}
       {sendTarget && (

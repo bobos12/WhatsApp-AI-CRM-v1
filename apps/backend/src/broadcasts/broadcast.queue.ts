@@ -7,7 +7,7 @@ import { emitRealtime } from '../realtime/socket';
 import { logger } from '../lib/logger';
 import { CONTACT_FIELDS, fillBlank, readBlank } from '@crm/messaging-schema';
 import { buildPersonalizationVars } from './personalization';
-import { toMetaTemplateName } from '../providers/meta/templates';
+import { toMetaTemplateName, approvedExtras } from '../providers/meta/templates';
 import { asMetaError, type MetaApiError } from '../providers/meta/graph';
 import { HttpError } from '../auth/authorize';
 import { emitDataChanged } from '../realtime/socket';
@@ -307,6 +307,8 @@ async function runSlice(broadcastId: string) {
     : [];
   const knownFields = [...CONTACT_FIELDS, ...customFieldKeys];
   const blanks = variableOrder.map((slot) => readBlank(variableMap, slot, knownFields));
+  /** Footer + buttons exactly as Meta approved them — same for every recipient. */
+  const extras = approvedExtras(template);
 
   // ── Recipients ─────────────────────────────────────────────────────────────
   const recipients = await prisma.broadcastRecipient.findMany({
@@ -367,6 +369,7 @@ async function runSlice(broadcastId: string) {
           // What the recipient actually reads, so the CRM transcript and the
           // conversation preview match the delivered message.
           renderedBody: renderBody(template.content ?? '', variableOrder, bodyValues),
+          ...extras,
         },
       });
 

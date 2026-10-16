@@ -204,7 +204,16 @@
       "inline": "Delete?",
       "yes": "Yes",
       "no": "No"
-    }
+    },
+    "roles": {
+      "SYSTEM_MANAGER": "System manager",
+      "EMPLOYEE": "Employee"
+    },
+    "count_one": "{{count}} user",
+    "count_other": "{{count}} users",
+    "selectedCount": "{{count}} selected",
+    "noTeam": "No team",
+    "joined": "Joined {{date}}"
   },
   "teams": {
     "title": "Team Management",

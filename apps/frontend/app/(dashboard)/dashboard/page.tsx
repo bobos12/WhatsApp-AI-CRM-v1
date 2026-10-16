@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Upload, MessageSquare } from 'lucide-react';
+import { Plus, Upload, ChevronRight, CheckCircle2, Send, FileText } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useSession } from 'next-auth/react';
 import { useLiveStats } from '../../../hooks/useLiveStats';
@@ -61,6 +61,7 @@ function Band({ label, children, delay = 0 }: { label: string; children: React.R
 export default function DashboardPage() {
   const { t } = useTranslation('dashboard');
   const { t: tCommon } = useTranslation('common');
+  const { t: tSidebar } = useTranslation('sidebar');
   const { data: session } = useSession();
   const { language } = useLanguage();
   const locale = localeFor(language);
@@ -88,43 +89,54 @@ export default function DashboardPage() {
   const [queue, setQueue] = useState<{ waiting: number; oldest: string | null } | null>(null);
   const onSummary = useCallback((s: { waiting: number; oldest: string | null }) => setQueue(s), []);
 
+  // One line, one job: who needs an answer. Today's volumes and hot leads live
+  // in the numbers band right below, so they aren't repeated here.
   const strong = <b className="font-semibold text-ink" />;
-  const brief = overview && queue ? (
-    <>
-      {queue.waiting > 0 ? (
-        <>
+  const brief = queue ? (
+    queue.waiting > 0 ? (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+          <span className="absolute inset-0 animate-ping rounded-full bg-amber-500 opacity-50 [animation-duration:2s]" />
+          <span className="relative h-2 w-2 rounded-full bg-amber-500" />
+        </span>
+        <span>
           <Trans t={t} i18nKey="today.brief.waiting" count={queue.waiting} values={{ count: queue.waiting }} components={{ b: strong }} />
           {queue.oldest && <Trans t={t} i18nKey="today.brief.longest" values={{ time: formatAgo(queue.oldest) }} components={{ w: <b className="font-semibold text-amber-700 dark:text-amber-400" /> }} />}
-          .{' '}
-        </>
-      ) : (
-        <>{t('today.brief.none')}. </>
-      )}
-      {overview.hotLeadsToday > 0
-        ? <Trans t={t} i18nKey="today.brief.hot" count={overview.hotLeadsToday} values={{ count: overview.hotLeadsToday }} components={{ b: strong }} />
-        : t('today.brief.noHot')}
-      {', '}{t('today.brief.and')}{' '}
-      <Trans t={t} i18nKey="today.brief.volume" values={{ count: formatNumber(overview.todayMessages, locale) }} components={{ b: strong }} />.
-    </>
+        </span>
+        <Link href="/conversations" className="inline-flex items-center gap-0.5 font-semibold text-brand hover:underline">
+          {t('today.brief.replyNow')}
+          <ChevronRight className="h-4 w-4 icon-mirror" aria-hidden="true" />
+        </Link>
+      </span>
+    ) : (
+      <span className="flex items-center gap-2">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+        {t('today.brief.caughtUp')}
+      </span>
+    )
   ) : null;
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-12 pb-4 sm:pt-4">
+    <div className="mx-auto max-w-[1280px] space-y-8 pb-4 sm:space-y-12 sm:pt-4">
       {/* ── Briefing ── */}
       <header className="enter flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
-        <div className="min-w-0 max-w-2xl">
-          <p className="text-xs font-medium text-ink-3">
-            {now ? now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }) : ' '}
-          </p>
-          <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.025em] text-ink sm:text-[32px]">
-            {now && firstName ? t(greetingKey(now.getHours()), { name: firstName }) : t('title')}
-          </h1>
-          <p className="mt-3 min-h-[3.25rem] text-[15px] leading-relaxed text-ink-2 sm:text-base">
-            {brief ?? <span className="inline-block h-4 w-80 max-w-full animate-pulse rounded bg-raised align-middle" />}
-          </p>
-          <div className="mt-4 min-h-[20px]"><SendingFrom /></div>
+        <div className="w-full min-w-0 max-w-2xl sm:w-auto">
+          {/* Phones: greeting and date share one line; larger screens stack the date above. */}
+          <div className="flex items-baseline justify-between gap-3 sm:flex-col-reverse sm:items-start sm:gap-2">
+            <h1 className="min-w-0 truncate text-xl font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[32px] sm:tracking-[-0.025em]">
+              {now && firstName ? t(greetingKey(now.getHours()), { name: firstName }) : t('title')}
+            </h1>
+            <p className="shrink-0 text-xs font-medium text-ink-3">
+              {now ? now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }) : ' '}
+            </p>
+          </div>
+          <div className="mt-2 min-h-6 text-sm leading-6 text-ink-2 sm:mt-3 sm:text-base">
+            {brief ?? <span className="inline-block h-4 w-64 max-w-full animate-pulse rounded bg-raised align-middle" />}
+          </div>
+          {/* The phone app bar already shows the live connection dot. */}
+          <div className="mt-4 hidden min-h-[20px] sm:block"><SendingFrom /></div>
         </div>
-        <div className="flex w-full gap-2 sm:w-auto">
+        <div className="hidden gap-2 sm:flex">
           <Link href="/contacts?import=1" className="btn btn-secondary btn-lg flex-1 sm:flex-none">
             <Upload aria-hidden="true" />
             {t('importContacts')}
@@ -150,7 +162,22 @@ export default function DashboardPage() {
 
       {/* ── Today's numbers, as an open band ── */}
       {overview
-        ? <div className="enter" style={{ animationDelay: '60ms' }}><PulseStrip data={overview} series={series} locale={locale} /></div>
+        ? (
+          <div className="enter space-y-3" style={{ animationDelay: '60ms' }}>
+            {/* Phones: campaigns and templates, one tap from home. */}
+            <div className="grid grid-cols-2 gap-2 sm:hidden">
+              <Link href="/broadcasts" className="btn btn-secondary h-11 justify-center active:scale-[0.98]">
+                <Send className="h-4 w-4 text-brand icon-mirror" aria-hidden="true" />
+                {tSidebar('nav.broadcasts')}
+              </Link>
+              <Link href="/templates" className="btn btn-secondary h-11 justify-center active:scale-[0.98]">
+                <FileText className="h-4 w-4 text-brand" aria-hidden="true" />
+                {tSidebar('nav.templates')}
+              </Link>
+            </div>
+            <PulseStrip data={overview} series={series} locale={locale} />
+          </div>
+        )
         : !loaded.overview && <Skeleton className="h-[150px] rounded-xl" />}
 
       {/* ── Act ── */}
@@ -180,11 +207,6 @@ export default function DashboardPage() {
           : <Skeleton className="h-56 rounded-xl" />}
       </Band>
 
-      {/* Phones reach the inbox from the tab bar; this keeps it one tap away here too. */}
-      <Link href="/conversations" className="btn btn-secondary btn-lg w-full sm:hidden">
-        <MessageSquare aria-hidden="true" />
-        {t('today.openInbox')}
-      </Link>
     </div>
   );
 }

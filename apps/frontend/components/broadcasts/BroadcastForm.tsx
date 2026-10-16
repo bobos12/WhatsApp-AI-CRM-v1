@@ -12,6 +12,9 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 import FriendlyError from '../ui/FriendlyError';
 import { cn } from '../../lib/utils';
+import TemplateButtonsPreview from '../templates/TemplateButtonsPreview';
+import { templateExtras } from '../../lib/template-engine/compiler';
+import type { TemplateButton } from '../../lib/template-engine/schema';
 import { useTags } from '../../hooks/useTags';
 import { useDirection } from '../../hooks/useDirection';
 import { useAudienceMatches } from '../../hooks/useAudienceMatches';
@@ -110,6 +113,8 @@ interface TemplateSummary {
   /** WhatsApp's verdict — only APPROVED templates can carry a campaign. */
   metaStatus?: MetaStatus;
   metaRejectedReason?: string | null;
+  /** Canonical payload — carries the footer and buttons. */
+  payload?: unknown;
 }
 
 const TOTAL_STEPS = 5;
@@ -119,8 +124,9 @@ const TOTAL_STEPS = 5;
  * chat wallpaper, header media on top. Uses WhatsApp's own colours in both
  * themes so it reads as "their phone", not as part of the CRM.
  */
-function PhonePreview({ message, mediaType, mediaUrl }: {
+function PhonePreview({ message, mediaType, mediaUrl, footer, buttons }: {
   message: string; mediaType?: PreviewMedia; mediaUrl?: string;
+  footer?: string; buttons?: TemplateButton[];
 }) {
   const { t } = useTranslation('broadcasts');
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -155,8 +161,12 @@ function PhonePreview({ message, mediaType, mediaUrl }: {
                   {message.length > 320 ? message.slice(0, 320) + '…' : message}
                 </p>
               )}
+              {footer && (
+                <p dir="auto" className="mt-1 text-[10px] leading-4 text-[#667781] dark:text-[#8696a0]">{footer}</p>
+              )}
               <p className="mt-0.5 text-end text-[9px] text-[#667781] dark:text-[#8696a0]">{now}</p>
             </div>
+            <TemplateButtonsPreview buttons={buttons} size="sm" tone="auto" />
           </div>
         ) : (
           <div className="flex h-[150px] items-center justify-center px-4">
@@ -536,6 +546,7 @@ export default function BroadcastForm({
     : '';
   const previewMediaType = (selectedTemplate?.mediaType as PreviewMedia | undefined) ?? undefined;
   const previewMediaUrl = selectedTemplate?.mediaUrl ?? undefined;
+  const previewExtras = templateExtras(selectedTemplate?.payload);
 
   const BackIcon = isRtl ? ChevronRight : ChevronLeft;
   const NextIcon = isRtl ? ChevronLeft : ChevronRight;
@@ -1234,7 +1245,7 @@ export default function BroadcastForm({
                       <Smartphone className="h-3.5 w-3.5" />
                       {t('form.livePreview')}
                     </p>
-                    <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} />
+                    <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} footer={previewExtras.footer} buttons={previewExtras.buttons} />
                   </div>
             </SectionCard>
           </div>
@@ -1329,7 +1340,7 @@ export default function BroadcastForm({
                 <Smartphone className="h-4 w-4 text-brand" />
                 <p className="text-sm font-semibold text-ink">{t('form.livePreview')}</p>
               </div>
-              <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} />
+              <PhonePreview message={previewText} mediaType={previewMediaType} mediaUrl={previewMediaUrl} footer={previewExtras.footer} buttons={previewExtras.buttons} />
             </div>
 
             {resolvedAudience.count > 0 && (

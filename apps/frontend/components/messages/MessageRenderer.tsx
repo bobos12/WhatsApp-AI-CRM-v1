@@ -633,7 +633,8 @@ function ButtonsView({ blocks, isFromMe }: { blocks: Array<{ type: 'reply_button
         }
         // reply_button
         return (
-          <button key={i} type="button" disabled={b.disabled} className={`${base} ${b.disabled ? 'opacity-50 cursor-default' : ''}`}>
+          <button key={i} type="button" disabled={b.disabled} className={`${base} flex items-center justify-center gap-1.5 ${b.disabled ? 'opacity-50 cursor-default' : ''}`}>
+            <Reply className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {b.title}
           </button>
         );
@@ -1034,7 +1035,11 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   // the last line if it fits (an invisible spacer reserves its width) and only
   // wraps to its own line when it doesn't — instead of always costing a line.
   const lastSeg = segments[segments.length - 1];
-  const endsInText = lastSeg?.kind === 'single' && lastSeg.block.type === 'body_text' && !(status === 'failed' && isFromMe);
+  /** Buttons that close the bubble are drawn after the timestamp, full-bleed. */
+  const trailingButtons = lastSeg?.kind === 'buttons' && segments.length > 1;
+  const contentSegs = trailingButtons ? segments.slice(0, -1) : segments;
+  const lastContent = contentSegs[contentSegs.length - 1];
+  const endsInText = lastContent?.kind === 'single' && lastContent.block.type === 'body_text' && !(status === 'failed' && isFromMe);
   const mediaOnly = segments.length === 1 && lastSeg?.kind === 'single' && lastSeg.block.type === 'media'
     && (lastSeg.block.media.mediaType === 'image' || lastSeg.block.media.mediaType === 'video') && !lastSeg.block.caption;
   const footer = <BubbleFooter timestamp={timestamp} status={status} compatibility={renderable.compatibility} isFromMe={isFromMe} overlay={mediaOnly} />;
@@ -1125,11 +1130,11 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
             )}
 
             <div className="space-y-1.5">
-              {segments.map((seg, i) => {
+              {contentSegs.map((seg, i) => {
                 if (seg.kind === 'buttons') {
                   return <ButtonsView key={i} blocks={seg.blocks as any} isFromMe={isFromMe} />;
                 }
-                const isLast = i === segments.length - 1;
+                const isLast = i === contentSegs.length - 1;
                 return <BlockRenderer key={i} block={seg.block} isFromMe={isFromMe} trailing={isLast && endsInText ? spacer : undefined} />;
               })}
             </div>
@@ -1141,9 +1146,16 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
               </div>
             )}
 
-            {endsInText || mediaOnly
+            {(endsInText && !trailingButtons) || mediaOnly
               ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-1.5 end-2.5'}`}>{footer}</span>
-              : <div className="mt-1 flex justify-end">{footer}</div>}
+              : <div className={`flex justify-end ${endsInText ? '-mt-4' : 'mt-1'}`}>{footer}</div>}
+
+            {/* Template buttons hang below the time, as WhatsApp draws them. */}
+            {trailingButtons && lastSeg?.kind === 'buttons' && (
+              <div className="-mx-2.5 -mb-1.5 mt-1">
+                <ButtonsView blocks={lastSeg.blocks as any} isFromMe={isFromMe} />
+              </div>
+            )}
           </div>
 
           {/* Reaction pills — hang off the bottom edge, as on WhatsApp */}

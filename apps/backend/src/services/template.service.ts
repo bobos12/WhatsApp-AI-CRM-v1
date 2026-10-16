@@ -13,7 +13,7 @@ import {
 import { providerManager } from '../providers/manager';
 import { loadMedia, isAudioMediaType, resolveMediaUrl, toStorageRef } from '../lib/media';
 import { logger } from '../lib/logger';
-import { toMetaTemplateName } from '../providers/meta/templates';
+import { toMetaTemplateName, approvedExtras } from '../providers/meta/templates';
 
 /**
  * A template's attachment is recorded in two places: inside the canonical
@@ -155,6 +155,7 @@ export async function sendTemplate(
             }
           : null,
         renderedBody: (template.content ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_: string, k: string) => variables[k] ?? ''),
+        ...approvedExtras(template),
       },
       clientId: opts.clientId,
       conversationId: opts.conversationId,

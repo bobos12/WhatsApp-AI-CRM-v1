@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'motion/react';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLiveCounts } from '@/hooks/useLiveCounts';
 import { useLeadAlerts } from '@/hooks/useLeadAlerts';
@@ -78,6 +78,17 @@ export default function MobileDrawer({ open, onClose }: { open: boolean; onClose
           >
             <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5" onPointerDown={(e) => dragControls.start(e)}>
               <div className="h-1 w-9 rounded-full bg-line-strong" />
+            </div>
+            <div className="flex shrink-0 items-center justify-between px-4 pb-1">
+              <p className="text-base font-semibold text-ink">{t('menu')}</p>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t('closeSidebar')}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-raised text-ink-2 transition-colors hover:bg-overlay hover:text-ink active:scale-95"
+              >
+                <X className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 pb-3">

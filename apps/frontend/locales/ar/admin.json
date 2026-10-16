@@ -204,7 +204,16 @@
       "inline": "حذف؟",
       "yes": "نعم",
       "no": "لا"
-    }
+    },
+    "roles": {
+      "SYSTEM_MANAGER": "مدير النظام",
+      "EMPLOYEE": "موظف"
+    },
+    "count_one": "مستخدم واحد",
+    "count_other": "{{count}} مستخدمين",
+    "selectedCount": "{{count}} محدد",
+    "noTeam": "بدون فريق",
+    "joined": "انضم {{date}}"
   },
   "teams": {
     "title": "إدارة الفرق",

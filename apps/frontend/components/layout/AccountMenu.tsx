@@ -72,24 +72,24 @@ export default function AccountMenu({
           'flex w-full items-center gap-2.5 rounded-lg text-start transition-colors',
           variant === 'nav'
             ? cn('p-1.5 hover:bg-nav-hover', open && 'bg-nav-hover', (railAlways || railBelowLg) && 'justify-center', railBelowLg && 'lg:justify-start')
-            : 'p-1 hover:bg-raised',
+            : 'min-h-[56px] rounded-xl px-2.5 py-2 hover:bg-raised active:bg-raised',
         )}
       >
         <span className={cn(
           'flex shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-          variant === 'nav' ? 'h-7 w-7 bg-brand-500/20 text-brand-300' : 'h-8 w-8 bg-brand/12 text-brand',
+          variant === 'nav' ? 'h-7 w-7 bg-brand-500/20 text-brand-300' : 'h-10 w-10 bg-brand/12 text-sm text-brand',
         )}>
           {initials}
         </span>
         {!railAlways && (
           <>
             <span className={cn("min-w-0 flex-1 leading-tight", railBelowLg && "hidden lg:block")}>
-              <span className={cn('block truncate text-[13px] font-medium', variant === 'nav' ? 'text-nav-ink' : 'text-ink')}>{name}</span>
-              <span className={cn('block truncate text-2xs', variant === 'nav' ? 'text-nav-muted' : 'text-ink-3')}>
+              <span className={cn('block truncate font-medium', variant === 'nav' ? 'text-[13px] text-nav-ink' : 'text-[15px] text-ink')}>{name}</span>
+              <span className={cn('block truncate', variant === 'nav' ? 'text-2xs text-nav-muted' : 'mt-0.5 text-xs text-ink-3')}>
                 {tCommon(`roles.${role}`)}
               </span>
             </span>
-            <ChevronsUpDown className={cn('h-3.5 w-3.5 shrink-0', variant === 'nav' ? 'text-nav-muted' : 'text-ink-4', railBelowLg && 'hidden lg:block')} aria-hidden="true" />
+            <ChevronsUpDown className={cn('shrink-0', variant === 'nav' ? 'h-3.5 w-3.5' : 'h-4 w-4', variant === 'nav' ? 'text-nav-muted' : 'text-ink-4', railBelowLg && 'hidden lg:block')} aria-hidden="true" />
           </>
         )}
       </button>

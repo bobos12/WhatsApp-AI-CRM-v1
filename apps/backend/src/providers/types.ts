@@ -1,4 +1,5 @@
 import type { ProviderName as SchemaProviderName } from '@crm/messaging-schema';
+import type { TemplateButtonDef } from '../lib/template-compiler';
 
 /**
  * The transports this build implements — the official Cloud API, and only it.
@@ -35,6 +36,9 @@ export interface OutboundTemplate {
   } | null;
   /** Rendered body text, stored so the CRM shows what the customer received. */
   renderedBody?: string;
+  /** Footer + buttons as Meta approved them (see `approvedExtras`). */
+  footer?: string;
+  buttons?: TemplateButtonDef[];
 }
 
 /**

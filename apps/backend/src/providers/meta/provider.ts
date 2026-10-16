@@ -9,7 +9,7 @@ import type {
 } from '../types';
 import { asMetaError, graphRequest } from './graph';
 import { uploadMedia } from './media';
-import { buildTemplatePayload } from './templates';
+import { buildTemplatePayload, resolvedButtonUrl } from './templates';
 import { getChannel, recordSync, type CloudApiConfig } from '../channel.service';
 import { normalizePhone } from '../../lib/phone';
 import { logger } from '../../lib/logger';
@@ -385,6 +385,7 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         language: template.language,
         bodyValues: template.bodyValues,
         headerMedia,
+        buttons: template.buttons,
       }),
     };
 
@@ -397,7 +398,21 @@ export class MetaWhatsAppProvider implements MessagingProvider {
       templateLanguage: template.language,
       templateId: template.templateId ?? null,
       metaTemplateId: null,
-      components: [{ type: 'body', text: template.renderedBody ?? template.bodyValues.join(' ') }],
+      components: [
+        { type: 'body', text: template.renderedBody ?? template.bodyValues.join(' ') },
+        ...(template.footer ? [{ type: 'footer' as const, text: template.footer }] : []),
+        // Recorded so the transcript shows the buttons the customer can tap.
+        ...(template.buttons?.length
+          ? [{
+              type: 'buttons' as const,
+              buttons: template.buttons.map((b) =>
+                b.type === 'URL' ? { kind: 'url' as const, text: b.text, url: resolvedButtonUrl(b) }
+                : b.type === 'PHONE_NUMBER' ? { kind: 'phone' as const, text: b.text, phoneNumber: b.phone_number }
+                : b.type === 'COPY_CODE' ? { kind: 'quick_reply' as const, text: b.text || `Copy code: ${b.example}`, payload: b.example }
+                : { kind: 'quick_reply' as const, text: b.text }),
+            }]
+          : []),
+      ],
       variables,
     };
 

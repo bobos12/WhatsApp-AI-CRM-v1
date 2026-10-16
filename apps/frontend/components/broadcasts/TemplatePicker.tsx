@@ -19,7 +19,8 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, ChevronDown, FileText, Image as ImageIcon, Search, Video, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Copy, ExternalLink, FileText, Image as ImageIcon, Phone, Reply, Search, Video, X } from 'lucide-react';
+import { templateExtras } from '../../lib/template-engine/compiler';
 import {
   CONTACT_FIELDS,
   defaultFallback,
@@ -40,6 +41,32 @@ export interface PickableTemplate {
   mediaType?: string | null;
   metaStatus?: MetaStatus;
   metaRejectedReason?: string | null;
+  /** Canonical payload — carries the footer and buttons. */
+  payload?: unknown;
+}
+
+const CHIP_ICONS = { QUICK_REPLY: Reply, URL: ExternalLink, PHONE_NUMBER: Phone, COPY_CODE: Copy } as const;
+
+/** The template's buttons as small labels, so two similar templates are told apart at a glance. */
+function ButtonChips({ payload }: { payload?: unknown }) {
+  const { buttons } = templateExtras(payload);
+  if (!buttons?.length) return null;
+  return (
+    <span className="mt-2 flex flex-wrap gap-1">
+      {buttons.slice(0, 3).map((b, i) => {
+        const Icon = CHIP_ICONS[b.type];
+        return (
+          <span key={i} dir="auto" className="inline-flex max-w-[10rem] items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-medium text-ink-2">
+            <Icon className="h-3 w-3 shrink-0 text-[#027EB5] dark:text-[#53BDEB]" aria-hidden="true" />
+            <span className="truncate">{b.type === 'COPY_CODE' ? b.example : b.text}</span>
+          </span>
+        );
+      })}
+      {buttons.length > 3 && (
+        <span className="inline-flex items-center rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-3">+{buttons.length - 3}</span>
+      )}
+    </span>
+  );
 }
 
 /** The value of the "same text for everyone" option in the source select. */
@@ -269,6 +296,7 @@ export default function TemplatePicker({
                     <span dir="auto" className="mt-1 line-clamp-2 text-xs leading-5 text-ink-3">
                       {tpl.content}
                     </span>
+                    <ButtonChips payload={tpl.payload} />
                   </span>
                 </button>
               );

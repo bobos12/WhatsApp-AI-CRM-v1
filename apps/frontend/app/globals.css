@@ -477,6 +477,17 @@ html[dir="rtl"] textarea {
   text-align: right;
   direction: rtl;
 }
+/* Phone numbers, links and fields marked dir="ltr" read left-to-right in Arabic
+   too — otherwise "+966…" renders as "966…+". */
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="url"] {
+  direction: ltr;
+}
+html[dir="rtl"] input[dir="ltr"],
+html[dir="rtl"] textarea[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
 
 /* Search input: flip icon side */
 html[dir="rtl"] .search-input-wrapper .search-icon {

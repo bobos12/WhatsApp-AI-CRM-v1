@@ -5,7 +5,13 @@ import { loadMedia } from '../../lib/media';
 import { uploadFile } from '../../lib/storage';
 import { logger } from '../../lib/logger';
 import { HttpError } from '../../auth/authorize';
-import type { CanonicalTemplate } from '../../lib/template-compiler';
+import {
+  normalizeButtons,
+  buttonProblems,
+  type CanonicalTemplate,
+  type MetaExtras,
+  type TemplateButtonDef,
+} from '../../lib/template-compiler';
 import { emitDataChanged } from '../../realtime/socket';
 
 /**
@@ -215,6 +221,41 @@ export interface BuiltTemplate {
   components: any[];
   /** Variable order that `components` was built against — persist alongside. */
   variableOrder: string[];
+  /** Footer + buttons as submitted — the snapshot sends and the chat render from. */
+  extras: MetaExtras;
+}
+
+/** Meta's BUTTONS component entry for one of our buttons. */
+function toMetaButton(b: TemplateButtonDef): any {
+  switch (b.type) {
+    case 'QUICK_REPLY': return { type: 'QUICK_REPLY', text: b.text };
+    case 'URL': return { type: 'URL', text: b.text, url: b.url, ...(b.url.includes('{{') && b.example ? { example: [b.example] } : {}) };
+    case 'PHONE_NUMBER': return { type: 'PHONE_NUMBER', text: b.text, phone_number: b.phone_number.replace(/[\s()-]/g, '') };
+    case 'COPY_CODE': return { type: 'COPY_CODE', example: b.example };
+  }
+}
+
+/** Read footer + buttons out of the components Meta returns for a template. */
+export function extrasFromComponents(components?: Array<{ type: string; text?: string; buttons?: any[] }>): MetaExtras {
+  const footer = components?.find((c) => c.type?.toUpperCase() === 'FOOTER')?.text?.trim();
+  const buttons = normalizeButtons(components?.find((c) => c.type?.toUpperCase() === 'BUTTONS')?.buttons);
+  return { ...(footer ? { footer } : {}), ...(buttons.length ? { buttons } : {}) };
+}
+
+/**
+ * Footer + buttons as Meta approved them for a stored template row. The snapshot
+ * taken at submission/sync wins over the editable payload: a template edited
+ * after approval must keep rendering — and sending — what Meta actually holds.
+ */
+export function approvedExtras(row: { payload?: any }): MetaExtras {
+  const snap = row.payload?._meta?.meta;
+  if (snap && typeof snap === 'object') {
+    const buttons = normalizeButtons(snap.buttons);
+    return { ...(snap.footer ? { footer: String(snap.footer) } : {}), ...(buttons.length ? { buttons } : {}) };
+  }
+  const buttons = normalizeButtons(row.payload?.buttons);
+  const footer = typeof row.payload?.footer?.text === 'string' ? row.payload.footer.text.trim() : '';
+  return { ...(footer ? { footer } : {}), ...(buttons.length ? { buttons } : {}) };
 }
 
 /**
@@ -273,12 +314,21 @@ export async function buildTemplateForSubmission(params: {
   }
   components.push(bodyComponent);
 
+  // ── Footer + buttons — validated here so Meta's terse rejection never reaches the tenant
+  const footer = canonical.footer?.text?.trim() || undefined;
+  const buttons = normalizeButtons(canonical.buttons);
+  const problems = buttonProblems(buttons, footer);
+  if (problems.length) throw new HttpError(400, problems[0], 'TEMPLATE_BUTTONS_INVALID');
+  if (footer) components.push({ type: 'FOOTER', text: footer });
+  if (buttons.length) components.push({ type: 'BUTTONS', buttons: buttons.map(toMetaButton) });
+
   return {
     name: toMetaTemplateName(displayName),
     language,
     category: toMetaCategory(category),
     components,
     variableOrder: order,
+    extras: { ...(footer ? { footer } : {}), ...(buttons.length ? { buttons } : {}) },
   };
 }
 
@@ -363,6 +413,7 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
         metaSyncedAt: new Date(),
         category: built.category,
         variables: built.variableOrder,
+        payload: withMetaSnapshot(row.payload, built.extras),
       },
     });
 
@@ -378,6 +429,12 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
   }
 }
 
+/** Store the approved footer/buttons inside the payload's `_meta` without touching the rest. */
+function withMetaSnapshot(payload: any, extras: MetaExtras): any {
+  const base = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  return { ...base, _meta: { ...(base._meta ?? {}), meta: extras } };
+}
+
 interface MetaTemplateRow {
   id: string;
   name: string;
@@ -391,6 +448,7 @@ interface MetaTemplateRow {
     format?: string;
     text?: string;
     example?: { header_handle?: string[] };
+    buttons?: any[];
   }>;
 }
 
@@ -430,11 +488,23 @@ async function importRemoteTemplate(r: MetaTemplateRow): Promise<void> {
   }
 
   const status = r.status?.toUpperCase() ?? null;
+  const extras = extrasFromComponents(r.components);
   await prisma.messageTemplate.create({
     data: {
       name: r.name,
       language: r.language,
       content: body,
+      // Footer and buttons live in the payload so the builder, previews and
+      // chat show the template as Meta holds it.
+      payload: {
+        name: r.name,
+        category: r.category?.toUpperCase() ?? 'GENERAL',
+        language: r.language,
+        body: { text: body },
+        ...(extras.footer ? { footer: { text: extras.footer } } : {}),
+        ...(extras.buttons ? { buttons: extras.buttons } : {}),
+        _meta: { variableNames: slots, meta: extras },
+      } as any,
       category: r.category?.toUpperCase() ?? null,
       type: media ? 'MEDIA' : 'TEXT',
       status: 'PUBLISHED',
@@ -481,7 +551,7 @@ export async function syncTemplates(
   let detached = 0;
 
   const locals = await prisma.messageTemplate.findMany({
-    select: { id: true, name: true, language: true, metaTemplateId: true, metaStatus: true },
+    select: { id: true, name: true, language: true, metaTemplateId: true, metaStatus: true, payload: true },
   });
 
   // A Meta id this WABA does not know belongs to another account (typically the
@@ -521,11 +591,16 @@ export async function syncTemplates(
     const nextStatus = r.status?.toUpperCase() ?? null;
     const nextQuality = r.quality_score?.score?.toUpperCase() ?? null;
 
-    if (local.metaStatus === nextStatus && local.metaTemplateId === r.id) continue;
+    // Meta's components are the truth for what a send carries; keep the snapshot current.
+    const extras = extrasFromComponents(r.components);
+    const snapshotStale = JSON.stringify((local.payload as any)?._meta?.meta ?? null) !== JSON.stringify(extras);
+
+    if (local.metaStatus === nextStatus && local.metaTemplateId === r.id && !snapshotStale) continue;
 
     await prisma.messageTemplate.update({
       where: { id: local.id },
       data: {
+        ...(snapshotStale ? { payload: withMetaSnapshot(local.payload, extras) } : {}),
         metaTemplateId: r.id,
         metaStatus: nextStatus,
         metaRejectedReason: nextStatus === 'REJECTED' ? r.rejected_reason ?? 'Rejected by WhatsApp' : null,
@@ -608,6 +683,36 @@ export interface TemplateSendSpec {
   bodyValues: string[];
   /** Storage ref for a media header, if the approved template has one. */
   headerMedia?: { mediaId?: string; link?: string; format: HeaderFormat; filename?: string } | null;
+  /** The approved buttons — only dynamic URLs and copy-code need a send-time parameter. */
+  buttons?: TemplateButtonDef[];
+}
+
+/**
+ * Send-time parameters for the buttons that require one. Static quick replies,
+ * links and call buttons need nothing; a URL ending in `{{1}}` needs its suffix
+ * and a copy-code button needs its code, or Meta refuses the whole message.
+ */
+/** For a URL ending in `{{1}}`, the suffix Meta's approved example implies. */
+export function urlSuffix(b: { url: string; example?: string }): string {
+  const prefix = b.url.split('{{')[0];
+  return b.example?.startsWith(prefix) ? b.example.slice(prefix.length) : b.example ?? '';
+}
+
+/** The link a customer actually opens — dynamic suffix filled in. */
+export function resolvedButtonUrl(b: { url: string; example?: string }): string {
+  return b.url.includes('{{') ? b.url.split('{{')[0] + urlSuffix(b) : b.url;
+}
+
+function buttonComponents(buttons: TemplateButtonDef[] = []): any[] {
+  const out: any[] = [];
+  buttons.forEach((b, index) => {
+    if (b.type === 'URL' && b.url.includes('{{')) {
+      out.push({ type: 'button', sub_type: 'url', index: String(index), parameters: [{ type: 'text', text: urlSuffix(b) || '-' }] });
+    } else if (b.type === 'COPY_CODE') {
+      out.push({ type: 'button', sub_type: 'copy_code', index: String(index), parameters: [{ type: 'coupon_code', coupon_code: b.example }] });
+    }
+  });
+  return out;
 }
 
 /** Build the `template` object for POST /{phone_number_id}/messages. */
@@ -641,6 +746,8 @@ export function buildTemplatePayload(spec: TemplateSendSpec): any {
       parameters: spec.bodyValues.map((v) => ({ type: 'text', text: sanitizeVariableValue(v) })),
     });
   }
+
+  components.push(...buttonComponents(spec.buttons));
 
   return {
     name: spec.name,
