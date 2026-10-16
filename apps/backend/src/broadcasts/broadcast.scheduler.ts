@@ -37,6 +37,11 @@ const BATCH_SIZE = Number(process.env.BROADCAST_SCHEDULER_BATCH ?? 50);
  */
 const MAX_CATCHUP_MS = Number(process.env.BROADCAST_MAX_CATCHUP_MS ?? 24 * 60 * 60 * 1000);
 
+const RECOVERY_EVERY_TICKS = 4;
+/** A claimed run whose job has not started within this long is considered lost. */
+const STALE_CLAIM_MS = 2 * 60_000;
+let tickCount = 0;
+
 let timer: ReturnType<typeof setInterval> | null = null;
 let ticking = false;
 
@@ -213,6 +218,12 @@ async function tick(): Promise<void> {
     // Delivery receipts and replies for recently-sent campaigns. Runs on the same
     // tick because it feeds account health, which the very next slice reads.
     await reconcileBroadcastEngagement();
+
+    // A run whose job vanished (Redis restart, a worker that died mid-claim)
+    // would otherwise sit at "Sending" until the next deploy. Checked every few
+    // ticks, and only for runs claimed long enough ago that their job has had
+    // every chance to start.
+    if (++tickCount % RECOVERY_EVERY_TICKS === 0) await recoverInterrupted(STALE_CLAIM_MS);
   } catch (error) {
     logger.error('broadcast.scheduler_tick_failed', {
       error: error instanceof Error ? error.message : String(error),
@@ -237,10 +248,14 @@ async function tick(): Promise<void> {
  * be left alone until it comes due. Only a run that was actively sending (or
  * claimed but not yet started) has a null cursor, and that is what needs rescuing.
  */
-async function recoverInterrupted(): Promise<void> {
+async function recoverInterrupted(olderThanMs = 0): Promise<void> {
   try {
     const sending = await prisma.broadcast.findMany({
-      where: { status: 'SENDING', nextBatchAt: null },
+      where: {
+        status: 'SENDING',
+        nextBatchAt: null,
+        ...(olderThanMs ? { queuedAt: { lte: new Date(Date.now() - olderThanMs) } } : {}),
+      },
       select: { id: true },
     });
     if (!sending.length) return;

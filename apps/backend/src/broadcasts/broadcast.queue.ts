@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import Queue from 'bull';
 import { prisma, prismaUnscoped } from '../lib/prisma';
 import { runWithTenant, runAsPlatform } from '../lib/tenant-context';
@@ -33,7 +34,22 @@ import { HttpError } from '../auth/authorize';
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
+/**
+ * Jobs are namespaced by the database they belong to.
+ *
+ * Two deployments pointed at one Redis (an old server left running after a
+ * move, a staging copy) would otherwise share one queue: whichever worker took
+ * a job looked the campaign up in *its own* database, found nothing, and
+ * dropped it — leaving the real campaign stuck at "Sending" forever.
+ */
+const queuePrefix = `bull-${crypto
+  .createHash('sha256')
+  .update(process.env.DATABASE_URL ?? 'local')
+  .digest('hex')
+  .slice(0, 12)}`;
+
 export const broadcastQueue = new Queue('broadcast-sends', redisUrl, {
+  prefix: queuePrefix,
   defaultJobOptions: {
     // One retry. A job that failed did so because the channel or Meta is
     // unhappy; genuine transients are already retried inside the Graph client,
