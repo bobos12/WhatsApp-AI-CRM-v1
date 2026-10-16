@@ -25,6 +25,7 @@ import {
 } from '../../../components/broadcasts/shared';
 import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 type BroadcastSortKey = 'name' | 'status' | 'recipientCount' | 'totalSent' | 'progress' | 'createdAt';
 
@@ -163,11 +164,12 @@ export default function BroadcastsPage() {
       const data = await api.get('/api/broadcasts');
       setBroadcasts(Array.isArray(data) ? data : []);
     } catch {
-      setBroadcasts([]);
+      // Keep what is on screen; a live refresh that fails must not blank the list.
     } finally {
       setLoading(false);
     }
   }, []);
+  useLiveData('broadcasts', fetchBroadcasts);
 
   useEffect(() => { fetchBroadcasts(); }, [fetchBroadcasts]);
 

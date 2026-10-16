@@ -102,7 +102,7 @@ export class TasksService {
     const id = crypto.randomUUID();
     await prisma.$executeRawUnsafe(
       `INSERT INTO "Task" (id, "tenantId", "teamId", "contactId", "conversationId", title, description, "dueDate", status, priority, "assigneeId", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', $9::"TaskPriority", $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       id,
       currentTenantId(),
       data.teamId ?? null,
@@ -147,8 +147,8 @@ export class TasksService {
            "dueDate"      = COALESCE($5, "dueDate"),
            "contactId"    = COALESCE($6, "contactId"),
            "assigneeId"   = COALESCE($7, "assigneeId"),
-           status         = COALESCE($8, status),
-           priority       = COALESCE($9, priority),
+           status         = COALESCE($8::"TaskStatus", status),
+           priority       = COALESCE($9::"TaskPriority", priority),
            "conversationId" = COALESCE($10, "conversationId"),
            "updatedAt"    = CURRENT_TIMESTAMP
        WHERE id = $1 AND "tenantId" = $2`,

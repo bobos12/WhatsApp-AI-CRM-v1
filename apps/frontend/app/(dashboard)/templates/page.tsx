@@ -16,6 +16,7 @@ import { isCanonicalPayload, TEMPLATE_CATEGORIES } from '../../../lib/template-e
 import SendTemplateDialog from '../../../components/templates/SendTemplateDialog';
 import { ApprovalBadge, describeApproval, type MetaStatus } from '../../../components/templates/ApprovalStatus';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -219,11 +220,12 @@ export default function TemplatesPage() {
       const data = await api.get('/api/templates');
       setTemplates(Array.isArray(data) ? data : []);
     } catch {
-      setTemplates([]);
+      // Keep what is on screen; a live refresh that fails must not blank the list.
     } finally {
       setLoading(false);
     }
   }, []);
+  useLiveData('templates', fetchTemplates);
 
   useEffect(() => {
     if (status === 'authenticated') fetchTemplates();

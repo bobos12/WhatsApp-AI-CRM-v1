@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import socket from '../lib/socket';
+import { useLiveData } from './useLiveData';
 
 export type WaStatus = 'connected' | 'disconnected' | 'connecting';
 
@@ -95,6 +96,7 @@ export function useWhatsAppConnect(enabled: boolean): WhatsAppConnectState {
       if (seq === requestSeq.current) setRefreshing(false);
     }
   }, [enabled]);
+  useLiveData(['channel', 'whatsapp'], () => { if (enabled) void refresh(); });
 
   useEffect(() => {
     if (!enabled) return;

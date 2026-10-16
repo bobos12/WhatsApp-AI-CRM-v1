@@ -20,6 +20,7 @@ import {
   scoreColor, localizedText, LeadAvatar, STATUS_CFG,
 } from '../../../components/leads/lead-ui';
 import { peek, remember } from '@/lib/api-cache';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 // Sidebar/tab views → underlying canonical statuses (reconciled 9-status set).
 const TABS: Array<{ key: string; statuses: LeadStatus[] | null }> = [
@@ -80,6 +81,7 @@ export default function LeadsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useLiveData(['leads', 'contacts', 'conversations'], fetchAll);
 
   // Run once on mount.
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

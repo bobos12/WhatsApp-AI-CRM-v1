@@ -6,6 +6,7 @@ import { uploadFile } from '../../lib/storage';
 import { logger } from '../../lib/logger';
 import { HttpError } from '../../auth/authorize';
 import type { CanonicalTemplate } from '../../lib/template-compiler';
+import { emitDataChanged } from '../../realtime/socket';
 
 /**
  * WhatsApp message templates on the Cloud API.
@@ -536,6 +537,7 @@ export async function syncTemplates(
     updated++;
   }
 
+  if (updated || imported || detached) emitDataChanged('templates');
   return { matched, updated, imported, detached, synced: updated + imported };
 }
 
@@ -580,6 +582,7 @@ export async function applyTemplateStatusUpdate(value: {
   });
 
   logger.info('meta.template_status_applied', { templateId: local.id, event });
+  emitDataChanged('templates', local.id);
 }
 
 /** Delete a template at Meta. Local rows are kept — history should survive. */

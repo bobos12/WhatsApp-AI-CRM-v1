@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
+import { useLiveData } from '../../hooks/useLiveData';
 
 export interface LiveStatus {
   id: string;
@@ -130,6 +131,7 @@ export default function CampaignMonitor({
       /* transient — the next poll retries */
     }
   }, [broadcastId]);
+  useLiveData('broadcasts', load, { id: broadcastId, debounceMs: 1_000 });
 
   useEffect(() => {
     void load();

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 interface SavedReply {
   id: string;
@@ -35,6 +36,7 @@ export default function SavedRepliesPage() {
       setLoading(false);
     }
   }, []);
+  useLiveData('saved-replies', fetchReplies);
 
   useEffect(() => {
     if (status === 'authenticated') {

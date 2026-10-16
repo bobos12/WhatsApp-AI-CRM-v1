@@ -43,6 +43,7 @@ import {
 import CampaignMonitor from '../../../../components/broadcasts/CampaignMonitor';
 import SafetyReport from '../../../../components/broadcasts/SafetyReport';
 import ConfirmRiskDialog from '../../../../components/broadcasts/ConfirmRiskDialog';
+import { useLiveData } from '../../../../hooks/useLiveData';
 
 interface RecipientPage {
   rows: BroadcastRecipient[];
@@ -251,6 +252,7 @@ export default function BroadcastDetailPage() {
       setLoading(false);
     }
   }, [id]);
+  useLiveData('broadcasts', fetchBroadcast, { id });
 
   useEffect(() => { fetchBroadcast(); }, [fetchBroadcast]);
 
@@ -316,6 +318,7 @@ export default function BroadcastDetailPage() {
       setRecipientsLoading(false);
     }
   }, [id, page, pageSize, statusFilter, debouncedSearch]);
+  useLiveData('broadcasts', fetchRecipients, { id });
 
   useEffect(() => { fetchRecipients(); }, [fetchRecipients]);
 

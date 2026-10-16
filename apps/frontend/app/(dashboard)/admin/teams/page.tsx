@@ -9,6 +9,7 @@ import { UsersRound, Plus, Pencil, Trash2, ShieldCheck, UserMinus, UserPlus } fr
 import { api } from '../../../../lib/api';
 import { Modal } from '../../../../components/ui/modal';
 import { isManager, roleLabel } from '../../../../lib/roles';
+import { useLiveData } from '../../../../hooks/useLiveData';
 
 type Member = { id: string; name: string; email: string; role: string };
 type Team   = { id: string; name: string; autoAssign: boolean; owner: { id: string; name: string }; members: Member[] };
@@ -44,6 +45,7 @@ export default function AdminTeamsPage() {
     setTeams(Array.isArray(teamsData) ? teamsData : []);
     setAllUsers(Array.isArray(usersData) ? usersData : []);
   }, []);
+  useLiveData(['teams', 'users'], loadData);
 
   useEffect(() => { loadData(); }, [loadData]);
 

@@ -4,6 +4,7 @@ import { getTenantId, requireTenantId, runAsPlatform } from '../lib/tenant-conte
 import { decryptSecret, encryptSecret, maskSecret, tryDecryptSecret } from '../lib/crypto';
 import { logger } from '../lib/logger';
 import { HttpError } from '../auth/authorize';
+import { emitDataChanged } from '../realtime/socket';
 
 /**
  * Per-tenant WhatsApp Cloud API configuration.
@@ -330,6 +331,7 @@ export async function recordSync(
     },
   });
   invalidateChannel(tenantId);
+  emitDataChanged('channel', null, tenantId);
 }
 
 /** Forget a tenant's Cloud API credentials and fall back to Baileys. */

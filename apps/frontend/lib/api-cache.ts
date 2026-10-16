@@ -1,3 +1,4 @@
+import socket from './socket';
 /**
  * Two small caches that make the CRM feel like an app instead of a website.
  *
@@ -37,6 +38,13 @@ export async function cachedGet<T>(url: string, fetcher: (url: string) => Promis
 /** Called after any write: whatever reference data the user just changed must be refetched. */
 export function invalidateReference() {
   reference.clear();
+}
+
+// A change made by anyone else (a colleague adds a saved reply, Meta approves a
+// template) makes the cached reference lists stale too — drop them so the next
+// read fetches fresh data.
+if (typeof window !== 'undefined') {
+  socket.on('data:changed', () => reference.clear());
 }
 
 export function peek<T>(key: string): T | undefined {

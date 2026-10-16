@@ -122,3 +122,31 @@ export function emitToUser(userId: string, event: string, payload: unknown) {
 export function getRealtimeServer() {
   return socketServer;
 }
+
+/**
+ * "Something of this kind changed — refetch it if it's on your screen."
+ *
+ * The one live signal every screen understands. It carries no data, only the
+ * resource name (and id when known), so it is safe to send to the whole tenant:
+ * each screen refetches through the normal API, which applies that user's
+ * permissions. Specific events (message:new, broadcast:progress…) still exist
+ * for the screens that patch state in place.
+ */
+const pendingChanges = new Map<string, ReturnType<typeof setTimeout>>();
+/** Bursts (a campaign's thousand delivery receipts) collapse into one signal per window. */
+const CHANGE_COALESCE_MS = 400;
+
+export function emitDataChanged(resource: string, id?: string | null, tenantId?: string | null) {
+  if (!socketServer) return;
+  const tenant = tenantId ?? getTenantId();
+  if (!tenant) return;
+  const key = `${tenant}|${resource}|${id ?? ''}`;
+  if (pendingChanges.has(key)) return;
+  pendingChanges.set(
+    key,
+    setTimeout(() => {
+      pendingChanges.delete(key);
+      socketServer?.to(`tenant:${tenant}`).emit('data:changed', { resource, id: id ?? null });
+    }, CHANGE_COALESCE_MS),
+  );
+}

@@ -3,7 +3,7 @@ import { MessageType, MsgStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import { runWithTenant } from '../../lib/tenant-context';
-import { emitRealtime } from '../../realtime/socket';
+import { emitDataChanged, emitRealtime } from '../../realtime/socket';
 import { processIncomingMessage } from '../../workflow/inbound-workflow';
 import { findTenantByPhoneNumberId, recordSync, type ResolvedChannel } from '../channel.service';
 import { downloadMedia } from './media';
@@ -440,6 +440,7 @@ async function applyCampaignStatus(
     select: { id: true, broadcastId: true, status: true, contactId: true },
   });
   if (!recipient) return;
+  emitDataChanged('broadcasts', recipient.broadcastId);
 
   if (next === MsgStatus.FAILED) {
     const code = errorCode ?? -1;

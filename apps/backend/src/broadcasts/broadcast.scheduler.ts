@@ -3,6 +3,7 @@ import { logger } from '../lib/logger';
 import { emitRealtime } from '../realtime/socket';
 import { broadcastQueue, ensureBroadcastWorker } from './broadcast.queue';
 import { reconcileBroadcastEngagement } from './engagement.service';
+import { emitDataChanged } from '../realtime/socket';
 
 /**
  * ─── Scheduled broadcast dispatch ────────────────────────────────────────────
@@ -62,6 +63,7 @@ export async function claimAndEnqueue(
   });
 
   if (claimed.count !== 1) return false;
+  emitDataChanged('broadcasts', broadcastId);
 
   try {
     await broadcastQueue.add({ broadcastId });
@@ -98,6 +100,7 @@ async function claimAndEnqueueBatch(broadcastId: string, now: Date): Promise<boo
     data: { nextBatchAt: null, queuedAt: now },
   });
   if (claimed.count !== 1) return false;
+  emitDataChanged('broadcasts', broadcastId);
 
   try {
     await broadcastQueue.add({ broadcastId });
@@ -127,6 +130,7 @@ async function expireMissedBroadcast(broadcast: { id: string; teamId: string | n
     data: { status: 'FAILED', lastError: message },
   });
   if (updated.count !== 1) return;
+  emitDataChanged('broadcasts', broadcast.id);
 
   logger.warn('broadcast.missed_schedule_window', {
     broadcastId: broadcast.id,

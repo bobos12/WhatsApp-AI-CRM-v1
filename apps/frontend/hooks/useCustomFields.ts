@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import type { CustomFieldDefinition } from '../lib/custom-fields';
+import { useLiveData } from './useLiveData';
 
 /**
  * Custom-field definitions are read on nearly every contact surface (form,
@@ -52,6 +53,7 @@ export function useCustomFields(options: { includeInactive?: boolean } = {}) {
       setLoading(false);
     }
   }, [includeInactive]);
+  useLiveData('custom-fields', load);
 
   useEffect(() => {
     subscribers.add(setDefinitions);

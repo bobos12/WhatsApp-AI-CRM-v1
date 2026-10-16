@@ -7,6 +7,7 @@ import RuleCard from '../../../components/automations/RuleCard';
 import RuleForm from '../../../components/automations/RuleForm';
 import FlowBuilder from '../../../components/automations/FlowBuilder';
 import { api } from '../../../lib/api';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 interface AutomationRule {
   id: string;
@@ -57,15 +58,17 @@ export default function AutomationsPage() {
     try {
       const data = await api.get('/api/automations');
       setRules(Array.isArray(data) ? data : []);
-    } catch { setRules([]); }
+    } catch { /* keep what is on screen */ }
   }, []);
+  useLiveData('automations', fetchRules);
 
   const fetchFlows = useCallback(async () => {
     try {
       const data = await api.get('/api/automations/flows');
       setFlows(Array.isArray(data) ? data : []);
-    } catch { setFlows([]); }
+    } catch { /* keep what is on screen */ }
   }, []);
+  useLiveData('automations', fetchFlows);
 
   useEffect(() => { fetchRules(); fetchFlows(); }, [fetchRules, fetchFlows]);
 

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { liveChanges } from './realtime/live-changes.middleware';
 import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -173,6 +174,8 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down and try again later.' },
 });
 app.use('/api', apiLimiter);
+// Every successful change is announced to the tenant, so open screens update live.
+app.use('/api', liveChanges);
 
 // Stricter limit on authentication endpoints to blunt credential brute-forcing.
 // Successful logins are not counted so normal usage is unaffected.

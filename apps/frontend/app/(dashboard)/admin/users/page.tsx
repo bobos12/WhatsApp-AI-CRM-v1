@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import {
   UserCog, Plus, Pencil, Trash2, ShieldCheck, Search,
-  SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, X,
+  SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, X, Check,
 } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { TablePagination } from '../../../../components/ui/TablePagination';
@@ -24,6 +24,7 @@ import {
   isManager,
 } from '../../../../lib/roles';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../../hooks/useLiveData';
 
 type UserSortKey = 'name' | 'email' | 'role' | 'createdAt';
 
@@ -129,6 +130,7 @@ export default function AdminUsersPage() {
       setFormData(emptyForm);
     }
   }, [editing, showForm]);
+  useLiveData(['users', 'teams'], loadData);
 
   // ─── Derived data ─────────────────────────────────────────────────────────
 
@@ -297,6 +299,8 @@ export default function AdminUsersPage() {
     setPage(1);
   };
 
+  const roleName = (r: SimpleRole) => t(`users.roles.${r}`, { defaultValue: SIMPLE_ROLE_LABEL[r] });
+
   if (status === 'loading' || !isManager(role)) return null;
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -321,16 +325,16 @@ export default function AdminUsersPage() {
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-raised px-5 py-3.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-raised px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5">
           {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" />
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" />
             <input
               type="text"
               placeholder={t('users.searchPlaceholder')}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="field w-full pl-10 pr-4"
+              className="field h-10 w-full ps-10 pe-3"
             />
           </div>
 
@@ -339,14 +343,14 @@ export default function AdminUsersPage() {
             type="button"
             onClick={() => setShowFilters((f) => !f)}
             className={cn(
-              'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors',
+              'inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm transition-colors',
               showFilters || advancedFilterCount > 0
                 ? 'border-brand/40 bg-brand/10 text-brand'
                 : 'border-line bg-white dark:bg-white/5 text-ink-3 hover:bg-gray-50 dark:hover:bg-white/10',
             )}
           >
             <SlidersHorizontal className="h-4 w-4" />
-            {t('common:actions.filter')}
+            <span className="hidden sm:inline">{t('common:actions.filter')}</span>
             {advancedFilterCount > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">
                 {advancedFilterCount}
@@ -355,18 +359,18 @@ export default function AdminUsersPage() {
           </button>
 
           {/* Results + selection count */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="flex w-full items-center gap-3 sm:ms-auto sm:w-auto">
             <span className="text-xs text-ink-3">
-              {totalCount} {totalCount === 1 ? 'user' : 'users'}
+              {t('users.count', { count: totalCount })}
               {selectedIds.size > 0 && (
-                <span className="ml-2 font-medium text-brand">· {selectedIds.size} selected</span>
+                <span className="ms-2 font-medium text-brand">· {t('users.selectedCount', { count: selectedIds.size })}</span>
               )}
             </span>
             {selectedIds.size > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="text-xs text-ink-3 hover:text-ink transition-colors"
+                className="ms-auto text-xs font-medium text-ink-3 transition-colors hover:text-ink sm:ms-0"
               >
                 {t('users.bulk.clearSelection')}
               </button>
@@ -376,18 +380,18 @@ export default function AdminUsersPage() {
 
         {/* Advanced filter panel */}
         {showFilters && (
-          <div className="border-b border-line bg-gray-50 dark:bg-canvas px-5 py-4">
-            <div className="flex flex-wrap items-end gap-4">
+          <div className="border-b border-line bg-canvas px-3 py-4 sm:px-5">
+            <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap sm:gap-4">
               <div>
                 <p className="mb-1.5 text-xs font-medium text-ink-3">{t('users.filters.role')}</p>
                 <select
                   value={filterRole}
                   onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
-                  className="field w-auto"
+                  className="field w-full sm:w-auto"
                 >
                   <option value="">{t('users.filters.allRoles')}</option>
                   {SIMPLE_ROLES.map((r) => (
-                    <option key={r} value={r}>{SIMPLE_ROLE_LABEL[r]}</option>
+                    <option key={r} value={r}>{roleName(r)}</option>
                   ))}
                 </select>
               </div>
@@ -396,7 +400,7 @@ export default function AdminUsersPage() {
                 <select
                   value={filterTeam}
                   onChange={(e) => { setFilterTeam(e.target.value); setPage(1); }}
-                  className="field w-auto"
+                  className="field w-full sm:w-auto"
                 >
                   <option value="">{t('users.filters.allTeams')}</option>
                   {teams.map((team) => (
@@ -417,7 +421,89 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* ── Phones: one row per person, tap to edit ── */}
+        <ul className="divide-y divide-line sm:hidden">
+          {loading ? (
+            [...Array(4)].map((_, i) => (
+              <li key={i} className="flex items-center gap-3 px-3 py-3.5">
+                <div className="skeleton h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-3.5 w-32 rounded" />
+                  <div className="skeleton h-3 w-44 rounded" />
+                </div>
+              </li>
+            ))
+          ) : paginatedUsers.length === 0 ? (
+            <li className="px-4 py-14 text-center">
+              <UserCog className="mx-auto mb-3 h-8 w-8 text-ink-4" />
+              <p className="text-sm text-ink-3">
+                {search || advancedFilterCount > 0 ? t('users.noUsersFiltered') : t('users.noUsers')}
+              </p>
+            </li>
+          ) : (
+            paginatedUsers.map((u) => {
+              const sel = selectedIds.has(u.id);
+              const r = toSimpleRole(u.role);
+              return (
+                <li key={u.id} className={cn('relative transition-colors', sel && 'bg-brand/[0.06]')}>
+                  {confirmDeleteId === u.id ? (
+                    <div className="flex items-center gap-2 px-3 py-3.5">
+                      <span className="flex-1 truncate text-sm text-red-500 dark:text-red-400">{t('users.deleteConfirm.inline')} <b className="font-semibold">{u.name}</b></span>
+                      <button type="button" onClick={() => handleDelete(u.id)} className="btn btn-sm bg-red-600 text-white hover:bg-red-700">
+                        {t('users.deleteConfirm.yes')}
+                      </button>
+                      <button type="button" onClick={() => setConfirmDeleteId(null)} className="btn btn-secondary btn-sm">
+                        {t('users.deleteConfirm.no')}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 py-3 pe-1 ps-3">
+                      {/* Avatar doubles as the selection control, like WhatsApp's chat list */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(u.id)}
+                        aria-pressed={sel}
+                        aria-label={u.name}
+                        className={cn(
+                          'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                          sel ? 'bg-brand text-brand-fg' : 'bg-brand/15 text-brand',
+                        )}
+                      >
+                        {sel ? <Check className="h-5 w-5" strokeWidth={3} /> : u.name.charAt(0).toUpperCase()}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (selectedIds.size > 0) toggleSelect(u.id); else { setEditing(u); setShowForm(true); } }}
+                        className="min-w-0 flex-1 text-start"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span dir="auto" className="truncate text-[15px] font-medium text-ink">{u.name}</span>
+                          <span className={cn('shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', SIMPLE_ROLE_BADGE[r])}>
+                            {roleName(r)}
+                          </span>
+                        </span>
+                        <span dir="ltr" className="mt-0.5 block truncate text-start text-[13px] text-ink-3">{u.email}</span>
+                        <span className="mt-0.5 block truncate text-xs text-ink-4">
+                          {u.team?.name ?? t('users.noTeam')} · {t('users.joined', { date: new Date(u.createdAt).toLocaleDateString() })}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(u.id)}
+                        aria-label={t('common:actions.delete')}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-4 transition-colors hover:bg-red-500/10 hover:text-red-500 active:bg-red-500/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })
+          )}
+        </ul>
+
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full">
             <thead>
               <tr className="border-b border-line bg-raised">
@@ -506,8 +592,8 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-5 py-3.5 text-sm text-ink-3">{u.email}</td>
                     <td className="px-5 py-3.5">
-                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', SIMPLE_ROLE_BADGE[toSimpleRole(u.role)])}>
-                        {SIMPLE_ROLE_LABEL[toSimpleRole(u.role)]}
+                      <span className={cn('whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold', SIMPLE_ROLE_BADGE[toSimpleRole(u.role)])}>
+                        {roleName(toSimpleRole(u.role))}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-ink-3">
@@ -536,7 +622,7 @@ export default function AdminUsersPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
                           <button
                             type="button"
                             onClick={() => { setEditing(u); setShowForm(true); }}
@@ -572,14 +658,14 @@ export default function AdminUsersPage() {
 
       {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[var(--bottom-nav-space)] sm:bottom-6 left-1/2 z-40 -translate-x-1/2 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-raised px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-          <span className="text-sm font-medium text-white">
-            {selectedIds.size} {selectedIds.size === 1 ? 'user' : 'users'} selected
+        <div className="pop-enter fixed inset-x-3 bottom-[calc(var(--bottom-nav-space)+0.75rem)] z-40 flex items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2.5 shadow-pop sm:inset-x-auto sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:gap-3 sm:px-4">
+          <span className="me-auto text-sm font-semibold text-ink sm:me-0">
+            {t('users.selectedCount', { count: selectedIds.size })}
           </span>
-          <div className="h-5 w-px bg-white/15" />
+          <div className="hidden h-5 w-px bg-line sm:block" />
           {showBulkConfirm ? (
             <>
-              <span className="text-xs text-red-300">{t('users.bulk.deleteConfirm', { count: selectedIds.size })}</span>
+              <span className="text-xs font-medium text-red-500 dark:text-red-400">{t('users.bulk.deleteConfirm', { count: selectedIds.size })}</span>
               <button
                 type="button"
                 onClick={handleBulkDelete}
@@ -591,7 +677,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setShowBulkConfirm(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 {t('users.bulk.cancel')}
               </button>
@@ -601,14 +687,14 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setShowBulkConfirm(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition-colors"
+                className="btn btn-sm inline-flex bg-red-600 text-white hover:bg-red-700"
               >
                 <Trash2 className="h-3.5 w-3.5" /> {t('users.bulk.delete')}
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedIds(new Set())}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-ink-3 hover:bg-white/10 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 {t('users.bulk.clearSelection')}
               </button>

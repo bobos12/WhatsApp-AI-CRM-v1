@@ -10,6 +10,7 @@ import { buildPersonalizationVars } from './personalization';
 import { toMetaTemplateName } from '../providers/meta/templates';
 import { asMetaError, type MetaApiError } from '../providers/meta/graph';
 import { HttpError } from '../auth/authorize';
+import { emitDataChanged } from '../realtime/socket';
 
 /**
  * Broadcast delivery worker.
@@ -427,6 +428,7 @@ async function runSlice(broadcastId: string) {
     }
 
     emitRealtime('broadcast:progress', { broadcastId, sent, failed }, teamId);
+    emitDataChanged('broadcasts', broadcastId);
 
     if (SEND_GAP_MS > 0) await sleep(SEND_GAP_MS);
   }
@@ -508,6 +510,7 @@ async function parkUntil(
   if (parked.count > 0) {
     logger.info('broadcast.parked', { broadcastId, reason, resumeAt: at.toISOString() });
     emitRealtime('broadcast:parked', { broadcastId, reason, resumeAt: at.toISOString() }, teamId);
+    emitDataChanged('broadcasts', broadcastId);
   }
 }
 
@@ -532,6 +535,7 @@ async function pauseForReview(broadcastId: string, teamId: string | undefined, r
   if (paused.count > 0) {
     logger.warn('broadcast.auto_paused', { broadcastId, reason });
     emitRealtime('broadcast:parked', { broadcastId, reason: 'PAUSED', message: reason }, teamId);
+    emitDataChanged('broadcasts', broadcastId);
   }
 }
 
@@ -559,6 +563,7 @@ async function finishCampaign(broadcastId: string, teamId: string | undefined, r
 
   logger.info('broadcast.completed', { broadcastId, sent, failed, reason });
   emitRealtime('broadcast:complete', { broadcastId, sent, failed }, teamId);
+  emitDataChanged('broadcasts', broadcastId);
 
   return { broadcastId, sent, failed, completed: true };
 }

@@ -32,6 +32,17 @@ const EVENT_SECTIONS: Record<string, StatsSection[]> = {
   'broadcast:complete': ['overview', 'series'],
 };
 
+/** `data:changed` resources → the dashboard sections built from them. */
+const RESOURCE_SECTIONS: Record<string, StatsSection[]> = {
+  contacts: ['overview'],
+  leads: ['overview'],
+  conversations: ['overview', 'agents'],
+  deals: ['pipeline'],
+  tasks: ['overview'],
+  users: ['agents'],
+  teams: ['agents'],
+};
+
 /** Long enough to swallow a burst of inbound messages, short enough to feel live. */
 const DEBOUNCE_MS = 800;
 
@@ -89,6 +100,13 @@ export function useLiveStats(sections: StatsSection[]) {
       socket.on(event, handler);
       listeners.push([event, handler]);
     }
+
+    const onDataChanged = (event: { resource?: string }) => {
+      const targets = event?.resource ? RESOURCE_SECTIONS[event.resource] : undefined;
+      if (targets) invalidate(targets);
+    };
+    socket.on('data:changed', onDataChanged);
+    listeners.push(['data:changed', onDataChanged as (...args: unknown[]) => void]);
 
     const onReconnect = () => { void refresh(mySections, { force: true }); };
     socket.on('connect', onReconnect);

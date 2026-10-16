@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import { formatPhone } from '../../../lib/phone';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 interface Tag {
   id: string;
@@ -58,6 +59,7 @@ export default function TagsPage() {
       setLoading(false);
     }
   }, []);
+  useLiveData(['tags', 'contacts'], fetchData);
 
   useEffect(() => {
     if (status === 'authenticated') void fetchData();

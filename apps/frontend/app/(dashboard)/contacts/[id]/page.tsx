@@ -16,6 +16,7 @@ import { useDirection } from '../../../../hooks/useDirection';
 import ContactTimeline from '../../../../components/contacts/ContactTimeline';
 import ContactTagSelector from '../../../../components/contacts/ContactTagSelector';
 import Avatar from '../../../../components/ui/Avatar';
+import { useLiveData } from '../../../../hooks/useLiveData';
 
 interface Contact {
   id: string;
@@ -108,6 +109,7 @@ export default function ContactProfilePage() {
       setLoading(false);
     }
   }, [contactId, t]);
+  useLiveData(['contacts', 'deals', 'tasks', 'tags', 'conversations'], fetchDetails);
 
   useEffect(() => { fetchDetails(); }, [fetchDetails]);
 

@@ -17,6 +17,7 @@ import { PageHeader } from '../../../components/ui/page';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import Avatar from '../../../components/ui/Avatar';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 type Stage = 'NEW' | 'INTERESTED' | 'NEGOTIATION' | 'CLOSED';
 
@@ -173,9 +174,7 @@ export default function DealsPage() {
 
   const presetContactId = searchParams.get('contactId');
 
-  // Initial load
-  useEffect(() => {
-    (async () => {
+  const loadAll = useCallback(async (initial = false) => {
       try {
         const [dealData, contactData, agentData] = await Promise.all([
           api.get('/api/deals'),
@@ -186,13 +185,16 @@ export default function DealsPage() {
         setContacts(Array.isArray(contactData) ? contactData : []);
         setMembers(Array.isArray(agentData) ? agentData : []);
       } catch (err) {
-        toastError(err instanceof Error ? err.message : t('toast.loadFailed'));
-        setDeals([]);
+        // Only the first load reports a failure; a background refresh keeps what is shown.
+        if (initial) toastError(err instanceof Error ? err.message : t('toast.loadFailed'));
       } finally {
         setLoading(false);
       }
-    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initial load
+  useEffect(() => { void loadAll(true); }, [loadAll]);
+  useLiveData(['deals', 'contacts', 'users', 'teams'], loadAll);
 
   // Open form with preset contact when navigating from chat window
   useEffect(() => {

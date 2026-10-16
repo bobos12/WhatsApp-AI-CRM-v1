@@ -17,6 +17,7 @@ import { PageHeader } from '../../../components/ui/page';
 import { useSocket } from '../../../hooks/useSocket';
 import { useToast } from '../../../hooks/useToast';
 import { useRemembered } from '@/hooks/useRemembered';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 type TaskStatus   = 'OPEN' | 'IN_PROGRESS' | 'DONE';
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -154,6 +155,7 @@ export default function TasksPage() {
     if (!presetContactId || editingTask) return;
     setFormData((cur) => ({ ...cur, contactId: presetContactId }));
   }, [editingTask, presetContactId]);
+  useLiveData('tasks', loadAll);
 
   useEffect(() => {
     if (presetContactId && !editingTask) setShowForm(true);

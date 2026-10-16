@@ -34,6 +34,7 @@ import { cn } from '../../../lib/utils';
 import { AnimatePresence, motion } from 'motion/react';
 import { PageHeader, SearchField } from '../../../components/ui/page';
 import { peek, remember } from '@/lib/api-cache';
+import { useLiveData } from '../../../hooks/useLiveData';
 
 interface ContactTagRef {
   tag: { id: string; name: string; color: string };
@@ -179,6 +180,7 @@ export default function ContactsPage() {
       // Keep what's on screen rather than blanking the list on a dropped request.
     }
   }, [search, tagFilter, filterQuery]);
+  useLiveData(['contacts', 'tags'], fetchContacts);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
