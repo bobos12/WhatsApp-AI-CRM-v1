@@ -224,9 +224,21 @@ function FindingRow({
 
   // Findings arrive in English from the server; render them in the user's
   // language when there is a translation for the key, with the server's values.
-  const { t } = useTranslation('broadcasts');
+  const { t, i18n } = useTranslation('broadcasts');
   const base = `safety.findings.${finding.key.split(':')[0]}`;
-  const params = finding.params ?? {};
+  const params: Record<string, string | number> = { ...(finding.params ?? {}) };
+  // "SA:10,EG:2" → "Saudi Arabia 10, Egypt 2" in the reader's language.
+  if (typeof params.countries === 'string') {
+    let names: Intl.DisplayNames | null = null;
+    try { names = new Intl.DisplayNames([i18n.language], { type: 'region' }); } catch { /* old browser */ }
+    params.breakdown = params.countries
+      .split(',')
+      .map((pair) => {
+        const [code, n] = pair.split(':');
+        return `${(code !== '??' && names?.of(code)) || code} ${Number(n).toLocaleString(i18n.language)}`;
+      })
+      .join(i18n.language.startsWith('ar') ? '، ' : ', ');
+  }
   const label = t(`${base}.label`, { ...params, defaultValue: finding.label });
   const detail = t(
     [`${base}.detail_${String(params.status ?? '')}`, `${base}.detail`],

@@ -61,7 +61,7 @@
     "reasonDisconnected": "WhatsApp dropped offline part-way through the send",
     "reasonNotOnWhatsapp": "Some numbers don't have a WhatsApp account",
     "reasonWarmup": "Your number hit its daily warm-up limit — new numbers are throttled to avoid bans",
-    "reasonInvalid": "A number wasn't in full international format, e.g. +9665XXXXXXXX",
+    "reasonInvalid": "A number couldn't be read as a phone number. Check it has all its digits, e.g. 05XXXXXXXX or +9665XXXXXXXX",
     "tip": "Keep WhatsApp connected while broadcasts run, and make sure numbers are valid and on WhatsApp."
   },
   "form": {
@@ -146,7 +146,7 @@
     "filtering": "Applying filters…",
     "filterMatches": "match",
     "addManually": "Add numbers manually",
-    "manualHint": "One number per line · international format",
+    "manualHint": "One number per line · any format (05…, +966…, +20…, +971…). Numbers without a country code are read as Saudi.",
     "resolvedAudience": "Resolved audience",
     "recipientSingular": "recipient",
     "recipientPlural": "recipients",
@@ -488,6 +488,11 @@
       "quality_rating_low": {
         "label": "WhatsApp rates your number’s quality as {{rating}}",
         "detail": "People have been blocking or reporting your messages. Sending more marketing now could make Meta lower your daily limit."
+      },
+      "country_assumed": {
+        "label_one": "1 number was saved without a country code",
+        "label_other": "{{count}} numbers were saved without a country code",
+        "detail": "They were read as: {{breakdown}}. If any belong to another country, add its code to the contact (for example +971 for UAE, +20 for Egypt)."
       }
     },
     "limitUnknown": "Not reported by Meta yet"

@@ -1,47 +1,95 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
-const DEFAULT_REGION = (process.env.WA_DEFAULT_REGION || process.env.DEFAULT_COUNTRY_CODE || 'EG').toUpperCase();
+// Saudi Arabia unless configured: most customers save numbers locally as
+// 05xxxxxxxx, and reading those as another country would message a stranger.
+const DEFAULT_REGION = (process.env.WA_DEFAULT_REGION || process.env.DEFAULT_COUNTRY_CODE || 'SA').toUpperCase();
+
+/**
+ * Countries tried, in order, for a number saved without its country code. The
+ * default region always goes first. A local number valid in several of these
+ * (UAE and Saudi mobiles both start 05…) is read as the first — which is why
+ * pre-flight lists every number that was read this way before anything is sent.
+ */
+const LOCAL_FALLBACKS = [
+  'SA', 'EG', 'AE', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'IQ', 'SY', 'YE', 'PS', 'SD',
+  'MA', 'DZ', 'TN', 'LY', 'TR', 'PK', 'IN', 'BD', 'PH', 'ID', 'GB', 'US',
+];
+
+export interface PhoneReading {
+  /** +<country><number> */
+  e164: string;
+  /** ISO country, e.g. SA, EG, AE. */
+  country: string | null;
+  /**
+   * True when the input carried no country code (+ or 00) and the country was
+   * inferred. Such numbers are reported in pre-flight so a wrong guess is seen
+   * before anyone is messaged.
+   */
+  assumed: boolean;
+}
+
+const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
+
+/** Arabic-Indic and Persian digits → 0-9; full-width plus → +. */
+function westernize(text: string): string {
+  return text
+    .replace(ARABIC_DIGITS, (d) => String((d.charCodeAt(0) & 0xf) % 10))
+    .replace(/＋/g, '+');
+}
+
+function tryParse(text: string, region?: string) {
+  const parsed = parsePhoneNumberFromString(text, region as any);
+  return parsed?.isValid() ? parsed : null;
+}
+
+/**
+ * Read any phone number the way a person would.
+ *
+ *  • With a country code (+966…, 00971…): exactly as written, any country.
+ *    A number written with + is never re-interpreted as another country.
+ *  • Country code without + (966…, 201…): read as international.
+ *  • Local (05…, 01…, 5…): the default country first, then common ones.
+ */
+export function readPhone(input: string, defaultCountry = DEFAULT_REGION): PhoneReading | null {
+  const raw = westernize(String(input || '').trim());
+  if (!raw || raw.includes('@g.us') || raw.includes('@broadcast')) return null;
+
+  const hasPlus = raw.replace(/[\s()\-.]/g, '').startsWith('+');
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 6 || digits.length > 15 + 2) return null;
+
+  // Written with an international prefix: no guessing.
+  if (hasPlus || digits.startsWith('00')) {
+    const international = tryParse('+' + (hasPlus ? digits : digits.slice(2)));
+    return international ? { e164: international.number, country: international.country ?? null, assumed: false } : null;
+  }
+
+  const regions = [defaultCountry, ...LOCAL_FALLBACKS.filter((r) => r !== defaultCountry)];
+  const asLocal = () => {
+    for (const region of regions) {
+      const local = tryParse(digits, region);
+      if (local) return local;
+    }
+    return null;
+  };
+
+  // Leading 0 is a local trunk prefix everywhere in this region.
+  if (digits.startsWith('0')) {
+    const local = asLocal();
+    return local ? { e164: local.number, country: local.country ?? null, assumed: true } : null;
+  }
+
+  // No prefix at all: either a country code without + (966501234567) or a
+  // local number without its 0 (501234567). Long numbers are international.
+  const international = tryParse('+' + digits);
+  const local = tryParse(digits, defaultCountry);
+  const pick =
+    international && local ? (digits.length >= 11 ? international : local) : international ?? local ?? asLocal();
+  return pick ? { e164: pick.number, country: pick.country ?? null, assumed: true } : null;
+}
 
 export function normalizePhone(input: string, defaultCountry = DEFAULT_REGION): string | null {
-  const raw = String(input || '').trim();
-  if (!raw) return null;
-  if (raw.includes('@g.us') || raw.includes('@broadcast')) return null;
-
-  const stripped = raw.replace(/[^\d+]/g, '');
-  const candidate = stripped.startsWith('+') ? stripped : stripped.replace(/^00/, '');
-
-  const parsed = parsePhoneNumberFromString(candidate, defaultCountry as any);
-  if (parsed?.isValid()) {
-    return parsed.number;
-  }
-
-  const fallbackRegions = ['US', 'EG'];
-  for (const region of fallbackRegions) {
-    if (region === defaultCountry) continue;
-    const parsedWithFallback = parsePhoneNumberFromString(candidate, region as any);
-    if (parsedWithFallback?.isValid()) {
-      return parsedWithFallback.number;
-    }
-  }
-
-  const digits = stripped.replace(/[^\d]/g, '');
-  if (!digits) return null;
-
-  const localCandidate = digits.startsWith('0') ? digits : `0${digits}`;
-  const parsedLocal = parsePhoneNumberFromString(localCandidate, defaultCountry as any);
-  if (parsedLocal?.isValid()) {
-    return parsedLocal.number;
-  }
-
-  for (const region of fallbackRegions) {
-    if (region === defaultCountry) continue;
-    const parsedLocalFallback = parsePhoneNumberFromString(localCandidate, region as any);
-    if (parsedLocalFallback?.isValid()) {
-      return parsedLocalFallback.number;
-    }
-  }
-
-  return null;
+  return readPhone(input, defaultCountry)?.e164 ?? null;
 }
 
 export function isE164(phone: string): boolean {

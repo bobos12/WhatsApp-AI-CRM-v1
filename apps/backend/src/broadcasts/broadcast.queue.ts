@@ -84,7 +84,10 @@ const WORKER_CONCURRENCY = Number(process.env.BROADCAST_WORKER_CONCURRENCY ?? 3)
  * mechanism — Meta's messaging limit tier is the real constraint and it is
  * enforced by Meta, not by us.
  */
-const SEND_GAP_MS = Number(process.env.BROADCAST_SEND_GAP_MS ?? 120);
+const SEND_GAP_MS = Number(process.env.BROADCAST_SEND_GAP_MS ?? 25);
+
+/** Recipients sent to at the same moment. */
+const SEND_CONCURRENCY = Math.max(1, Number(process.env.BROADCAST_SEND_CONCURRENCY ?? 4));
 
 /** How many recipients one slice will attempt before parking. */
 const SLICE_SIZE = Number(process.env.BROADCAST_SLICE_SIZE ?? 500);
@@ -331,23 +334,13 @@ async function runSlice(broadcastId: string) {
   /** Why the run stopped itself, in words the user can act on. */
   let stopMessage = '';
 
-  for (const recipient of recipients) {
-    // Time-box the job so a long run stays resumable across a deploy.
-    if (Date.now() - startedAt > MAX_JOB_MS) {
-      stopReason = 'JOB_TIME_LIMIT';
-      break;
-    }
+  type Outcome =
+    | { kind: 'sent' }
+    | { kind: 'failed'; meta: MetaApiError }
+    | { kind: 'stop'; verdict: Verdict; message: string; code: number };
 
-    // Re-read status so Pause/Cancel takes effect mid-slice rather than after it.
-    const current = await prisma.broadcast.findUnique({
-      where: { id: broadcastId },
-      select: { status: true },
-    });
-    if (current?.status !== 'SENDING') {
-      stopReason = 'USER_STOPPED';
-      break;
-    }
-
+  /** One recipient, start to finish. Never throws. */
+  const sendOne = async (recipient: (typeof recipients)[number]): Promise<Outcome> => {
     const contact = contactByPhone.get(recipient.phone);
     const vars = buildPersonalizationVars(contact, recipient.phone);
 
@@ -389,8 +382,7 @@ async function runSlice(broadcastId: string) {
           lastError: null,
         },
       });
-      sent += 1;
-      failureStreak = 0;
+      return { kind: 'sent' };
     } catch (error) {
       const meta = asMetaError(error);
       const verdict = classify(error, meta);
@@ -398,11 +390,12 @@ async function runSlice(broadcastId: string) {
       // Not this person's fault: leave them pending so they are sent to when
       // the run resumes, rather than written off as a failure.
       if (verdict !== 'recipient') {
-        stopReason =
-          verdict === 'rate' ? 'RATE_LIMITED' : verdict === 'account' ? 'ACCOUNT_RESTRICTED' : 'CAMPAIGN_PROBLEM';
-        stopMessage = meta.code === -1 && error instanceof Error ? error.message : meta.userMessage;
-        logger.warn('broadcast.stopped_by_error', { broadcastId, code: meta.code, verdict });
-        break;
+        return {
+          kind: 'stop',
+          verdict,
+          code: meta.code,
+          message: meta.code === -1 && error instanceof Error ? error.message : meta.userMessage,
+        };
       }
 
       await prisma.broadcastRecipient.update({
@@ -415,21 +408,61 @@ async function runSlice(broadcastId: string) {
           lastError: meta.userMessage.slice(0, 500),
         },
       });
-      failed += 1;
-      if (!isRecipientSpecific(meta)) failureStreak += 1;
+      return { kind: 'failed', meta };
+    }
+  };
 
-      if (failureStreak >= FAILURE_STREAK_LIMIT) {
-        stopReason = 'CAMPAIGN_PROBLEM';
-        stopMessage =
-          `The last ${FAILURE_STREAK_LIMIT} messages all failed, so sending was stopped to protect your number. ` +
-          `WhatsApp's reason: ${meta.userMessage}`;
-        break;
+  // A few sends in flight at once: each one mostly waits on Meta and the
+  // database, so four together take about as long as one. Still a tiny
+  // fraction of what Meta accepts per number.
+  for (let at = 0; at < recipients.length; at += SEND_CONCURRENCY) {
+    // Time-box the job so a long run stays resumable across a deploy.
+    if (Date.now() - startedAt > MAX_JOB_MS) {
+      stopReason = 'JOB_TIME_LIMIT';
+      break;
+    }
+
+    // Re-read status so Pause/Cancel takes effect within a few messages.
+    const current = await prisma.broadcast.findUnique({
+      where: { id: broadcastId },
+      select: { status: true },
+    });
+    if (current?.status !== 'SENDING') {
+      stopReason = 'USER_STOPPED';
+      break;
+    }
+
+    const outcomes = await Promise.all(recipients.slice(at, at + SEND_CONCURRENCY).map(sendOne));
+
+    for (const outcome of outcomes) {
+      if (outcome.kind === 'sent') {
+        sent += 1;
+        failureStreak = 0;
+      } else if (outcome.kind === 'failed') {
+        failed += 1;
+        if (!isRecipientSpecific(outcome.meta)) failureStreak += 1;
+        if (failureStreak >= FAILURE_STREAK_LIMIT && stopReason === 'AUDIENCE_DRAINED') {
+          stopReason = 'CAMPAIGN_PROBLEM';
+          stopMessage =
+            `The last ${FAILURE_STREAK_LIMIT} messages all failed, so sending was stopped to protect your number. ` +
+            `WhatsApp's reason: ${outcome.meta.userMessage}`;
+        }
+      } else if (stopReason === 'AUDIENCE_DRAINED') {
+        stopReason =
+          outcome.verdict === 'rate'
+            ? 'RATE_LIMITED'
+            : outcome.verdict === 'account'
+              ? 'ACCOUNT_RESTRICTED'
+              : 'CAMPAIGN_PROBLEM';
+        stopMessage = outcome.message;
+        logger.warn('broadcast.stopped_by_error', { broadcastId, code: outcome.code, verdict: outcome.verdict });
       }
     }
 
     emitRealtime('broadcast:progress', { broadcastId, sent, failed }, teamId);
     emitDataChanged('broadcasts', broadcastId);
 
+    if (stopReason !== 'AUDIENCE_DRAINED') break;
     if (SEND_GAP_MS > 0) await sleep(SEND_GAP_MS);
   }
 
