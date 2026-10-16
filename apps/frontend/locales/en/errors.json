@@ -38,7 +38,7 @@
     },
     "invalidPhone": {
       "title": "That phone number looks off",
-      "body": "The number isn't in a valid format. Use the full international format, e.g. +9665XXXXXXXX."
+      "body": "The number doesn't match the chosen country. Pick the right country or write the number with its code, e.g. +9665XXXXXXXX."
     },
     "emptyMessage": {
       "title": "Nothing to send",
@@ -135,6 +135,7 @@
       "video": "video",
       "audio": "voice note",
       "document": "document"
-    }
+    },
+    "invalidPhone": "This phone number is not valid for the chosen country. Check the digits or the country."
   }
 }

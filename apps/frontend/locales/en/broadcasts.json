@@ -146,7 +146,7 @@
     "filtering": "Applying filters…",
     "filterMatches": "match",
     "addManually": "Add numbers manually",
-    "manualHint": "One number per line · any format (05…, +966…, +20…, +971…). Numbers without a country code are read as Saudi.",
+    "manualHint": "One number per line. Write numbers from other countries with + and their code (+971…, +20…).",
     "resolvedAudience": "Resolved audience",
     "recipientSingular": "recipient",
     "recipientPlural": "recipients",
@@ -198,7 +198,12 @@
     "hintMessage": "Choose an approved template and fill in its blanks to continue.",
     "reviewSend": "Review & send",
     "reviewSchedule": "Review & schedule",
-    "readyToReceive": "will receive it"
+    "readyToReceive": "will receive it",
+    "manualCountry": "Numbers without + are from",
+    "manualValid_one": "1 number ready",
+    "manualValid_other": "{{count}} numbers ready",
+    "manualInvalid_one": "1 line is not a valid number — fix or remove it",
+    "manualInvalid_other": "{{count}} lines are not valid numbers — fix or remove them"
   },
   "interactive": {
     "tabButtons": "Quick Reply",

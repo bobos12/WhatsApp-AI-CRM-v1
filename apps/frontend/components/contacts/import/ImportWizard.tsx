@@ -13,6 +13,8 @@ import {
   ACCEPT_ATTRIBUTE, ImportParseError, buildErrorReport, downloadCsv, parseFile,
   type ParsedFile, type ParsedSheet,
 } from '../../../lib/import/parse';
+import { CountrySelect, DEFAULT_PHONE_COUNTRY } from '../../ui/PhoneInput';
+import type { CountryCode } from 'libphonenumber-js';
 
 /**
  * ─── Contact import ──────────────────────────────────────────────────────────
@@ -98,6 +100,8 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
   const [mapping, setMapping] = useState<Record<number, string>>({});
 
   const [strategy, setStrategy] = useState<DuplicateStrategy>('SKIP');
+  /** Country of numbers in the file written without + / 00 (unless a row has its own). */
+  const [country, setCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY);
   const [validation, setValidation] = useState<ValidationRowResult[] | null>(null);
 
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -192,7 +196,7 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
   const mappedTargets = useMemo(() => new Set(Object.values(mapping).filter((id) => id !== SKIP)), [mapping]);
   const phoneMapped = mappedTargets.has('phone');
 
-  const options = { duplicateStrategy: strategy, createMissingTags: true, source: 'import' as const };
+  const options = { duplicateStrategy: strategy, defaultCountry: country, createMissingTags: true, source: 'import' as const };
 
   // ── Review (server dry run) ────────────────────────────────────────────────
 
@@ -227,14 +231,14 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
       try {
         const result = await api.post<{ results: ValidationRowResult[] }>('/api/contacts/import/validate', {
           rows: buildRows().slice(0, 500),
-          options: { duplicateStrategy: strategy, createMissingTags: true, source: 'import' },
+          options: { duplicateStrategy: strategy, defaultCountry: country, createMissingTags: true, source: 'import' },
         });
         if (!stale) setValidation(result.results);
       } catch { /* keep the previous preview rather than blanking the screen */ }
     })();
     return () => { stale = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strategy]);
+  }, [strategy, country]);
 
   // ── Import ─────────────────────────────────────────────────────────────────
 
@@ -486,6 +490,22 @@ export default function ImportWizard({ onClose, onImported }: { onClose: () => v
 
   const reviewScreen = (
     <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
+          {t('import.phoneCountry', { defaultValue: 'Numbers without + are from' })}
+        </p>
+        <CountrySelect
+          value={country}
+          onChange={setCountry}
+          ariaLabel={t('import.phoneCountry', { defaultValue: 'Numbers without + are from' })}
+          className="field w-full sm:w-72"
+        />
+        <p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">
+          {t('import.phoneCountryHint', {
+            defaultValue: 'Numbers from other countries must have their code (+971…, +20…) or a country_code column. Anything else is listed as an error, not guessed.',
+          })}
+        </p>
+      </div>
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
           {t('import.duplicates', { defaultValue: 'When a contact already exists' })}

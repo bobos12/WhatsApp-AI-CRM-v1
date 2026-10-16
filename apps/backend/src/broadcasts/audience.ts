@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { readPhone } from '../lib/phone';
+import { readPhoneStrict } from '../lib/phone';
 import { RESERVED_CUSTOM_FIELD_KEYS } from '../contacts/custom-fields.constants';
 
 /**
@@ -201,11 +201,6 @@ export interface ResolvedAudience {
    * a person who received the campaign twice.
    */
   duplicates: number;
-  /**
-   * Numbers saved without + or 00, by the country they were read as. Shown
-   * before sending so a wrong guess (a UAE 05… read as Saudi) is caught.
-   */
-  assumedCountries: Record<string, number>;
 }
 
 /**
@@ -265,11 +260,12 @@ export async function resolveAudienceDetailed(input: AudienceInput): Promise<Res
   const seen = new Set<string>();
   const invalid: string[] = [];
   let duplicates = 0;
-  const assumedCountries: Record<string, number> = {};
-
   for (const entry of all) {
-    const reading = readPhone(entry);
-    const normalized = reading?.e164;
+    // Strict: a campaign only goes to numbers whose country is certain. The
+    // composer converts typed numbers using the country chosen beside them, and
+    // contacts are stored complete, so a local number here is refused, not guessed.
+    const reading = readPhoneStrict(entry);
+    const normalized = reading.ok ? reading.e164 : null;
     if (!normalized) {
       invalid.push(entry);
       continue;
@@ -279,10 +275,6 @@ export async function resolveAudienceDetailed(input: AudienceInput): Promise<Res
       continue;
     }
     seen.add(normalized);
-    if (reading.assumed) {
-      const country = reading.country ?? '??';
-      assumedCountries[country] = (assumedCountries[country] ?? 0) + 1;
-    }
   }
 
   return {
@@ -290,7 +282,6 @@ export async function resolveAudienceDetailed(input: AudienceInput): Promise<Res
     requested: all.length,
     invalid,
     duplicates,
-    assumedCountries,
   };
 }
 

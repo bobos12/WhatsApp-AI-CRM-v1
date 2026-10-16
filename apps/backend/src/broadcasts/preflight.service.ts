@@ -386,24 +386,6 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
     });
   }
 
-  // Numbers saved without a country code were read as the most likely country.
-  // Say so before anything is sent, with the breakdown, so a wrong guess is
-  // fixed by adding the code rather than discovered after messaging a stranger.
-  const assumedTotal = Object.values(audience.assumedCountries).reduce((a, b) => a + b, 0);
-  if (assumedTotal > 0) {
-    const breakdown = Object.entries(audience.assumedCountries).sort((a, b) => b[1] - a[1]);
-    const mixed = breakdown.length > 1;
-    findings.push({
-      key: 'country_assumed',
-      kind: mixed ? 'warning' : 'tip',
-      label: `${assumedTotal.toLocaleString()} ${assumedTotal === 1 ? 'number was' : 'numbers were'} saved without a country code`,
-      detail:
-        `They were read as: ${breakdown.map(([c, n]) => `${c} ${n}`).join(', ')}. ` +
-        'If any belong to another country, add the code (for example +971 for UAE) to the contact.',
-      params: { count: assumedTotal, countries: breakdown.map(([c, n]) => `${c}:${n}`).join(',') },
-    });
-  }
-
   // 5. Messaging tier headroom — informational, because Meta enforces it.
   const capacity = channel.messagingLimit ? TIER_CAPACITY[channel.messagingLimit] : undefined;
   if (capacity && plan.length > capacity) {

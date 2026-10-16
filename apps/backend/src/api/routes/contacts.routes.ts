@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { ContactsService } from '../../contacts/contacts.service';
 import { enrichContactAvatar } from '../../conversations/conversations.service';
 import multer from 'multer';
@@ -11,7 +11,7 @@ import { HttpError, type AuthActor } from '../../auth/authorize';
 import { validateBody } from '../validate';
 import { AUDIENCE_OPERATORS } from '../../broadcasts/audience';
 import { getChannelOrDefault } from '../../providers/channel.service';
-import { regionOfPhone } from '../../lib/phone';
+import { readPhoneStrict, regionOfPhone } from '../../lib/phone';
 import {
   DUPLICATE_STRATEGIES,
   detectMapping,
@@ -49,6 +49,8 @@ router.use(authMiddleware);
 
 const contactSchema = z.object({
   phone: z.string().min(1).max(32),
+  /** The country picked next to the number; required unless it starts with + or 00. */
+  phoneCountry: z.string().length(2).optional(),
   name: z.string().max(200).nullish(),
   email: z.string().max(200).nullish(),
   company: z.string().max(200).nullish(),
@@ -61,6 +63,28 @@ const contactSchema = z.object({
 });
 
 const updateContactSchema = contactSchema.partial();
+
+/**
+ * Typed numbers are accepted only when their country is certain — written with
+ * + / 00, or sent with the country chosen beside the field. The number is
+ * stored in its full international form; anything ambiguous is refused with a
+ * reason the form can show, never guessed.
+ */
+function strictPhone(req: Request, res: Response, next: NextFunction) {
+  const { phone, phoneCountry } = req.body ?? {};
+  delete req.body?.phoneCountry;
+  if (phone === undefined) return next();
+  const result = readPhoneStrict(String(phone), phoneCountry);
+  if (!result.ok) {
+    return res.status(400).json(
+      result.reason === 'COUNTRY_REQUIRED'
+        ? { error: 'Choose the country for this number, or write it with its country code (for example +966…).', code: 'PHONE_COUNTRY_REQUIRED' }
+        : { error: 'This is not a valid phone number for the chosen country. Check the digits.', code: 'PHONE_INVALID' },
+    );
+  }
+  req.body.phone = result.e164;
+  next();
+}
 
 const importOptionsSchema = z.object({
   duplicateStrategy: z.enum(DUPLICATE_STRATEGIES).default('SKIP'),
@@ -289,7 +313,7 @@ router.post('/import', checkPermission('create', 'contacts'), upload.single('fil
 
 // ── CRUD ─────────────────────────────────────────────────────────────────────
 
-router.post('/', checkPermission('create', 'contacts'), validateBody(contactSchema), async (req, res) => {
+router.post('/', checkPermission('create', 'contacts'), validateBody(contactSchema), strictPhone, async (req, res) => {
   try {
     const { tagIds, ...data } = req.body;
     const contact = await ContactsService.createContact({
@@ -310,7 +334,7 @@ router.post('/', checkPermission('create', 'contacts'), validateBody(contactSche
   }
 });
 
-router.put('/:id', checkPermission('update', 'contacts'), validateBody(updateContactSchema), async (req, res) => {
+router.put('/:id', checkPermission('update', 'contacts'), validateBody(updateContactSchema), strictPhone, async (req, res) => {
   try {
     const { tagIds: _tagIds, ...data } = req.body;
     const contact = await ContactsService.updateContact(req.params.id, data, actorOf(req));

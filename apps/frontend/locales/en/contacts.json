@@ -130,7 +130,8 @@
     "manageFields": "Manage",
     "loadingFields": "Loading custom fields…",
     "saveFailed": "Could not save this contact.",
-    "noTagsYet": "No tags yet — create them in the Tags page."
+    "noTagsYet": "No tags yet — create them in the Tags page.",
+    "phoneInvalid": "Enter a valid phone number and choose its country."
   },
   "timeline": {
     "title": "Activity Timeline",
@@ -210,6 +211,8 @@
     "back": "Back",
     "review": "Review",
     "start": "Import {{count}} contacts",
-    "startAll": "Import {{count}} rows"
+    "startAll": "Import {{count}} rows",
+    "phoneCountry": "Numbers without + are from",
+    "phoneCountryHint": "Numbers from other countries must have their code (+971…, +20…) or a country_code column. Anything else is listed as an error, not guessed."
   }
 }

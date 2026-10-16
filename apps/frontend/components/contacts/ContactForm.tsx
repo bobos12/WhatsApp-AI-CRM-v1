@@ -9,6 +9,7 @@ import { useCustomFields } from '../../hooks/useCustomFields';
 import ContactTagSelector from './ContactTagSelector';
 import CustomFieldInput from './CustomFieldInput';
 import { Modal } from '../ui/modal';
+import PhoneInput from '../ui/PhoneInput';
 import { initialFieldValues, validateFieldValue, type CustomFieldValues } from '../../lib/custom-fields';
 
 interface Contact {
@@ -57,6 +58,8 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** The number as it will be stored (+966…), or null while it isn't valid. */
+  const [phoneE164, setPhoneE164] = useState<string | null>(contact?.phone || null);
 
   const setCustomValue = (key: string, value: unknown) => {
     setValues((current) => ({ ...current, [key]: value }));
@@ -81,11 +84,16 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
     }
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
+    if (!phoneE164) {
+      setSubmitError(t('form.phoneInvalid', { defaultValue: 'Enter a valid phone number and its country.' }));
+      return;
+    }
 
     try {
       setSaving(true);
       await onSave({
         ...formData,
+        phone: phoneE164,
         // Always sent, even when empty, so the server can enforce required fields
         // and so clearing a field actually clears it.
         customFields: values,
@@ -117,13 +125,12 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={labelCls}>{t('form.phone')}</label>
-          <input
-            type="text"
+          <PhoneInput
+            value={contact?.phone || ''}
+            onChange={setPhoneE164}
             required
-            dir="ltr"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className={inputCls}
+            autoFocus={!contact}
+            inputClassName={inputCls}
           />
         </div>
 
@@ -260,7 +267,7 @@ export default function ContactForm({ contact, onSave, onCancel }: ContactFormPr
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !phoneE164}
             className="btn btn-primary inline-flex disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}

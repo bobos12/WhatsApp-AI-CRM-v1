@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { normalizePhone } from '../lib/phone';
+import { readPhoneStrict } from '../lib/phone';
 import { logger } from '../lib/logger';
 import {
   coerceCustomFieldValues,
@@ -260,9 +260,16 @@ function prepareRow(
     errors.push('Phone number is missing.');
   } else {
     const { phone: combined, region } = applyCountryCode(rawPhone, text(values.country_code), options.defaultCountry);
-    const normalized = normalizePhone(combined, region || options.defaultCountry);
-    if (!normalized) errors.push(`"${rawPhone}" is not a valid phone number.`);
-    else phone = normalized;
+    // Strict: a number without + / 00 belongs to the row's country column or
+    // the import's chosen country — never to whichever country happens to fit.
+    const country = (region || options.defaultCountry || 'SA').toUpperCase();
+    const result = readPhoneStrict(combined, country);
+    if (!result.ok) {
+      errors.push(
+        `"${rawPhone}" is not a valid ${country} number. Write it with its country code (for example +971…) ` +
+          'or add a country_code column.',
+      );
+    } else phone = result.e164;
   }
 
   // ── Name: explicit `name` wins, otherwise stitch the two halves together ──

@@ -28,6 +28,8 @@ import { blockers, type PreflightFinding } from '../../lib/preflight';
 import TemplatePicker, { renderTemplatePreview, templateBlanksFilled } from './TemplatePicker';
 import type { MetaStatus } from '../templates/ApprovalStatus';
 import { useRouter } from 'next/navigation';
+import { CountrySelect, DEFAULT_PHONE_COUNTRY, checkPhone } from '../ui/PhoneInput';
+import type { CountryCode } from 'libphonenumber-js';
 
 /** Header media a template can carry, as the preview draws it. */
 type PreviewMedia = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
@@ -244,6 +246,8 @@ export default function BroadcastForm({
 
   const [selectedContacts, setSelectedContacts] = useState<string[]>(initialRecipientSet);
   const [manualPhones, setManualPhones] = useState('');
+  /** The country of typed numbers that don't start with + or 00. */
+  const [manualCountry, setManualCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY);
   const [contactSearch, setContactSearch] = useState('');
 
   // The advanced audience filter narrows the contact picker; it is a *selection*
@@ -302,8 +306,23 @@ export default function BroadcastForm({
       .catch(() => {});
   }, []);
 
-  const normalizePhoneList = (value: string) =>
-    value.split('\n').map((p) => p.trim()).filter(Boolean);
+  /**
+   * Typed numbers, each checked against the chosen country. Only valid ones are
+   * ever sent, as full international numbers, and invalid lines block the
+   * campaign until they are fixed or removed, so nothing is silently dropped.
+   */
+  const manualCheck = useMemo(() => {
+    const lines = manualPhones.split('\n').map((line) => line.trim()).filter(Boolean);
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    for (const line of lines) {
+      const result = checkPhone(line, manualCountry);
+      if (result.ok) valid.push(result.e164);
+      else invalid.push(line);
+    }
+    return { valid: Array.from(new Set(valid)), invalid };
+  }, [manualPhones, manualCountry]);
+  const normalizePhoneList = (_value: string) => manualCheck.valid;
 
   const normalizeTag = (value: string) => value.trim().toLowerCase();
 
@@ -474,7 +493,8 @@ export default function BroadcastForm({
     normalizePhoneList(manualPhones).length > 0 ||
     formData.tag.trim().length > 0;
 
-  const isValid = formData.name.trim().length > 0 && messageReady && hasAudience;
+  const isValid =
+    formData.name.trim().length > 0 && messageReady && hasAudience && manualCheck.invalid.length === 0;
 
   // Per-step validation for the mobile wizard. The safety step has no gate of
   // its own: it reports, it does not withhold. The only hard stop is a server
@@ -483,7 +503,7 @@ export default function BroadcastForm({
   const stepValid = [
     formData.name.trim().length > 0,
     messageReady,
-    hasAudience,
+    hasAudience && manualCheck.invalid.length === 0,
     formData.sendNow || (!!formData.scheduledAtLocal && formData.scheduledAtLocal >= minWallClock),
     true,
   ];
@@ -523,7 +543,7 @@ export default function BroadcastForm({
   const stepHints = [
     t('form.hintName'),
     t('form.hintMessage'),
-    t('form.errorNoRecipients'),
+    manualCheck.invalid.length ? t('form.manualInvalid', { count: manualCheck.invalid.length }) : t('form.errorNoRecipients'),
     t('form.errorNoSchedule'),
     '',
   ];
@@ -534,7 +554,7 @@ export default function BroadcastForm({
   const draftRecipients = useMemo(
     () => Array.from(new Set([...selectedContacts, ...normalizePhoneList(manualPhones)])),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedContacts, manualPhones],
+    [selectedContacts, manualCheck],
   );
 
   const { report: preflight, loading: preflightLoading, error: preflightError } = usePreflight(
@@ -899,15 +919,49 @@ export default function BroadcastForm({
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-3">
           {t('form.addManually')}
         </p>
+        <label className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
+          <span>{t('form.manualCountry')}</span>
+          <CountrySelect
+            value={manualCountry}
+            onChange={setManualCountry}
+            ariaLabel={t('form.manualCountry')}
+            className="field field-sm w-auto max-w-[14rem]"
+          />
+        </label>
         <textarea
           rows={3}
           value={manualPhones}
           onChange={(e) => setManualPhones(e.target.value)}
-          className="field w-full resize-none font-mono transition"
-          placeholder={'+1234567890\n+0987654321\n+4412345678'}
+          className={cn(
+            'field w-full resize-none font-mono transition',
+            manualCheck.invalid.length > 0 && 'border-red-400 focus:border-red-400',
+          )}
+          placeholder={'0501234567\n+971501234567\n+201012345678'}
           dir="ltr"
         />
         <p className="mt-1 text-[10px] text-ink-3">{t('form.manualHint')}</p>
+        {(manualCheck.valid.length > 0 || manualCheck.invalid.length > 0) && (
+          <div className="mt-2 space-y-1 text-[11px]" aria-live="polite">
+            {manualCheck.valid.length > 0 && (
+              <p className="flex items-center gap-1.5 text-brand">
+                <Check className="h-3.5 w-3.5" />
+                {t('form.manualValid', { count: manualCheck.valid.length })}
+              </p>
+            )}
+            {manualCheck.invalid.length > 0 && (
+              <div className="rounded-lg bg-red-500/[0.07] px-2.5 py-2 text-red-600 dark:text-red-400">
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {t('form.manualInvalid', { count: manualCheck.invalid.length })}
+                </p>
+                <p dir="ltr" className="mt-1 font-mono text-[11px] opacity-90">
+                  {manualCheck.invalid.slice(0, 6).join(' · ')}
+                  {manualCheck.invalid.length > 6 ? ' …' : ''}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-line bg-gray-50 dark:bg-canvas p-4">

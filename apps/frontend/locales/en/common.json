@@ -263,5 +263,11 @@
     "open": "Open",
     "toggle": "Toggle",
     "askAi": "Ask the AI assistant"
+  },
+  "phone": {
+    "country": "Country",
+    "placeholder": "Phone number",
+    "required": "Enter a phone number.",
+    "invalidFor": "Not a valid number for {{country}}. Check the digits or the country."
   }
 }

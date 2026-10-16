@@ -88,6 +88,35 @@ export function readPhone(input: string, defaultCountry = DEFAULT_REGION): Phone
   return pick ? { e164: pick.number, country: pick.country ?? null, assumed: true } : null;
 }
 
+/**
+ * The strict reader, for numbers a person types into the CRM.
+ *
+ * A number is accepted only when its country is certain: written with + or 00,
+ * or typed together with the country chosen next to it. No guessing — a number
+ * that would need a guess is refused with a reason the screen can show.
+ */
+export type StrictPhoneResult =
+  | { ok: true; e164: string; country: string | null }
+  | { ok: false; reason: 'EMPTY' | 'COUNTRY_REQUIRED' | 'INVALID' };
+
+export function readPhoneStrict(input: string, country?: string | null): StrictPhoneResult {
+  const raw = westernize(String(input || '').trim());
+  if (!raw) return { ok: false, reason: 'EMPTY' };
+  if (raw.includes('@')) return { ok: false, reason: 'INVALID' };
+
+  const compact = raw.replace(/[\s()\-.]/g, '');
+  const digits = compact.replace(/\D/g, '');
+  const international = compact.startsWith('+') || digits.startsWith('00');
+
+  if (international) {
+    const parsed = tryParse('+' + (compact.startsWith('+') ? digits : digits.slice(2)));
+    return parsed ? { ok: true, e164: parsed.number, country: parsed.country ?? null } : { ok: false, reason: 'INVALID' };
+  }
+  if (!country) return { ok: false, reason: 'COUNTRY_REQUIRED' };
+  const parsed = tryParse(digits, country.toUpperCase());
+  return parsed ? { ok: true, e164: parsed.number, country: parsed.country ?? null } : { ok: false, reason: 'INVALID' };
+}
+
 export function normalizePhone(input: string, defaultCountry = DEFAULT_REGION): string | null {
   return readPhone(input, defaultCountry)?.e164 ?? null;
 }
