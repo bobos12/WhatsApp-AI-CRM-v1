@@ -24,6 +24,8 @@ import { cn } from '../../lib/utils';
 /** Pinned to the top of the list: where nearly all customers are. */
 export const PINNED_COUNTRIES: CountryCode[] = ['SA', 'AE', 'EG', 'KW', 'QA', 'BH', 'OM', 'JO'];
 export const DEFAULT_PHONE_COUNTRY: CountryCode = 'SA';
+/** Not offered in the country picker. */
+const HIDDEN_COUNTRIES: CountryCode[] = ['IL'];
 
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 function westernize(text: string): string {
@@ -60,7 +62,7 @@ export function useCountryOptions() {
     try { names = new Intl.DisplayNames([i18n.language], { type: 'region' }); } catch { /* very old browser */ }
     const label = (c: CountryCode) => `${flagOf(c)} ${names?.of(c) ?? c} +${getCountryCallingCode(c)}`;
     const rest = getCountries()
-      .filter((c) => !PINNED_COUNTRIES.includes(c))
+      .filter((c) => !PINNED_COUNTRIES.includes(c) && !HIDDEN_COUNTRIES.includes(c))
       .map((c) => ({ code: c, label: label(c), name: names?.of(c) ?? c }))
       .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
     return {
