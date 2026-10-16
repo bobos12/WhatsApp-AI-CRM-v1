@@ -1252,9 +1252,6 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   }
 
   const assignee = conversation.assignedUser ? (conversation.assignedUser.name || conversation.assignedUser.email) : null;
-  const headerSub = peerTyping
-    ? null
-    : [contactPhone, assignee ? t('header.assignedTo', { name: assignee }) : null].filter(Boolean).join(' · ');
   const resolved = conversation.status === 'RESOLVED' || conversation.status === 'ARCHIVED';
 
   // ── AI control, shared by the header pill and the details panel ──────────
@@ -1322,7 +1319,13 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               {peerTyping ? (
                 <p className="flex items-center gap-1 text-xs font-medium text-brand">{t('window.typing')}</p>
               ) : (
-                <p className="truncate text-xs text-ink-3"><bdi>{headerSub}</bdi></p>
+                // The number is its own left-to-right run: in one mixed string the
+                // Arabic layout reorders "+20 111…" into "…111 20+".
+                <p className="truncate text-xs text-ink-3">
+                  {contactPhone && <span dir="ltr">{contactPhone}</span>}
+                  {contactPhone && assignee && ' · '}
+                  {assignee && <bdi>{t('header.assignedTo', { name: assignee })}</bdi>}
+                </p>
               )}
             </div>
           </button>
@@ -1810,7 +1813,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: isRTL ? '-100%' : '100%', opacity: 0.6 }}
               transition={{ type: 'spring', stiffness: 420, damping: 42 }}
-              className="absolute inset-y-0 end-0 z-50 flex w-[min(92vw,360px)] flex-col border-s border-line bg-surface pb-safe pt-safe shadow-pop min-[1440px]:relative min-[1440px]:z-0 min-[1440px]:w-[340px] min-[1440px]:shadow-none"
+              className="absolute inset-y-0 end-0 z-50 flex w-full flex-col bg-surface pb-safe pt-safe sm:w-[min(92vw,360px)] sm:border-s sm:border-line sm:shadow-pop min-[1440px]:relative min-[1440px]:z-0 min-[1440px]:w-[340px] min-[1440px]:shadow-none"
             >
               {showInteractiveSidebar ? (
                 <div className="flex h-full flex-col overflow-hidden">
@@ -1822,9 +1825,18 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                 </div>
               ) : (
                 <>
-                  <div className="flex h-[60px] shrink-0 items-center justify-between gap-2 border-b border-line ps-4 pe-2">
-                    <p className="truncate text-[13px] font-semibold text-ink">{t('details.conversationDetails')}</p>
-                    <button type="button" onClick={() => setShowRightPanel(false)} className="btn btn-ghost btn-icon btn-sm" aria-label={t('common:actions.close', 'Close')}>
+                  {/* Phones: one back arrow, where the chat's was. Larger screens: a close X. */}
+                  <div className="flex h-[60px] shrink-0 items-center gap-1 border-b border-line pe-2 ps-1 sm:justify-between sm:ps-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowRightPanel(false)}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-raised active:bg-raised sm:hidden"
+                      aria-label={t('common:actions.back', 'Back')}
+                    >
+                      <ArrowLeft className="h-5 w-5 icon-mirror" />
+                    </button>
+                    <p className="truncate text-[15px] font-semibold text-ink sm:text-[13px]">{t('details.conversationDetails')}</p>
+                    <button type="button" onClick={() => setShowRightPanel(false)} className="btn btn-ghost btn-icon btn-sm hidden sm:inline-flex" aria-label={t('common:actions.close', 'Close')}>
                       <X aria-hidden="true" />
                     </button>
                   </div>

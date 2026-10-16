@@ -120,7 +120,7 @@ export function Modal({
   return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm',
+        'fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm',
         overlayClassName,
       )}
       onClick={closeOnBackdrop ? onClose : undefined}

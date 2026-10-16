@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, ArrowRight, MessageSquare, BriefcaseBusiness, CheckSquare,
   PlusCircle, Phone, CalendarDays, StickyNote, Tag as TagIcon, Clock,
-  Loader2, ChevronRight,
+  Loader2, ChevronRight, Pencil,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../../lib/api';
@@ -14,6 +14,7 @@ import { formatPhone } from '../../../../lib/phone';
 import { cn } from '../../../../lib/utils';
 import { useDirection } from '../../../../hooks/useDirection';
 import ContactTimeline from '../../../../components/contacts/ContactTimeline';
+import ContactForm from '../../../../components/contacts/ContactForm';
 import ContactTagSelector from '../../../../components/contacts/ContactTagSelector';
 import Avatar from '../../../../components/ui/Avatar';
 import { useLiveData } from '../../../../hooks/useLiveData';
@@ -114,6 +115,14 @@ export default function ContactProfilePage() {
   useEffect(() => { fetchDetails(); }, [fetchDetails]);
 
   const contact = details?.contact;
+  const [editing, setEditing] = useState(false);
+  const saveContact = async (data: Record<string, unknown>) => {
+    if (!contact) return;
+    const { tagIds: _tags, ...rest } = data as { tagIds?: string[] };
+    await api.put(`/api/contacts/${contact.id}`, rest);
+    setEditing(false);
+    await fetchDetails();
+  };
   const name = contact?.name || (contact ? formatPhone(contact.phone) : '');
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
@@ -195,6 +204,10 @@ export default function ContactProfilePage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setEditing(true)} className="btn btn-secondary inline-flex">
+                <Pencil className="h-4 w-4" />
+                {t('edit', { defaultValue: 'Edit' })}
+              </button>
               <button
                 type="button"
                 onClick={() => { router.push(`/conversations?phone=${encodeURIComponent(contact.phone)}`); }}
@@ -359,6 +372,9 @@ export default function ContactProfilePage() {
       </div>
       {/* Mobile bottom-nav spacer */}
       <div aria-hidden="true" className="h-[var(--bottom-nav-space)] sm:hidden" />
+      {editing && (
+        <ContactForm contact={contact as any} onSave={saveContact as any} onCancel={() => setEditing(false)} />
+      )}
     </div>
   );
 }

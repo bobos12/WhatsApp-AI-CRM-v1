@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -63,48 +64,125 @@ export function TagChip({ name, color }: { name: string; color: string }) {
   );
 }
 
-/** Secondary row actions, one menu instead of five icons on every line. */
-function RowMenu({ contact, onOpenDetails, onConfirmDelete }: {
+/**
+ * Secondary row actions, one menu instead of five icons on every line.
+ *
+ * Rendered in a portal so no scrolling or clipped container can cut it off: a
+ * bottom sheet on phones (thumb-reachable, like WhatsApp's own menus), and a
+ * dropdown on larger screens that opens upward when there is no room below.
+ */
+function RowMenu({ contact, onOpenDetails, onEdit, onConfirmDelete }: {
   contact: Contact;
   onOpenDetails: (c: Contact) => void;
+  onEdit: (c: Contact) => void;
   onConfirmDelete: (id: string | null) => void;
 }) {
   const { t } = useTranslation('contacts');
   const { t: tChat } = useTranslation('chat');
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const [sheet, setSheet] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    const phone = window.matchMedia('(max-width: 767px)').matches;
+    setSheet(phone);
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r && !phone) {
+      const W = 208; // w-52
+      const up = window.innerHeight - r.bottom < 240;
+      const rtl = document.documentElement.dir === 'rtl';
+      setPos({ top: up ? r.top - 4 : r.bottom + 4, left: rtl ? r.left : r.right - W, up });
+    }
+    setOpen(true);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const down = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || btnRef.current?.contains(target)) return;
+      setOpen(false);
+    };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const close = () => setOpen(false);
     document.addEventListener('mousedown', down);
     document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', down);
+      document.removeEventListener('keydown', key);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [open]);
-  const item = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-ink-2 hover:bg-raised hover:text-ink';
+
+  const item = sheet
+    ? 'flex h-12 w-full items-center gap-3.5 rounded-xl px-3 text-start text-[15px] text-ink active:bg-raised'
+    : 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-ink-2 hover:bg-raised hover:text-ink';
+  const icon = sheet ? 'h-5 w-5 text-ink-3' : 'h-4 w-4 text-ink-3';
+  const run = (fn: () => void) => () => { setOpen(false); fn(); };
+
+  const items = (
+    <>
+      <button type="button" className={item} onClick={run(() => onEdit(contact))}>
+        <Edit className={icon} /> {t('edit', { defaultValue: 'Edit' })}
+      </button>
+      <button type="button" className={item} onClick={run(() => onOpenDetails(contact))}>
+        <Eye className={icon} /> {t('tabs.overview')}
+      </button>
+      <Link href={`/tasks?contactId=${encodeURIComponent(contact.id)}`} className={item} onClick={() => setOpen(false)}>
+        <CheckSquare className={icon} /> {tChat('details.createTask')}
+      </Link>
+      <Link href={`/deals?contactId=${encodeURIComponent(contact.id)}`} className={item} onClick={() => setOpen(false)}>
+        <BriefcaseBusiness className={icon} /> {tChat('details.createDeal')}
+      </Link>
+      <div className="my-1 h-px bg-line" />
+      <button
+        type="button"
+        className={cn(item, 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10')}
+        onClick={run(() => onConfirmDelete(contact.id))}
+      >
+        <Trash2 className={cn(icon, 'text-current')} /> {t('deleteConfirm.title')}
+      </button>
+    </>
+  );
+
   return (
-    <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t('table.actions')} className="btn btn-ghost btn-icon btn-sm">
+    <>
+      <button ref={btnRef} type="button" onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label={t('table.actions')} className="btn btn-ghost btn-icon">
         <MoreHorizontal aria-hidden="true" />
       </button>
-      {open && (
-        <div className="pop-enter absolute end-0 top-full z-30 mt-1 w-48 rounded-lg bg-surface p-1 shadow-pop">
-          <button type="button" className={item} onClick={() => { setOpen(false); onOpenDetails(contact); }}>
-            <Eye className="h-4 w-4 text-ink-3" /> {t('tabs.overview')}
-          </button>
-          <Link href={`/tasks?contactId=${encodeURIComponent(contact.id)}`} className={item}>
-            <CheckSquare className="h-4 w-4 text-ink-3" /> {tChat('details.createTask')}
-          </Link>
-          <Link href={`/deals?contactId=${encodeURIComponent(contact.id)}`} className={item}>
-            <BriefcaseBusiness className="h-4 w-4 text-ink-3" /> {tChat('details.createDeal')}
-          </Link>
-          <div className="my-1 h-px bg-line" />
-          <button type="button" className={cn(item, 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10')} onClick={() => { setOpen(false); onConfirmDelete(contact.id); }}>
-            <Trash2 className="h-4 w-4" /> {t('deleteConfirm.title')}
-          </button>
-        </div>
+      {open && typeof document !== 'undefined' && createPortal(
+        sheet ? (
+          <div className="fixed inset-0 z-[70]" role="presentation">
+            <div className="absolute inset-0 bg-[rgb(8_12_10/0.35)] animate-fade-in" onClick={() => setOpen(false)} aria-hidden="true" />
+            <div
+              ref={menuRef}
+              role="menu"
+              className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-surface px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-pop animate-slide-up"
+            >
+              <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-line-strong" aria-hidden="true" />
+              <p dir="auto" className="truncate px-3 pb-2 text-sm font-semibold text-ink">{contact.name || formatPhone(contact.phone)}</p>
+              {items}
+            </div>
+          </div>
+        ) : pos && (
+          <div
+            ref={menuRef}
+            role="menu"
+            className="pop-enter fixed z-[70] w-52 rounded-lg bg-surface p-1 shadow-pop"
+            style={{ left: pos.left, ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}
+          >
+            {items}
+          </div>
+        ),
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
@@ -185,7 +263,7 @@ export default function ContactsTable({
                     <button type="button" onClick={() => chat(contact)} className="btn btn-ghost btn-icon" aria-label="Chat">
                       <MessageSquare aria-hidden="true" />
                     </button>
-                    <RowMenu contact={contact} onOpenDetails={onOpenDetails} onConfirmDelete={onConfirmDelete} />
+                    <RowMenu contact={contact} onOpenDetails={onOpenDetails} onEdit={onEdit} onConfirmDelete={onConfirmDelete} />
                   </>
                 )}
               </div>
@@ -274,7 +352,7 @@ export default function ContactsTable({
                         <button type="button" onClick={() => onEdit(contact)} className="btn btn-ghost btn-icon btn-sm" title={t('edit', { defaultValue: 'Edit' })} aria-label={t('edit', { defaultValue: 'Edit' })}>
                           <Edit aria-hidden="true" />
                         </button>
-                        <RowMenu contact={contact} onOpenDetails={onOpenDetails} onConfirmDelete={onConfirmDelete} />
+                        <RowMenu contact={contact} onOpenDetails={onOpenDetails} onEdit={onEdit} onConfirmDelete={onConfirmDelete} />
                       </div>
                     )}
                   </td>

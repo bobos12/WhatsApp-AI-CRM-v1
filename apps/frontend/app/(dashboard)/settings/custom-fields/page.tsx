@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Pencil, Plus, SlidersHorizontal, Trash2,
 } from 'lucide-react';
@@ -21,6 +21,7 @@ export default function CustomFieldsSettingsPage() {
   const { t } = useTranslation('settings');
   const { isRTL } = useDirection();
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
+  const router = useRouter();
 
   const { definitions, loading, reload } = useCustomFields({ includeInactive: true });
 
@@ -105,13 +106,16 @@ export default function CustomFieldsSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link
-          href="/settings"
+        {/* Back returns to wherever this was opened from — contacts, the contact
+            form or settings — and only falls back to settings on a fresh tab. */}
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? router.back() : router.push('/settings'))}
           className="btn btn-secondary flex"
         >
           <BackIcon className="h-4 w-4" />
           {t('back', { defaultValue: 'Back' })}
-        </Link>
+        </button>
       </div>
 
       <section className="relative">

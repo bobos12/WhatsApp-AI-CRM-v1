@@ -915,7 +915,7 @@ function BuilderContent() {
       {/* ── Left: editor ── */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Top bar — flush to the very top, no gap */}
-        <header className="z-20 flex h-14 flex-shrink-0 items-center gap-2 border-b border-line bg-surface px-3 sm:gap-3 sm:px-5">
+        <header className="z-20 box-content flex h-14 flex-shrink-0 items-center gap-2 border-b border-line bg-surface px-3 pt-safe sm:gap-3 sm:px-5">
           <button
             type="button"
             onClick={() => router.push('/templates')}
