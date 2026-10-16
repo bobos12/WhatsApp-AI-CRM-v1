@@ -801,8 +801,6 @@ model BroadcastRecipient {
   messageId   String?
 
   @@index([broadcastId, status])
-  // Delivery receipts arrive keyed by the WhatsApp message id.
-  @@index([messageId])
   @@index([tenantId])
   /// Cooldown lookups: "did this phone get a broadcast in the last N hours?"
   @@index([tenantId, phone, sentAt])
