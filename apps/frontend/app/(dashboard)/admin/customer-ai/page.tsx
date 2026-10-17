@@ -10,7 +10,7 @@ import {
   Save, RotateCcw, CheckCircle2, AlertCircle, Bot, Info, Send, Sparkles, X,
   Eye, EyeOff, KeyRound, ListChecks, Ban, ShieldAlert,
   Thermometer, Hash, Timer, LayoutGrid, HelpCircle, Heart, TrendingUp, MessageSquare,
-  ChevronRight, Gauge, PlugZap, UserRound, Hand, BookOpen, MessagesSquare, ShieldCheck,
+  ChevronRight, PlugZap, UserRound, Hand, BookOpen, MessagesSquare, ShieldCheck,
   Users, Clock, Headset, SlidersHorizontal, FlaskConical,
   type LucideIcon,
 } from 'lucide-react';
@@ -54,16 +54,25 @@ interface ChatStatus { models: GroqModelStatus[]; geminiModels: GeminiModelStatu
 
 // Friendly, consistent label for any routed model.
 const MODEL_LABELS: Record<string, string> = {
-  'gemini-2.5-flash': 'Gemini · 2.5 Flash',
-  'gemini-2.5-flash-lite': 'Gemini · 2.5 Flash-Lite',
-  'gemini-2.0-flash': 'Gemini · 2.0 Flash',
-  'gemini-2.0-flash-lite': 'Gemini · 2.0 Flash-Lite',
   'llama-3.3-70b-versatile': 'Groq · Llama 70B',
   'llama-3.1-8b-instant': 'Groq · Llama 8B',
   'gemma2-9b-it': 'Groq · Gemma 9B',
   'llama3-8b-8192': 'Groq · Llama3 8B',
 };
-function modelLabel(model: string): string { return MODEL_LABELS[model] ?? model; }
+// Gemini ids are discovered by the backend, so derive their labels from the id.
+function modelLabel(model: string): string {
+  if (MODEL_LABELS[model]) return MODEL_LABELS[model];
+  const gem = model.match(/^gemini-([\d.]+)-flash(-lite)?$/);
+  if (gem) return `Gemini · ${gem[1]} Flash${gem[2] ? '-Lite' : ''}`;
+  const gemma = model.match(/^gemma-([\d.]+)-(\d+)b/);
+  if (gemma) return `Gemma · ${gemma[1]} ${gemma[2]}B`;
+  return model;
+}
+function fmtCountdown(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(sec % 60).padStart(2, '0')}`;
+}
 function fmtNum(n: number | null): string {
   if (n == null) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -766,30 +775,18 @@ export default function CustomerAiPage() {
               subtitle={sec.connection.subtitle}
               badge={!hasApiKey && !hasGeminiKey ? <span className="chip chip-warn">{t('bot.connection.keyMissing')}</span> : undefined}
             >
+              <AiStatusBanner status={status} hasGeminiKey={hasGeminiKey} hasGroqKey={hasApiKey} t={t} />
               <div className="grid gap-5 md:grid-cols-2">
-                <Field label={t('bot.connection.apiKey')} hint={t('bot.connection.apiKeyHint', { url: 'console.groq.com' })}>
-                  {keyInput(apiKey, setApiKey, showApiKey, () => setShowApiKey((v) => !v), 'gsk_…')}
-                  <p className={cn('flex items-center gap-1.5 text-2xs font-medium', hasApiKey ? 'text-brand' : 'text-amber-700 dark:text-amber-400')}>
-                    <KeyRound className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {hasApiKey ? t('bot.connection.keySet') : t('bot.connection.keyMissing')}
-                  </p>
-                </Field>
                 <Field label={t('bot.connection.geminiKey')} hint={t('bot.connection.geminiKeyHint', { url: 'aistudio.google.com/apikey' })}>
                   {keyInput(geminiApiKey, setGeminiApiKey, showGeminiKey, () => setShowGeminiKey((v) => !v), 'AIza… / AQ.…')}
-                  <p className={cn('flex items-center gap-1.5 text-2xs font-medium', hasGeminiKey ? 'text-brand' : 'text-ink-3')}>
-                    <KeyRound className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {hasGeminiKey ? t('bot.connection.geminiKeySet') : t('bot.connection.geminiKeyMissing')}
-                  </p>
+                  <KeyState ok={hasGeminiKey} okText={t('bot.connection.geminiKeySet')} missingText={t('bot.connection.geminiKeyMissing')} warn={!hasApiKey} />
+                </Field>
+                <Field label={t('bot.connection.apiKey')} hint={t('bot.connection.apiKeyHint', { url: 'console.groq.com' })}>
+                  {keyInput(apiKey, setApiKey, showApiKey, () => setShowApiKey((v) => !v), 'gsk_…')}
+                  <KeyState ok={hasApiKey} okText={t('bot.connection.keySet')} missingText={hasGeminiKey ? t('bot.connection.groqOptional') : t('bot.connection.keyMissing')} warn={!hasGeminiKey} />
                 </Field>
               </div>
-              <div className="flex items-start gap-2 rounded-lg bg-raised px-3 py-2.5">
-                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" aria-hidden="true" />
-                <p className="text-xs leading-5 text-ink-2">{t('bot.connection.routingNote')}</p>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ModelAssignment routing={status?.routing ?? null} t={t} />
-                <FreeTierMeter models={status?.models ?? []} geminiModels={status?.geminiModels ?? []} t={t} />
-              </div>
+              <ReplyOrder status={status} hasGeminiKey={hasGeminiKey} hasGroqKey={hasApiKey} t={t} />
             </SectionCard>
           </div>
 
@@ -941,85 +938,158 @@ export default function CustomerAiPage() {
   );
 }
 
-// ── Which model each feature uses (read from the router) ─────────────────────
-function ModelAssignment({ routing, t }: { routing: RoutingMap | null; t: (k: string) => string }) {
-  const rows: Array<{ key: keyof RoutingMap; label: string }> = [
-    { key: 'bot', label: t('bot.routing.bot') },
+// ── Connection: live status, key state, reply order ─────────────────────────
+type StepState = 'active' | 'standby' | 'resting' | 'nokey';
+interface Step { model: string; provider: 'gemini' | 'groq'; state: StepState; secondsLeft: number; today: number }
+type TFn = (k: string, o?: Record<string, unknown>) => string;
+
+// Plain-language role per model family, so owners don't need to know model names.
+function modelRole(model: string): string {
+  if (/-flash-lite$/.test(model)) return 'balanced';
+  if (/-flash$/.test(model)) return 'best';
+  if (model.startsWith('gemma-')) return 'volume';
+  return 'backup';
+}
+
+function buildSteps(chain: RouteCandidate[], status: ChatStatus | null, hasGemini: boolean, hasGroq: boolean): Step[] {
+  let activeFound = false;
+  return chain.map((c) => {
+    const gem = status?.geminiModels.find((m) => m.model === c.model);
+    const live = c.provider === 'gemini' ? gem : status?.models.find((m) => m.model === c.model);
+    const hasKey = c.provider === 'gemini' ? hasGemini : hasGroq;
+    const secondsLeft = live && !live.available ? live.secondsLeft : 0;
+    let state: StepState = 'standby';
+    if (!hasKey) state = 'nokey';
+    else if (secondsLeft > 0) state = 'resting';
+    else if (!activeFound) { state = 'active'; activeFound = true; }
+    return { model: c.model, provider: c.provider, state, secondsLeft, today: gem?.requestsToday ?? 0 };
+  });
+}
+
+function KeyState({ ok, okText, missingText, warn }: { ok: boolean; okText: string; missingText: string; warn: boolean }) {
+  return (
+    <p className={cn('flex items-center gap-1.5 text-2xs font-medium', ok ? 'text-brand' : warn ? 'text-amber-700 dark:text-amber-400' : 'text-ink-3')}>
+      {ok ? <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden="true" /> : <KeyRound className="h-3 w-3 shrink-0" aria-hidden="true" />}
+      {ok ? okText : missingText}
+    </p>
+  );
+}
+
+function AiStatusBanner({ status, hasGeminiKey, hasGroqKey, t }: { status: ChatStatus | null; hasGeminiKey: boolean; hasGroqKey: boolean; t: TFn }) {
+  const steps = buildSteps(status?.routing.bot ?? [], status, hasGeminiKey, hasGroqKey);
+  const active = steps.find((s) => s.state === 'active');
+  const down = !hasGeminiKey && !hasGroqKey ? 'nokey' : status && !active ? 'exhausted' : null;
+  return (
+    <div className={cn(
+      'flex items-start gap-3 rounded-lg border px-3.5 py-3 transition-colors duration-200',
+      down ? 'border-amber-500/30 bg-amber-500/5' : 'border-brand/25 bg-brand/5',
+    )}>
+      <span className="relative mt-1.5 flex h-2 w-2 shrink-0">
+        {!down && active && <span className="absolute inset-0 rounded-full bg-brand opacity-60 motion-safe:animate-ping" />}
+        <span className={cn('relative h-2 w-2 rounded-full', down ? 'bg-amber-500' : 'bg-brand')} />
+      </span>
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-[13px] font-medium text-ink">
+          {down === 'nokey' ? t('bot.ai.statusNoKey')
+            : down === 'exhausted' ? t('bot.ai.statusExhausted')
+            : active ? <>{t('bot.ai.statusReplying')} <span dir="ltr" className="font-semibold">{modelLabel(active.model)}</span></>
+            : t('bot.ai.statusLoading')}
+        </p>
+        <p className="text-xs leading-5 text-ink-3">{down === 'nokey' ? t('bot.ai.statusNoKeyHint') : t('bot.ai.statusHint')}</p>
+      </div>
+    </div>
+  );
+}
+
+function StepBadge({ step, t }: { step: Step; t: TFn }) {
+  if (step.state === 'active') return <span className="chip chip-brand shrink-0">{t('bot.ai.state.active')}</span>;
+  if (step.state === 'resting') return <span className="chip chip-warn shrink-0">{t('bot.ai.state.resting', { time: fmtCountdown(step.secondsLeft) })}</span>;
+  if (step.state === 'nokey') return <span className="shrink-0 text-2xs text-ink-4">{t('bot.ai.state.nokey')}</span>;
+  return <span className="shrink-0 text-2xs text-ink-3">{t('bot.ai.state.standby')}</span>;
+}
+
+function ReplyOrder({ status, hasGeminiKey, hasGroqKey, t }: { status: ChatStatus | null; hasGeminiKey: boolean; hasGroqKey: boolean; t: TFn }) {
+  const [showOther, setShowOther] = useState(false);
+  const bot = buildSteps(status?.routing.bot ?? [], status, hasGeminiKey, hasGroqKey);
+  const others: Array<{ key: 'qualification' | 'assistant'; label: string }> = [
     { key: 'qualification', label: t('bot.routing.qualification') },
     { key: 'assistant', label: t('bot.routing.assistant') },
   ];
   return (
     <div className="rounded-lg border border-line">
-      <p className="border-b border-line px-3.5 py-2.5 text-[13px] font-medium text-ink">{t('bot.routing.title')}</p>
-      <div className="divide-y divide-line">
-        {rows.map((r) => {
-          const chain = routing?.[r.key] ?? [];
-          return (
-            <div key={r.key} className="flex flex-col gap-1.5 px-3.5 py-2.5">
-              <span className="text-xs text-ink-3">{r.label}</span>
-              <div className="flex flex-wrap items-center gap-1">
-                {chain.length === 0
-                  ? <span className="text-xs text-ink-4">—</span>
-                  : chain.map((cand, i) => (
-                      <span key={i} className="flex items-center gap-1">
-                        {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 text-ink-4 icon-mirror" />}
-                        <span className={cn('chip', i === 0 ? 'chip-brand' : 'chip-neutral')}>{modelLabel(cand.model)}</span>
-                      </span>
-                    ))}
-              </div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-line px-3.5 py-2.5">
+        <p className="text-[13px] font-medium text-ink">{t('bot.ai.orderTitle')}</p>
+        <p className="text-2xs text-ink-3">{t('bot.ai.orderHint')}</p>
+      </div>
+      <ol className="divide-y divide-line">
+        {bot.length === 0 && <li className="px-3.5 py-3"><Skeleton className="h-4 w-1/2" /></li>}
+        {bot.map((step, i) => (
+          <motion.li
+            key={step.model}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, delay: i * 0.03, ease: [0.2, 0, 0, 1] }}
+            className={cn(
+              'flex items-center gap-3 px-3.5 py-2.5 transition-colors duration-200',
+              step.state === 'active' && 'bg-brand/5',
+              step.state === 'nokey' && 'opacity-55',
+            )}
+          >
+            <span className={cn(
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-2xs font-semibold tabular-nums transition-colors duration-200',
+              step.state === 'active' ? 'bg-brand text-white' : 'bg-raised text-ink-3 ring-1 ring-inset ring-line',
+            )}>{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-ink"><bdi>{modelLabel(step.model)}</bdi></p>
+              <p className="text-2xs text-ink-3">
+                {t(`bot.ai.role.${modelRole(step.model)}`)}
+                {step.today > 0 && <> · <span className="tabular-nums">{t('bot.ai.today', { count: step.today })}</span></>}
+              </p>
             </div>
-          );
-        })}
-      </div>
-      <p className="border-t border-line px-3.5 py-2 text-2xs leading-4 text-ink-3">{t('bot.routing.hint')}</p>
-    </div>
-  );
-}
-
-// ── Live free-tier usage meter (Gemini + Groq buckets) ───────────────────────
-function FreeTierMeter({ models, geminiModels, t }: {
-  models: GroqModelStatus[]; geminiModels: GeminiModelStatus[]; t: (k: string) => string;
-}) {
-  if (models.length === 0 && geminiModels.length === 0) return null;
-  return (
-    <div className="rounded-lg border border-line">
-      <div className="flex items-center gap-2 border-b border-line px-3.5 py-2.5">
-        <Gauge className="h-4 w-4 text-ink-4" aria-hidden="true" />
-        <p className="text-[13px] font-medium text-ink">{t('bot.usage.title')}</p>
-      </div>
-      <div className="space-y-3 px-3.5 py-3">
-        {geminiModels.map((m) => (
-          <div key={m.model} className="flex items-center justify-between gap-2 text-xs">
-            <span className="truncate text-ink-2">{modelLabel(m.model)}</span>
-            {!m.available
-              ? <span dir="ltr" className="font-medium tabular-nums text-amber-600">{Math.floor(m.secondsLeft / 60)}:{String(m.secondsLeft % 60).padStart(2, '0')}</span>
-              : <span className="text-ink-3"><span className="font-semibold tabular-nums text-ink">{m.requestsToday}</span> {t('bot.usage.today')}</span>}
-          </div>
+            <StepBadge step={step} t={t} />
+          </motion.li>
         ))}
-        {models.map((m) => {
-          const q = m.quota;
-          const tokPct = q && q.remainingTokens != null && q.limitTokens ? Math.max(0, Math.min(1, q.remainingTokens / q.limitTokens)) : null;
-          const low = tokPct != null && tokPct <= 0.15;
-          const mid = tokPct != null && tokPct > 0.15 && tokPct <= 0.4;
-          return (
-            <div key={m.model} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-ink-2">{modelLabel(m.model)}</span>
-                {!m.available
-                  ? <span dir="ltr" className="font-medium tabular-nums text-amber-600">{Math.floor(m.secondsLeft / 60)}:{String(m.secondsLeft % 60).padStart(2, '0')}</span>
-                  : q
-                  ? <span dir="ltr" className="tabular-nums text-ink-3">{fmtNum(q.remainingTokens)}/{fmtNum(q.limitTokens)} {t('bot.usage.tok')}</span>
-                  : <span className="text-ink-4">{t('bot.usage.idle')}</span>}
-              </div>
-              {tokPct != null && (
-                <div className="h-1 overflow-hidden rounded-full bg-raised ring-1 ring-inset ring-line">
-                  <div className={cn('grow-x h-1 rounded-full', low ? 'bg-red-500' : mid ? 'bg-amber-400' : 'bg-brand')} style={{ width: `${Math.round(tokPct * 100)}%` }} />
-                </div>
-              )}
+      </ol>
+      <button
+        type="button"
+        onClick={() => setShowOther((v) => !v)}
+        aria-expanded={showOther}
+        className="flex w-full items-center gap-1.5 border-t border-line px-3.5 py-2.5 text-start text-xs text-ink-3 transition-colors hover:bg-raised hover:text-ink"
+      >
+        <ChevronRight className={cn('icon-mirror h-3.5 w-3.5 shrink-0 transition-transform duration-200', showOther && 'rotate-90')} aria-hidden="true" />
+        {t('bot.ai.otherTitle')}
+      </button>
+      <AnimatePresence initial={false}>
+        {showOther && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2.5 px-3.5 pb-3">
+              <p className="text-2xs leading-4 text-ink-3">{t('bot.ai.otherHint')}</p>
+              {others.map((o) => {
+                const steps = buildSteps(status?.routing[o.key] ?? [], status, hasGeminiKey, hasGroqKey);
+                return (
+                  <div key={o.key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                    <span className="shrink-0 text-xs text-ink-2 sm:w-32">{o.label}</span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {steps.map((s, i) => (
+                        <span key={s.model} className="flex items-center gap-1">
+                          {i > 0 && <ChevronRight className="icon-mirror h-3 w-3 shrink-0 text-ink-4" aria-hidden="true" />}
+                          <span className={cn('chip', s.state === 'active' ? 'chip-brand' : 'chip-neutral', s.state === 'nokey' && 'opacity-55')}><bdi>{modelLabel(s.model)}</bdi></span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

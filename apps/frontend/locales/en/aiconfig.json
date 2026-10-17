@@ -467,14 +467,14 @@
       "provider": "AI Provider",
       "providerNote": "Shared by every AI feature in the system.",
       "apiKey": "Groq API Key",
-      "apiKeyHint": "Get your key from {{url}}",
+      "apiKeyHint": "Free key from {{url}} — backup when Google's free limits run out.",
       "keySet": "Key is set",
       "keyMissing": "No key set — the bot cannot reply until you add one",
       "geminiKey": "Gemini API Key",
-      "geminiKeyHint": "Free key from {{url}} — used as the primary, with Groq as automatic fallback.",
+      "geminiKeyHint": "Free key from {{url}} — the bot's main AI.",
       "geminiKeySet": "Gemini key is set",
-      "geminiKeyMissing": "Optional — add it to use Gemini's free tier first",
-      "routingNote": "Smart routing is automatic: the bot uses Gemini first, then falls back to Groq if a limit is hit. Lead qualification and the CRM assistant run on separate free lanes so nothing competes for the same quota."
+      "geminiKeyMissing": "Recommended — the bot's main AI",
+      "groqOptional": "Optional — extra backup if Google is busy"
     },
     "routing": {
       "title": "Which model each feature uses",
@@ -482,12 +482,6 @@
       "qualification": "Lead scoring",
       "assistant": "CRM assistant",
       "hint": "Tried left → right. The first healthy free model answers; if it hits a limit, the next one takes over automatically."
-    },
-    "usage": {
-      "title": "Live free-tier usage",
-      "today": "today",
-      "tok": "tokens left",
-      "idle": "no usage yet"
     },
     "habits": "Conversation habits",
     "sellingStyle": "Selling style",
@@ -514,6 +508,32 @@
     "testButton": "Test",
     "templates": "Templates",
     "unsavedBody": "Your changes apply to the bot once saved.",
-    "rawActive": "Override active"
+    "rawActive": "Override active",
+    "ai": {
+      "statusReplying": "The bot is replying with",
+      "statusHint": "When a model reaches its free daily limit, the next one takes over automatically — customers always get an answer.",
+      "statusLoading": "Checking AI status…",
+      "statusNoKey": "The bot can't reply yet",
+      "statusNoKeyHint": "Add a Gemini key (recommended) or a Groq key below.",
+      "statusExhausted": "All free models are resting right now",
+      "orderTitle": "Customer bot — reply order",
+      "orderHint": "Top to bottom. New Google models are adopted automatically.",
+      "role": {
+        "best": "Best quality · small daily allowance",
+        "balanced": "Good quality · larger allowance",
+        "volume": "High volume · very large allowance",
+        "backup": "Backup"
+      },
+      "state": {
+        "active": "Answering now",
+        "standby": "Standby",
+        "resting": "Back in {{time}}",
+        "nokey": "No key"
+      },
+      "today_one": "{{count}} reply today",
+      "today_other": "{{count}} replies today",
+      "otherTitle": "Lead scoring & CRM assistant",
+      "otherHint": "These run on their own models, so they never use the customer bot's allowance."
+    }
   }
 }

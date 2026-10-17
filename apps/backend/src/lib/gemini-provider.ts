@@ -33,6 +33,28 @@ function track(model: string, totalTokens: number): void {
   }
 }
 
+// Free-tier daily quotas reset at midnight Pacific; 08:00 UTC covers PST and is
+// at most an hour late during PDT.
+function nextPacificMidnight(): number {
+  const d = new Date();
+  d.setUTCHours(8, 0, 0, 0);
+  if (d.getTime() <= Date.now()) d.setUTCDate(d.getUTCDate() + 1);
+  return d.getTime();
+}
+
+function foldSystemPrompt(
+  systemPrompt: string,
+  msgs: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const first = msgs.findIndex((m) => m.role === 'user');
+  if (first === -1) return [{ role: 'user', content: systemPrompt }, ...msgs];
+  return msgs.map((m, i) => (i === first ? { ...m, content: `${systemPrompt}
+
+---
+
+${m.content}` } : m));
+}
+
 export function isGeminiAvailable(model: string): boolean {
   const until = cooldownUntil.get(model);
   return !until || Date.now() >= until;
@@ -50,6 +72,13 @@ export interface GeminiCallOpts {
 
 /** One Gemini call. Returns the reply text, or throws on rate-limit/error so the router can fall back. */
 export async function callGeminiSingle(opts: GeminiCallOpts): Promise<string | null> {
+  const isGemma = opts.model.startsWith('gemma-');
+  // Gemma models don't take Gemini's thinking switch, and don't reliably accept a
+  // separate system role on this endpoint — fold the instructions into the first turn.
+  const messages = isGemma
+    ? foldSystemPrompt(opts.systemPrompt, opts.messages)
+    : [{ role: 'system', content: opts.systemPrompt }, ...opts.messages];
+
   const resp = await fetch(GEMINI_OPENAI_URL, {
     method: 'POST',
     headers: {
@@ -58,18 +87,28 @@ export async function callGeminiSingle(opts: GeminiCallOpts): Promise<string | n
     },
     body: JSON.stringify({
       model: opts.model,
-      reasoning_effort: 'none', // disable Gemini "thinking" — saves tokens, prevents truncation
-      messages: [{ role: 'system', content: opts.systemPrompt }, ...opts.messages],
+      ...(isGemma ? {} : { reasoning_effort: 'none' }), // disable Gemini "thinking" — saves tokens, prevents truncation
+      messages,
       max_tokens: opts.maxTokens,
       temperature: opts.temperature,
-      ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      ...(opts.jsonMode && !isGemma ? { response_format: { type: 'json_object' } } : {}),
     }),
   });
 
   if (resp.status === 429) {
-    cooldownUntil.set(opts.model, Date.now() + 60_000);
-    logger.warn('gemini.rate_limited', { model: opts.model });
+    const body = await resp.text().catch(() => '');
+    // Daily quota spent → skip this model until Google's reset instead of
+    // re-trying (and wasting a round-trip) on every customer message.
+    const daily = /per ?day|PerDay|daily/i.test(body);
+    cooldownUntil.set(opts.model, daily ? nextPacificMidnight() : Date.now() + 60_000);
+    logger.warn('gemini.rate_limited', { model: opts.model, daily });
     throw new Error(`gemini 429 on ${opts.model}`);
+  }
+  if (resp.status === 404) {
+    // Model retired or not available to this key — stop trying it for a day.
+    cooldownUntil.set(opts.model, Date.now() + 24 * 60 * 60 * 1000);
+    logger.warn('gemini.model_not_found', { model: opts.model });
+    throw new Error(`gemini 404 on ${opts.model}`);
   }
   if (!resp.ok) {
     const body = await resp.text().catch(() => resp.statusText);

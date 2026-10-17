@@ -12,7 +12,7 @@ import { AI_CONFIG_TEMPLATES } from '../../services/ai-config-templates';
 import { callChatModel } from '../../lib/chat-model';
 import { getModelStatus } from '../../lib/groq-fallback';
 import { getGeminiStatus } from '../../lib/gemini-provider';
-import { routeChat, routerChains } from '../../services/model-router';
+import { routeChat, routerChains, routerGeminiModels } from '../../services/model-router';
 import { logger } from '../../lib/logger';
 
 const router = Router();
@@ -58,7 +58,7 @@ router.get('/status', authMiddleware, (_req: Request, res: Response) => {
     // Live free-bucket status per provider for the quota meter.
     models: getModelStatus(botModel),
     geminiModels: (s.geminiApiKey || process.env.GEMINI_API_KEY)
-      ? getGeminiStatus(['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite'])
+      ? getGeminiStatus(routerGeminiModels())
       : [],
     // Which model each feature uses, in fallback order (single source: the router).
     routing: routerChains(),

@@ -4,36 +4,39 @@
 // daily quota until that whole chain is exhausted. The router tries each
 // candidate in order and falls back automatically when one is rate-limited.
 //
-// Free-tier allocation (per-model/per-provider daily limits are independent):
-//   • Customer bot      → Gemini 2.5 Flash → Groq 70B → Groq 8B   (quality + Arabic)
-//   • Lead qualification→ Gemini 2.5 Flash-Lite → Groq 8B          (cheap JSON, isolated)
-//   • CRM assistant     → Groq 8B → Gemini 2.0 Flash-Lite          (low volume, own lane)
+// Gemini ids are discovered at runtime (see lib/gemini-models.ts), so new
+// Google releases are picked up automatically and retired ones never 404.
+//
+// Free-tier allocation (each model has its own independent daily quota):
+//   • Customer bot      → newest Flash → newest Flash-Lite → Gemma (largest)
+//                         → Groq 70B → Groq 8B
+//   • Lead qualification→ 2nd Flash-Lite → Gemma (2nd) → Groq 8B
+//   • CRM assistant     → Groq 8B → Gemma (2nd)
+// The bot gets the best models; the background features use separate buckets
+// so they never eat the customer bot's quota.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { logger } from '../lib/logger';
 import { chatbotSettingsService } from './chatbot-settings.service';
 import { groqChatWithFallback } from '../lib/groq-fallback';
 import { callGeminiSingle, isGeminiAvailable } from '../lib/gemini-provider';
+import { getGeminiFamilies, peekGeminiFamilies, type GeminiFamilies } from '../lib/gemini-models';
 
 export type RouterFeature = 'bot' | 'qualification' | 'assistant';
 
 interface Candidate { provider: 'gemini' | 'groq'; model: string }
 
-const CHAINS: Record<RouterFeature, Candidate[]> = {
-  bot: [
-    { provider: 'gemini', model: 'gemini-2.5-flash' },
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' },
-    { provider: 'groq', model: 'llama-3.1-8b-instant' },
-  ],
-  qualification: [
-    { provider: 'gemini', model: 'gemini-2.5-flash-lite' },
-    { provider: 'groq', model: 'llama-3.1-8b-instant' },
-  ],
-  assistant: [
-    { provider: 'groq', model: 'llama-3.1-8b-instant' },
-    { provider: 'gemini', model: 'gemini-2.0-flash-lite' },
-  ],
-};
+const GROQ_70B: Candidate = { provider: 'groq', model: 'llama-3.3-70b-versatile' };
+const GROQ_8B: Candidate = { provider: 'groq', model: 'llama-3.1-8b-instant' };
+
+function buildChains(f: GeminiFamilies): Record<RouterFeature, Candidate[]> {
+  const g = (model: string | undefined): Candidate[] => (model ? [{ provider: 'gemini', model }] : []);
+  return {
+    bot: [...g(f.flash[0]), ...g(f.flashLite[0]), ...g(f.gemma[0]), GROQ_70B, GROQ_8B],
+    qualification: [...g(f.flashLite[1] ?? f.flashLite[0]), ...g(f.gemma[1] ?? f.gemma[0]), GROQ_8B],
+    assistant: [GROQ_8B, ...g(f.gemma[1] ?? f.gemma[0])],
+  };
+}
 
 export interface RouteOpts {
   systemPrompt: string;
@@ -45,7 +48,13 @@ export interface RouteOpts {
 
 export interface RouteResult { content: string | null; provider: string; model: string }
 
-export function routerChains(): Record<RouterFeature, Candidate[]> { return CHAINS; }
+export function routerChains(): Record<RouterFeature, Candidate[]> { return buildChains(peekGeminiFamilies()); }
+
+/** Every Gemini model the router may use (for the usage meter). */
+export function routerGeminiModels(): string[] {
+  const chains = routerChains();
+  return [...new Set(Object.values(chains).flat().filter((c) => c.provider === 'gemini').map((c) => c.model))];
+}
 
 /**
  * Route one chat completion for a feature across its free-bucket chain.
@@ -57,8 +66,10 @@ export async function routeChat(feature: RouterFeature, opts: RouteOpts): Promis
   const groqKey = s.apiKey || process.env.GROQ_API_KEY || '';
   const geminiKey = (s as { geminiApiKey?: string }).geminiApiKey || process.env.GEMINI_API_KEY || '';
 
+  const chain = buildChains(geminiKey ? await getGeminiFamilies(geminiKey) : peekGeminiFamilies())[feature];
+
   let lastErr = '';
-  for (const cand of CHAINS[feature]) {
+  for (const cand of chain) {
     if (cand.provider === 'gemini' && (!geminiKey || !isGeminiAvailable(cand.model))) continue;
     if (cand.provider === 'groq' && !groqKey) continue;
     try {
