@@ -631,6 +631,7 @@ function BuilderContent() {
         hasPendingEdits: false,
         metaEditError: null,
       });
+      router.push('/templates');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not submit for approval';
       // A refused edit of a live template keeps it approved; show why in the panel.
