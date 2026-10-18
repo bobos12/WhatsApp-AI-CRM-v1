@@ -26,6 +26,10 @@ export interface ApprovalFields {
   metaRejectedReason?: string | null;
   metaSubmittedAt?: string | null;
   metaQualityScore?: string | null;
+  /** Saved in the CRM but not yet accepted by WhatsApp — sends still carry the approved version. */
+  hasPendingEdits?: boolean;
+  /** Why WhatsApp refused the last edit, when it did. */
+  metaEditError?: string | null;
 }
 
 type Tone = 'good' | 'warn' | 'bad' | 'neutral';
@@ -45,6 +49,18 @@ interface Descriptor {
  * — it is called from list filters and card bodies, not only from components.
  */
 export function describeApproval(template: ApprovalFields, t: TFn): Descriptor {
+  // A live template with local edits: the edits reach nobody until resubmitted.
+  if (template.hasPendingEdits && (template.metaStatus === 'APPROVED' || template.metaStatus === 'PAUSED')) {
+    return {
+      tone: template.metaEditError ? 'bad' : 'warn',
+      label: template.metaEditError ? t('approval.editRejected') : t('approval.pendingEdits'),
+      detail: template.metaEditError
+        ? `${template.metaEditError} — ${t('approval.detailStillApproved')}`
+        : t('approval.detailPendingEdits'),
+      icon: template.metaEditError ? XCircle : AlertTriangle,
+      canSubmit: true,
+    };
+  }
   switch (template.metaStatus) {
     case 'APPROVED':
       return {
@@ -192,9 +208,11 @@ export function ApprovalPanel({
                 <Send className="h-3.5 w-3.5" />
                 {submitting
                   ? t('approval.submitting')
-                  : template.metaStatus === 'REJECTED'
-                    ? t('approval.resubmit')
-                    : t('approval.submit')}
+                  : template.hasPendingEdits
+                    ? t('approval.submitEdits')
+                    : template.metaStatus === 'REJECTED'
+                      ? t('approval.resubmit')
+                      : t('approval.submit')}
               </button>
               {disabledReason && (
                 <p className="mt-2 text-xs text-ink-3">{disabledReason}</p>

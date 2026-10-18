@@ -37,6 +37,8 @@ interface MessageTemplate {
   metaRejectedReason?: string | null;
   metaSubmittedAt?: string | null;
   metaQualityScore?: string | null;
+  hasPendingEdits?: boolean;
+  metaEditError?: string | null;
 }
 
 type Tab = 'library' | 'presets';
@@ -129,9 +131,15 @@ function TemplateCard({
 
       {/* Meta's rejection wording, verbatim. A rejection the tenant cannot read
           is a support ticket — and it is the only thing that says what to edit. */}
-      {template.metaStatus === 'REJECTED' && template.metaRejectedReason && (
+      {template.metaStatus === 'REJECTED' && template.metaRejectedReason && !template.hasPendingEdits && (
         <p className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-rose-600 dark:text-rose-400">
           {template.metaRejectedReason}
+        </p>
+      )}
+      {/* Edits that WhatsApp hasn't accepted yet — say plainly what customers get. */}
+      {template.hasPendingEdits && template.metaStatus !== 'REJECTED' && (
+        <p className={`rounded-lg px-2.5 py-1.5 text-[11px] leading-snug ${template.metaEditError ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}>
+          {approval.detail}
         </p>
       )}
 
@@ -146,9 +154,11 @@ function TemplateCard({
           <ShieldCheck className="h-3.5 w-3.5" />
           {submitting
             ? t('approval.submitting')
-            : template.metaStatus === 'REJECTED'
-              ? t('approval.resubmitShort')
-              : t('approval.submitShort')}
+            : template.hasPendingEdits
+              ? t('approval.submitEditsShort')
+              : template.metaStatus === 'REJECTED'
+                ? t('approval.resubmitShort')
+                : t('approval.submitShort')}
         </button>
       )}
 
@@ -299,6 +309,8 @@ export default function TemplatesPage() {
                 metaStatus: (result?.metaStatus ?? 'PENDING') as MetaStatus,
                 metaRejectedReason: result?.metaRejectedReason ?? null,
                 metaSubmittedAt: result?.metaSubmittedAt ?? new Date().toISOString(),
+                hasPendingEdits: false,
+                metaEditError: null,
               }
             : item,
         ),

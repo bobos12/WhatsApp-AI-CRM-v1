@@ -488,6 +488,8 @@ function BuilderContent() {
         metaRejectedReason: found.metaRejectedReason ?? null,
         metaSubmittedAt: found.metaSubmittedAt ?? null,
         metaQualityScore: found.metaQualityScore ?? null,
+        hasPendingEdits: Boolean(found.hasPendingEdits),
+        metaEditError: found.metaEditError ?? null,
       });
     }).catch(() => {});
   }, [templateId, status]);
@@ -584,7 +586,9 @@ function BuilderContent() {
       };
       let id = templateId;
       if (templateId) {
-        await api.put(`/api/templates/${templateId}`, body);
+        const saved = await api.put(`/api/templates/${templateId}`, body);
+        // An approved template that now differs from WhatsApp's copy needs resubmitting.
+        if (saved) setApproval((a) => ({ ...a, hasPendingEdits: Boolean(saved.hasPendingEdits), metaEditError: saved.metaEditError ?? null }));
       } else {
         const created = await api.post('/api/templates', body);
         if (created?.id) { id = created.id; setTemplateId(created.id); window.history.replaceState(null, '', `/templates/builder?id=${created.id}`); }
@@ -624,9 +628,14 @@ function BuilderContent() {
         metaRejectedReason: result?.metaRejectedReason ?? null,
         metaSubmittedAt: result?.metaSubmittedAt ?? new Date().toISOString(),
         metaQualityScore: result?.metaQualityScore ?? null,
+        hasPendingEdits: false,
+        metaEditError: null,
       });
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not submit for approval');
+      const message = err instanceof Error ? err.message : 'Could not submit for approval';
+      // A refused edit of a live template keeps it approved; show why in the panel.
+      setApproval((a) => (a.metaStatus === 'APPROVED' || a.metaStatus === 'PAUSED' ? { ...a, hasPendingEdits: true, metaEditError: message } : a));
+      setSaveError(message);
     } finally {
       setSubmitting(false);
     }
@@ -666,6 +675,8 @@ function BuilderContent() {
   );
 
   const rejected = approval.metaStatus === 'REJECTED';
+  // Live template with unsent edits: the warning belongs at the top, like a rejection.
+  const editsPending = Boolean(approval.hasPendingEdits) && !rejected;
   const canSubmit = describeApproval(approval, t as Parameters<typeof describeApproval>[1]).canSubmit;
   const busy = saving || submitting;
   const approvalPanel = (
@@ -894,7 +905,7 @@ function BuilderContent() {
 
       {/* 6 · WhatsApp approval — the last step. A rejection moves to the top of
           the page instead, because Meta's reason dictates what to change. */}
-      {!rejected && (
+      {!rejected && !editsPending && (
         <Step
           n={6}
           title={t('builder.steps.approval.title')}
@@ -950,7 +961,7 @@ function BuilderContent() {
               className="btn btn-primary hidden disabled:opacity-60 sm:inline-flex"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
-              {submitting ? t('approval.submitting') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
+              {submitting ? t('approval.submitting') : editsPending ? t('approval.submitEditsShort') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
             </button>
           )}
         </header>
@@ -964,7 +975,7 @@ function BuilderContent() {
               </div>
             )}
 
-            {rejected && <div className="mb-8">{approvalPanel}</div>}
+            {(rejected || editsPending) && <div className="mb-8">{approvalPanel}</div>}
 
             {editorControls}
 
@@ -1003,7 +1014,7 @@ function BuilderContent() {
             className="btn btn-primary h-12 flex-[1.3] justify-center text-sm font-semibold active:scale-[0.98] disabled:opacity-60"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 icon-mirror" />}
-            {submitting ? t('approval.submitting') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
+            {submitting ? t('approval.submitting') : editsPending ? t('approval.submitEditsShort') : rejected ? t('approval.resubmit') : t('builder.submitShort')}
           </button>
         )}
       </div>

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authMiddleware, checkPermission } from '../../auth/auth.middleware';
 import { prisma } from '../../lib/prisma';
 import { resolveMediaUrl, toStorageRef } from '../../lib/media';
-import { renderTemplate, sendTemplate } from '../../services/template.service';
+import { renderTemplate, resolveCanonical, sendTemplate } from '../../services/template.service';
 
 const router = Router();
 
@@ -53,10 +53,23 @@ function syncPayload(payload: any, media: ReturnType<typeof normalizeMedia>) {
 }
 
 /** Media leaves the API as a loadable URL; it is stored as a portable ref. */
+/**
+ * What Meta reviews: body, attachment, footer and buttons. Comparing this before
+ * and after a save tells us whether an approved template now differs from the
+ * version WhatsApp actually sends.
+ */
+function contentFingerprint(row: any): string {
+  const c = resolveCanonical(row);
+  return JSON.stringify([c.body?.text?.trim() ?? '', c.media?.url ?? null, c.footer?.text?.trim() ?? '', c.buttons ?? []]);
+}
+
 function serializeTemplate(template: any) {
   const payload = template.payload;
   return {
     ...template,
+    // Saved locally but not yet accepted by Meta — sends still carry the approved version.
+    hasPendingEdits: Boolean(template.metaTemplateId && payload?._meta?.pendingEdits),
+    metaEditError: payload?._meta?.editError ?? null,
     mediaUrl: resolveMediaUrl(template.mediaUrl),
     payload:
       payload && typeof payload === 'object' && payload.media?.url
@@ -145,6 +158,25 @@ router.put('/:id', checkPermission('update', 'templates'), async (req, res) => {
         ...(category !== undefined ? { category } : {}),
       },
     });
+
+    // A Meta-linked template whose content changed must be resubmitted before
+    // the change reaches anyone — flag it so the UI can say so and offer submit.
+    // The flags are server-owned: whatever the client echoed back is replaced.
+    if (existing.metaTemplateId && template.payload && typeof template.payload === 'object' && !Array.isArray(template.payload)) {
+      const prev = ((existing.payload as any)?._meta ?? {}) as Record<string, unknown>;
+      const { pendingEdits: _p, editError: _e, ...meta } = ((template.payload as any)._meta ?? {}) as Record<string, unknown>;
+      const pending = Boolean(prev.pendingEdits) || contentFingerprint(existing) !== contentFingerprint(template);
+      const flagged = await prisma.messageTemplate.update({
+        where: { id: template.id },
+        data: {
+          payload: {
+            ...(template.payload as any),
+            _meta: { ...meta, ...(pending ? { pendingEdits: true } : {}), ...(pending && prev.editError ? { editError: prev.editError } : {}) },
+          },
+        },
+      });
+      return res.json(serializeTemplate(flagged));
+    }
     res.json(serializeTemplate(template));
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

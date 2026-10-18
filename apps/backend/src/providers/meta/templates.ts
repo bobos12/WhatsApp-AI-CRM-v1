@@ -413,7 +413,7 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
         metaSyncedAt: new Date(),
         category: built.category,
         variables: built.variableOrder,
-        payload: withMetaSnapshot(row.payload, built.extras),
+        payload: clearEditFlags(withMetaSnapshot(row.payload, built.extras)),
       },
     });
 
@@ -421,12 +421,34 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
     return { metaTemplateId, metaStatus: 'PENDING', category: built.category };
   } catch (err) {
     const meta = asMetaError(err);
+    // Meta refused an EDIT of a live template: the approved version is untouched
+    // and still sends. Marking the row REJECTED would hide that, so keep the
+    // status and record why the edit failed.
+    const liveEdit = row.metaTemplateId && ['APPROVED', 'PAUSED'].includes((row.metaStatus ?? '').toUpperCase());
+    if (liveEdit) {
+      const base = row.payload && typeof row.payload === 'object' && !Array.isArray(row.payload) ? (row.payload as any) : {};
+      await prisma.messageTemplate.update({
+        where: { id: templateId },
+        data: {
+          payload: { ...base, _meta: { ...(base._meta ?? {}), pendingEdits: true, editError: meta.userMessage } },
+          metaSyncedAt: new Date(),
+        },
+      });
+      throw new HttpError(meta.httpStatus >= 500 ? 502 : 400, meta.userMessage, `META_${meta.kind}`);
+    }
     await prisma.messageTemplate.update({
       where: { id: templateId },
       data: { metaStatus: 'REJECTED', metaRejectedReason: meta.userMessage, metaSyncedAt: new Date() },
     });
     throw new HttpError(meta.httpStatus >= 500 ? 502 : 400, meta.userMessage, `META_${meta.kind}`);
   }
+}
+
+/** A successful submission means Meta now holds the edited version. */
+function clearEditFlags(payload: any): any {
+  if (!payload?._meta) return payload;
+  const { pendingEdits: _p, editError: _e, ...meta } = payload._meta;
+  return { ...payload, _meta: meta };
 }
 
 /** Store the approved footer/buttons inside the payload's `_meta` without touching the rest. */

@@ -265,6 +265,12 @@
     "filterNeedsApproval": "Needs approval",
     "filterApproved": "Approved",
     "presetsIntro": "Wording that WhatsApp is known to approve — a head start on writing your own, not a shortcut past review. Add one to your library, then submit it for approval.",
-    "presetsBadge": "Needs approval"
+    "presetsBadge": "Needs approval",
+    "pendingEdits": "Edits not submitted",
+    "editRejected": "Edit refused",
+    "detailPendingEdits": "Your changes are saved in the CRM only. Customers still receive the approved version until you submit the edits and WhatsApp approves them.",
+    "detailStillApproved": "customers still receive the approved version. Fix the issue and submit again.",
+    "submitEdits": "Submit edits for review",
+    "submitEditsShort": "Submit edits"
   }
 }
