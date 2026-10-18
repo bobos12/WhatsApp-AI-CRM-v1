@@ -51,6 +51,42 @@ export function toMetaTemplateName(displayName: string): string {
   return slug || 'template';
 }
 
+const ARABIC_LATIN: Record<string, string> = {
+  'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'j', 'ح': 'h', 'خ': 'kh',
+  'د': 'd', 'ذ': 'th', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z',
+  'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'ة': 'h',
+  'و': 'w', 'ؤ': 'o', 'ي': 'y', 'ى': 'a', 'ئ': 'e', 'ء': '',
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+};
+
+/**
+ * The Meta name for a template's FIRST submission. Arabic names used to collapse
+ * to their digits ("عقارات 28" and "محاضرة … 28" both became "28"), so two
+ * templates collided at Meta. Transliterate for readability in WhatsApp Manager
+ * and suffix part of the row id so the name is unique and stable across retries.
+ */
+export function newMetaTemplateName(displayName: string, rowId: string): string {
+  const latin = [...displayName].map((ch) => ARABIC_LATIN[ch] ?? ch).join('');
+  const base = toMetaTemplateName(latin).slice(0, 60).replace(/_+$/, '');
+  const suffix = rowId.replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase();
+  return `${base === 'template' ? 'tpl' : base}_${suffix}`;
+}
+
+/**
+ * The name this template has AT META. Stored on first submission/import; older
+ * rows fall back to the legacy derivation, which is what they were created with.
+ * Always use this — never re-derive from the display name, which the user can rename.
+ */
+export function metaNameOf(row: { name: string; payload?: any }): string {
+  const stored = row.payload?._meta?.metaName;
+  return typeof stored === 'string' && stored ? stored : toMetaTemplateName(row.name);
+}
+
+function withMetaName(payload: any, metaName: string): any {
+  const base = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  return { ...base, _meta: { ...(base._meta ?? {}), metaName } };
+}
+
 export type MetaCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
 
 /**
@@ -270,6 +306,8 @@ export async function buildTemplateForSubmission(params: {
   category?: string | null;
   previousOrder?: string[];
   cloud: CloudApiConfig;
+  /** The name at Meta; defaults to the legacy derivation from the display name. */
+  metaName?: string;
 }): Promise<BuiltTemplate> {
   const { canonical, displayName, language, category, previousOrder, cloud } = params;
 
@@ -323,7 +361,7 @@ export async function buildTemplateForSubmission(params: {
   if (buttons.length) components.push({ type: 'BUTTONS', buttons: buttons.map(toMetaButton) });
 
   return {
-    name: toMetaTemplateName(displayName),
+    name: params.metaName ?? toMetaTemplateName(displayName),
     language,
     category: toMetaCategory(category),
     components,
@@ -364,10 +402,19 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
   const { resolveCanonical } = await import('../../services/template.service');
   const canonical = resolveCanonical(row);
 
+  // An existing Meta object keeps its name (it is its identity there); a first
+  // submission gets a fresh, collision-proof one.
+  const metaName = row.metaTemplateId ? metaNameOf(row) : newMetaTemplateName(row.name, row.id);
+  // The editor defaults to en_US; Arabic text filed as English gets rejected or
+  // misrouted. Only a first submission can pick its language — it is part of the
+  // template's identity at Meta afterwards.
+  const language =
+    !row.metaTemplateId && row.language === 'en_US' && /[؀-ۿ]/.test(canonical.body?.text ?? '') ? 'ar' : row.language;
   const built = await buildTemplateForSubmission({
     canonical,
+    metaName,
     displayName: row.name,
-    language: row.language,
+    language,
     category: row.category,
     previousOrder: Array.isArray(row.variables) ? (row.variables as string[]) : undefined,
     cloud,
@@ -410,10 +457,11 @@ export async function submitTemplate(templateId: string, cloud: CloudApiConfig):
         metaStatus: 'PENDING',
         metaRejectedReason: null,
         metaSubmittedAt: new Date(),
+        language,
         metaSyncedAt: new Date(),
         category: built.category,
         variables: built.variableOrder,
-        payload: clearEditFlags(withMetaSnapshot(row.payload, built.extras)),
+        payload: withMetaName(clearEditFlags(withMetaSnapshot(row.payload, built.extras)), built.name),
       },
     });
 
@@ -525,7 +573,7 @@ async function importRemoteTemplate(r: MetaTemplateRow): Promise<void> {
         body: { text: body },
         ...(extras.footer ? { footer: { text: extras.footer } } : {}),
         ...(extras.buttons ? { buttons: extras.buttons } : {}),
-        _meta: { variableNames: slots, meta: extras },
+        _meta: { variableNames: slots, meta: extras, metaName: r.name },
       } as any,
       category: r.category?.toUpperCase() ?? null,
       type: media ? 'MEDIA' : 'TEXT',
@@ -582,7 +630,7 @@ export async function syncTemplates(
   const remoteIds = new Set(remote.map((r) => r.id));
   for (const l of locals) {
     if (!l.metaTemplateId || remoteIds.has(l.metaTemplateId)) continue;
-    if (remote.some((r) => toMetaTemplateName(l.name) === r.name && l.language === r.language)) continue;
+    if (remote.some((r) => metaNameOf(l) === r.name && l.language === r.language)) continue;
     await prisma.messageTemplate.update({
       where: { id: l.id },
       data: { metaTemplateId: null, metaStatus: null, metaRejectedReason: null, metaSyncedAt: new Date() },
@@ -594,9 +642,11 @@ export async function syncTemplates(
     // Match on the Meta id when we have it, otherwise on the (name, language)
     // identity Meta itself uses — that second path adopts templates created
     // directly in Meta Business Manager.
-    const local =
-      locals.find((l) => l.metaTemplateId === r.id) ??
-      locals.find((l) => toMetaTemplateName(l.name) === r.name && l.language === r.language);
+    // Name matching only adopts rows not yet linked to a Meta object, and only
+    // when exactly one fits — otherwise one template could inherit another's
+    // approved copy and send the wrong content.
+    const byName = locals.filter((l) => !l.metaTemplateId && metaNameOf(l) === r.name && l.language === r.language);
+    const local = locals.find((l) => l.metaTemplateId === r.id) ?? (byName.length === 1 ? byName[0] : undefined);
 
     if (!local) {
       if (r.status?.toUpperCase() === 'DELETED') continue;
@@ -616,13 +666,14 @@ export async function syncTemplates(
     // Meta's components are the truth for what a send carries; keep the snapshot current.
     const extras = extrasFromComponents(r.components);
     const snapshotStale = JSON.stringify((local.payload as any)?._meta?.meta ?? null) !== JSON.stringify(extras);
+    const nameStale = (local.payload as any)?._meta?.metaName !== r.name;
 
-    if (local.metaStatus === nextStatus && local.metaTemplateId === r.id && !snapshotStale) continue;
+    if (local.metaStatus === nextStatus && local.metaTemplateId === r.id && !snapshotStale && !nameStale) continue;
 
     await prisma.messageTemplate.update({
       where: { id: local.id },
       data: {
-        ...(snapshotStale ? { payload: withMetaSnapshot(local.payload, extras) } : {}),
+        ...(snapshotStale || nameStale ? { payload: withMetaName(withMetaSnapshot(local.payload, extras), r.name) } : {}),
         metaTemplateId: r.id,
         metaStatus: nextStatus,
         metaRejectedReason: nextStatus === 'REJECTED' ? r.rejected_reason ?? 'Rejected by WhatsApp' : null,
@@ -651,9 +702,9 @@ export async function applyTemplateStatusUpdate(value: {
   const local =
     (metaId ? await prisma.messageTemplate.findFirst({ where: { metaTemplateId: metaId } }) : null) ??
     (value.message_template_name
-      ? (await prisma.messageTemplate.findMany({ select: { id: true, name: true, language: true } })).find(
+      ? (await prisma.messageTemplate.findMany({ select: { id: true, name: true, language: true, payload: true } })).find(
           (l) =>
-            toMetaTemplateName(l.name) === value.message_template_name &&
+            metaNameOf(l) === value.message_template_name &&
             (!value.message_template_language || l.language === value.message_template_language),
         ) ?? null
       : null);

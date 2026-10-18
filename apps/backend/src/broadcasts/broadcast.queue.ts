@@ -7,7 +7,7 @@ import { emitRealtime } from '../realtime/socket';
 import { logger } from '../lib/logger';
 import { CONTACT_FIELDS, fillBlank, readBlank } from '@crm/messaging-schema';
 import { buildPersonalizationVars } from './personalization';
-import { toMetaTemplateName, approvedExtras } from '../providers/meta/templates';
+import { metaNameOf, approvedExtras } from '../providers/meta/templates';
 import { asMetaError, type MetaApiError } from '../providers/meta/graph';
 import { HttpError } from '../auth/authorize';
 import { emitDataChanged } from '../realtime/socket';
@@ -356,7 +356,7 @@ async function runSlice(broadcastId: string) {
         phone: recipient.phone,
         template: {
           templateId: template.id,
-          name: toMetaTemplateName(template.name),
+          name: metaNameOf(template),
           language: template.language,
           bodyValues,
           headerMedia: template.mediaUrl

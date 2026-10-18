@@ -13,7 +13,7 @@ import {
 import { providerManager } from '../providers/manager';
 import { loadMedia, isAudioMediaType, resolveMediaUrl, toStorageRef } from '../lib/media';
 import { logger } from '../lib/logger';
-import { toMetaTemplateName, approvedExtras } from '../providers/meta/templates';
+import { metaNameOf, approvedExtras } from '../providers/meta/templates';
 
 /**
  * A template's attachment is recorded in two places: inside the canonical
@@ -144,7 +144,7 @@ export async function sendTemplate(
       phone,
       template: {
         templateId: template.id,
-        name: toMetaTemplateName(template.name),
+        name: metaNameOf(template),
         language: template.language,
         bodyValues: slots.map((slot) => variables[slot] ?? ''),
         headerMedia: template.mediaUrl
