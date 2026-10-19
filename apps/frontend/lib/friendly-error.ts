@@ -213,3 +213,37 @@ export function groupErrors(rawErrors: string[]): Array<{ code: FriendlyCode; co
     .map(([code, { count, sample }]) => ({ code, count, sample }))
     .sort((a, b) => b.count - a.count);
 }
+
+/**
+ * Template submission/review errors arrive as WhatsApp's English wording (or a
+ * bare review code like INVALID_FORMAT) under a generic error code, so they need
+ * matching on the text. Returns a key under `errors:template.*`, or null.
+ */
+const TEMPLATE_ERROR_PATTERNS: Array<[RegExp, string]> = [
+  [/direct links to whatsapp|links to whatsapp aren/i, 'whatsappLinkButton'],
+  [/content in this language already exists|already .*content for this template/i, 'nameTaken'],
+  [/status (for this message template )?can'?t be changed|can only delete or add templates/i, 'notEditable'],
+  [/edit(s|ing)? limit|can only be edited|edited (once|\d+ times)/i, 'editLimit'],
+  [/(variable|parameter)s? (can'?t|cannot|are not allowed to) (be )?(at|placed at) the (start|beginning|end)|leading or trailing (variable|param)/i, 'variableAtEdge'],
+  [/words? ratio|too many (variables|parameters)|parameters? .*ratio/i, 'tooManyVariables'],
+  [/^\s*(PROMOTIONAL|TAG_CONTENT_MISMATCH|INCORRECT_CATEGORY)\s*$/i, 'wrongCategory'],
+  [/^\s*INVALID_FORMAT\s*$/i, 'invalidFormat'],
+  [/^\s*(ABUSIVE_CONTENT|SCAM)\s*$/i, 'policy'],
+  [/^\s*(NONE|Rejected by WhatsApp)\s*$/i, 'noReason'],
+  [/header handle|could not be read\. re-upload|attachment could not be read/i, 'headerMedia'],
+  [/needs a full web address/i, 'buttonUrl'],
+  [/international format/i, 'buttonPhone'],
+  [/allows (at most \d+|only one) .*button/i, 'tooManyButtons'],
+  [/button ".*" is longer than/i, 'buttonTextLong'],
+  [/footer is longer than/i, 'footerLong'],
+  [/footer cannot contain/i, 'footerVariable'],
+  [/needs body text/i, 'bodyRequired'],
+  [/meta app id/i, 'appIdRequired'],
+  [/waba id/i, 'wabaRequired'],
+];
+
+export function templateErrorKey(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  for (const [re, key] of TEMPLATE_ERROR_PATTERNS) if (re.test(raw)) return key;
+  return null;
+}

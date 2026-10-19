@@ -137,5 +137,27 @@
       "document": "document"
     },
     "invalidPhone": "This phone number is not valid for the chosen country. Check the digits or the country."
+  },
+  "template": {
+    "whatsappLinkButton": "WhatsApp doesn't allow a button that opens a WhatsApp link (a group link or wa.me). Remove that button, put the link in the message text, then submit for review.",
+    "nameTaken": "Another template on WhatsApp already has this name and language. Rename the template or use the Duplicate button (two-squares icon) to create a new one, then submit it.",
+    "notEditable": "WhatsApp doesn't allow editing this template. Use the Duplicate button (two-squares icon) on the Templates page to create a new one with your changes and submit it.",
+    "editLimit": "You've reached WhatsApp's edit limit for this template (about once every 24 hours). Wait a day, or use the Duplicate button (two-squares icon) to create a new template.",
+    "variableAtEdge": "The message can't start or end with a blank like {{example}}. Add a word before or after it, e.g. \"Hi {{example}}\".",
+    "tooManyVariables": "Too many blanks for the length of the message. Add more text or use fewer blanks.",
+    "wrongCategory": "WhatsApp rejected the template because its content doesn't fit the chosen category. If it promotes an offer, choose Marketing and submit again.",
+    "invalidFormat": "WhatsApp rejected the template because of its formatting. Check blanks are written like {{example}} and the text has no errors, then submit again.",
+    "policy": "WhatsApp rejected the template for breaking its policies. Reword it in a clear, non-exaggerated way, or ask a manager.",
+    "noReason": "WhatsApp rejected the template without giving a reason. Review the wording, links and buttons, then submit again.",
+    "headerMedia": "The attachment (image or file) couldn't be read. Remove it, upload it again, then submit.",
+    "buttonUrl": "The website button link is invalid. Enter the full address starting with https://",
+    "buttonPhone": "The call button number is invalid. Use international format, like +966500000000.",
+    "tooManyButtons": "Too many buttons. WhatsApp allows at most one call button and two website buttons.",
+    "buttonTextLong": "A button label is too long. Keep it to 25 characters or fewer.",
+    "footerLong": "The footer is too long. Keep it to 60 characters or fewer.",
+    "footerVariable": "The footer can't contain blanks like {{example}}. Remove them from the footer.",
+    "bodyRequired": "Write the message text before submitting for review.",
+    "appIdRequired": "Templates with an image or file need the Meta App ID. Ask a manager to add it in Settings → WhatsApp, or remove the attachment.",
+    "wabaRequired": "The WhatsApp connection is incomplete. Ask a manager to add the WhatsApp Business Account ID in Settings → WhatsApp."
   }
 }

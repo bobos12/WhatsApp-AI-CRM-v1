@@ -16,6 +16,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle2, Clock, Send, XCircle, PauseCircle } from 'lucide-react';
+import { templateErrorText } from '../../lib/template-error-text';
 
 type TFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -55,7 +56,7 @@ export function describeApproval(template: ApprovalFields, t: TFn): Descriptor {
       tone: template.metaEditError ? 'bad' : 'warn',
       label: template.metaEditError ? t('approval.editRejected') : t('approval.pendingEdits'),
       detail: template.metaEditError
-        ? `${template.metaEditError} — ${t('approval.detailStillApproved')}`
+        ? `${templateErrorText(template.metaEditError)} — ${t('approval.detailStillApproved')}`
         : t('approval.detailPendingEdits'),
       icon: template.metaEditError ? XCircle : AlertTriangle,
       canSubmit: true,
@@ -84,7 +85,7 @@ export function describeApproval(template: ApprovalFields, t: TFn): Descriptor {
         label: t('approval.rejected'),
         // Meta's own wording wins when present: it is the only text that says
         // what to change, and translating it would misrepresent the reviewer.
-        detail: template.metaRejectedReason?.trim() || t('approval.detailRejected'),
+        detail: templateErrorText(template.metaRejectedReason?.trim()) || t('approval.detailRejected'),
         icon: XCircle,
         canSubmit: true,
       };
@@ -191,9 +192,9 @@ export function ApprovalPanel({
           </p>
           <p className="mt-1 text-xs leading-relaxed text-ink-2">{detail}</p>
 
-          {template.metaQualityScore && template.metaQualityScore !== 'GREEN' && (
+          {template.metaQualityScore && !['GREEN', 'UNKNOWN'].includes(template.metaQualityScore.toUpperCase()) && (
             <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-              {t('approval.qualityWarning', { score: template.metaQualityScore.toLowerCase() })}
+              {t('approval.qualityWarning', { score: t(`approval.quality.${template.metaQualityScore.toUpperCase()}`, { defaultValue: template.metaQualityScore.toLowerCase() }) })}
             </p>
           )}
 

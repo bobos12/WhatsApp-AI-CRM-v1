@@ -16,6 +16,7 @@ import { isCanonicalPayload, TEMPLATE_CATEGORIES } from '../../../lib/template-e
 import SendTemplateDialog from '../../../components/templates/SendTemplateDialog';
 import { Modal } from '../../../components/ui/modal';
 import { ApprovalBadge, describeApproval, type MetaStatus } from '../../../components/templates/ApprovalStatus';
+import { templateErrorText } from '../../../lib/template-error-text';
 import { useRemembered } from '@/hooks/useRemembered';
 import { useLiveData } from '../../../hooks/useLiveData';
 
@@ -133,7 +134,7 @@ function TemplateCard({
           is a support ticket — and it is the only thing that says what to edit. */}
       {template.metaStatus === 'REJECTED' && template.metaRejectedReason && !template.hasPendingEdits && (
         <p className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-rose-600 dark:text-rose-400">
-          {template.metaRejectedReason}
+          {templateErrorText(template.metaRejectedReason)}
         </p>
       )}
       {/* Edits that WhatsApp hasn't accepted yet — say plainly what customers get. */}
@@ -183,6 +184,8 @@ function TemplateCard({
         <button
           type="button"
           onClick={onDuplicate}
+          title={t('duplicateAction')}
+          aria-label={t('duplicateAction')}
           className="btn btn-secondary btn-sm inline-flex justify-center"
         >
           <Copy className="h-3.5 w-3.5" />

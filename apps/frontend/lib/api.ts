@@ -1,7 +1,7 @@
 import { getSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import i18n from './i18n';
-import { plainKeyFor } from './friendly-error';
+import { plainKeyFor, templateErrorKey } from './friendly-error';
 import { cachedGet, invalidateReference } from './api-cache';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -130,7 +130,12 @@ async function getValidAccessToken() {
 function apiError(message: string, status?: number, data?: any): Error {
   const code: string | undefined = data?.code;
   const key = plainKeyFor(code, status);
-  const error = new Error(key ? i18n.t(`errors:plain.${key}`) : message);
+  const templateKey = key ? null : templateErrorKey(message);
+  const error = new Error(
+    key ? i18n.t(`errors:plain.${key}`)
+    : templateKey ? i18n.t(`errors:template.${templateKey}`, { example: '{{name}}' })
+    : message,
+  );
   (error as any).status = status;
   (error as any).data = data;
   (error as any).code = code;
