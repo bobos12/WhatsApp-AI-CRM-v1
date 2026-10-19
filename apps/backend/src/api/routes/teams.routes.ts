@@ -108,6 +108,30 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     // Unlink all members before deleting
     await prisma.user.updateMany({ where: { teamId: req.params.id }, data: { teamId: null } });
     await prisma.team.delete({ where: { id: req.params.id } });
+
+    // Records only store a team id (no relation), so the team's customers,
+    // chats and leads would otherwise point at a team that no longer exists —
+    // invisible to every non-admin forever. Make them shared instead. Records
+    // orphaned by earlier deletes are swept up too.
+    const live = (await prisma.team.findMany({ select: { id: true } })).map((t) => t.id);
+    const orphaned = { teamId: { not: null, notIn: live } };
+    const unteam = { data: { teamId: null } };
+    await prisma.$transaction([
+      prisma.contact.updateMany({ where: orphaned, ...unteam }),
+      prisma.conversation.updateMany({ where: orphaned, ...unteam }),
+      prisma.leadQualification.updateMany({ where: orphaned, ...unteam }),
+      prisma.leadStatusEvent.updateMany({ where: orphaned, ...unteam }),
+      prisma.deal.updateMany({ where: orphaned, ...unteam }),
+      prisma.task.updateMany({ where: orphaned, ...unteam }),
+      prisma.tag.updateMany({ where: orphaned, ...unteam }),
+      prisma.customFieldDefinition.updateMany({ where: orphaned, ...unteam }),
+      prisma.messageTemplate.updateMany({ where: orphaned, ...unteam }),
+      prisma.savedReply.updateMany({ where: orphaned, ...unteam }),
+      prisma.broadcast.updateMany({ where: orphaned, ...unteam }),
+      prisma.automationRule.updateMany({ where: orphaned, ...unteam }),
+      prisma.automationFlow.updateMany({ where: orphaned, ...unteam }),
+      prisma.notification.updateMany({ where: orphaned, ...unteam }),
+    ]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
