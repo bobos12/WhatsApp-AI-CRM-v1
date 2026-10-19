@@ -62,6 +62,29 @@ export function extractVariableNames(template: CanonicalTemplate): string[] {
   return Array.from(vars)
 }
 
+// ── Body format checks (WhatsApp's instant / INVALID_FORMAT rejections) ─────────
+
+export type BodyIssueCode = 'notAField' | 'unclosed' | 'edge' | 'adjacent'
+export interface BodyIssue { code: BodyIssueCode; token?: string }
+
+/**
+ * Problems WhatsApp rejects a template for, caught while typing so the person
+ * writing it sees exactly what to change instead of a bare INVALID_FORMAT.
+ */
+export function bodyIssues(text: string): BodyIssue[] {
+  const issues: BodyIssue[] = []
+  const body = text ?? ''
+  // {{ … }} around something that isn't a field name, e.g. {{رملة }} or {{ name }}
+  for (const m of body.matchAll(/\{\{([^{}]*)\}\}/g)) {
+    if (!/^\w+$/.test(m[1]) && !issues.some((i) => i.token === m[0])) issues.push({ code: 'notAField', token: m[0] })
+  }
+  if (/\{\{|\}\}/.test(body.replace(/\{\{[^{}]*\}\}/g, ''))) issues.push({ code: 'unclosed' })
+  const trimmed = body.trim()
+  if (/^\{\{\w+\}\}/.test(trimmed) || /\{\{\w+\}\}$/.test(trimmed)) issues.push({ code: 'edge' })
+  if (/\{\{\w+\}\}\s*\{\{\w+\}\}/.test(body)) issues.push({ code: 'adjacent' })
+  return issues
+}
+
 // ── Derive template type for DB ────────────────────────────────────────────────
 
 export function deriveTemplateType(template: CanonicalTemplate): 'TEXT' | 'MEDIA' {

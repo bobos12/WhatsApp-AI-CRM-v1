@@ -189,7 +189,14 @@
     },
     "namePlaceholder": "e.g. Order ready for pickup",
     "nameRequired": "Required",
-    "submitShort": "Submit for review"
+    "submitShort": "Submit for review",
+    "bodyIssues": {
+      "notAField": "\"{{token}}\" isn't a personalization field, and WhatsApp will reject the template because of it. If it's a fixed name like \"Ramla\", remove the braces and type it normally. Braces are only for fields from the Personalize buttons, like {{example}}.",
+      "unclosed": "There's a {{ or }} that isn't closed. Remove it or complete the field properly, like {{example}}.",
+      "edge": "The message can't start or end with a personalization field. Add a word before or after it, e.g. \"Hi {{example}}\".",
+      "adjacent": "Two personalization fields can't sit next to each other. Put a word between them.",
+      "fixFirst": "Fix the problems shown under the message text first, then submit for review."
+    }
   },
   "send": {
     "action": "Send",

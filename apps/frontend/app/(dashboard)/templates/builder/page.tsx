@@ -15,7 +15,7 @@ import { useHeaderHidden } from '../../../../stores/header-hidden-store';
 import { useDirection } from '../../../../hooks/useDirection';
 import type { CanonicalTemplate, MessageType, MediaType, TemplateCategory, TemplateButton, ButtonType } from '../../../../lib/template-engine/schema';
 import { isCanonicalPayload, isLegacyPayload, BUTTON_LIMITS } from '../../../../lib/template-engine/schema';
-import { toRenderable, extractVariableNames, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType, buttonIssue, remainingFor, normalizeButtons, templateExtras } from '../../../../lib/template-engine/compiler';
+import { toRenderable, extractVariableNames, bodyIssues, legacyBlocksToCanonical, foldLegacyCanonical, deriveTemplateType, buttonIssue, remainingFor, normalizeButtons, templateExtras } from '../../../../lib/template-engine/compiler';
 import TemplateButtonsPreview, { TemplateFooterLine } from '../../../../components/templates/TemplateButtonsPreview';
 import { ApprovalPanel, describeApproval, type ApprovalFields } from '../../../../components/templates/ApprovalStatus';
 import { prepareUpload } from '@/lib/prepare-upload';
@@ -614,6 +614,10 @@ function BuilderContent() {
    * thing, so the two steps are welded together.
    */
   const handleSubmitForApproval = async () => {
+    if (!isAudio && bodyIssues(template.body.text).length) {
+      setSaveError(t('builder.bodyIssues.fixFirst'));
+      return;
+    }
     // handleSave returns the id on both the create and update paths, so this one
     // call covers "never saved" and "saved but since edited" alike.
     const id = await handleSave();
@@ -667,6 +671,7 @@ function BuilderContent() {
     : messageType === 'AUDIO' ? 'audio/*'
     : '*/*';
   const charCount = template.body.text.length;
+  const formatIssues = isAudio ? [] : bodyIssues(template.body.text);
 
   const SaveButtonInner = (
     <>
@@ -729,7 +734,7 @@ function BuilderContent() {
         n={3}
         title={t('builder.steps.content.title')}
         desc={isAudio ? undefined : t('builder.steps.content.desc')}
-        done={hasContent}
+        done={hasContent && formatIssues.length === 0}
         aside={!isAudio && <span className="shrink-0 pt-1 text-[11px] tabular-nums text-ink-4">{charCount}/4096</span>}
       >
         <div className="space-y-3">
@@ -806,6 +811,18 @@ function BuilderContent() {
                   className="block min-h-[150px] w-full resize-y bg-transparent px-4 py-3 text-[15px] leading-relaxed text-ink placeholder:text-ink-4 focus:outline-none"
                 />
               </div>
+
+              {/* What WhatsApp would reject, said plainly while typing — not after review. */}
+              {formatIssues.length > 0 && (
+                <ul role="alert" className="enter space-y-1.5 rounded-xl border border-rose-500/25 bg-rose-500/[0.06] px-3.5 py-2.5">
+                  {formatIssues.map((issue, i) => (
+                    <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-rose-700 dark:text-rose-300">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>{t(`builder.bodyIssues.${issue.code}`, { token: issue.token ?? '', example: '{{name}}' })}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {/* Personalisation */}
               <div className="flex flex-wrap items-center gap-1.5">
