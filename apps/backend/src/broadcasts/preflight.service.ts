@@ -138,6 +138,20 @@ export const TIER_CAPACITY: Record<string, number> = {
   TIER_UNLIMITED: Number.MAX_SAFE_INTEGER,
 };
 
+/**
+ * Meta's tier name → people per 24h. Meta renames tiers as it changes the
+ * ladder (TIER_2K appeared alongside TIER_1K), so read the number from the
+ * name instead of trusting a fixed list: TIER_2K → 2000, TIER_250 → 250.
+ */
+export function tierCapacity(tier: string | null | undefined): number | null {
+  if (!tier) return null;
+  const t = tier.toUpperCase();
+  if (t in TIER_CAPACITY) return TIER_CAPACITY[t] === Number.MAX_SAFE_INTEGER ? null : TIER_CAPACITY[t];
+  const m = t.match(/^TIER_(\d+(?:\.\d+)?)(K|M)?$/);
+  if (!m) return null;
+  return Math.round(Number(m[1]) * (m[2] === 'M' ? 1_000_000 : m[2] === 'K' ? 1_000 : 1));
+}
+
 export interface DailyUsage {
   /** Meta's limit for this number, or null when unknown / unlimited. */
   limit: number | null;
@@ -162,8 +176,7 @@ export async function dailyUsage(messagingLimit: string | null): Promise<DailyUs
   } catch (err) {
     // Advisory only — a failed count must never block creating a campaign.
     logger.warn('broadcast.daily_usage_failed', { error: err instanceof Error ? err.message : String(err) });
-    const cap = messagingLimit ? TIER_CAPACITY[messagingLimit] : undefined;
-    const limit = cap && cap !== Number.MAX_SAFE_INTEGER ? cap : null;
+    const limit = tierCapacity(messagingLimit);
     return { limit, used: 0, remaining: limit, scheduledSoon: 0 };
   }
 }
@@ -201,8 +214,7 @@ async function countDailyUsage(messagingLimit: string | null): Promise<DailyUsag
   ]);
 
   const used = Number(usedRows[0]?.used ?? 0);
-  const cap = messagingLimit ? TIER_CAPACITY[messagingLimit] : undefined;
-  const limit = cap && cap !== Number.MAX_SAFE_INTEGER ? cap : null;
+  const limit = tierCapacity(messagingLimit);
   return { limit, used, remaining: limit === null ? null : Math.max(0, limit - used), scheduledSoon };
 }
 

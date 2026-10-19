@@ -25,6 +25,7 @@ import {
 } from '../../../components/broadcasts/shared';
 import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
 import DailyLimit from '../../../components/broadcasts/DailyLimit';
+import FailureInsight from '../../../components/broadcasts/FailureInsight';
 import { useRemembered } from '@/hooks/useRemembered';
 import { useLiveData } from '../../../hooks/useLiveData';
 
@@ -477,32 +478,7 @@ export default function BroadcastsPage() {
         waStatus === 'disconnected' ? (
           <FriendlyError classified={{ code: 'whatsappDisconnected', severity: 'error', values: {}, raw: '' }} />
         ) : (
-          <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/[0.07]">
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
-                <Info className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                  {t('failureInsight.title', { count: totals.failed })}
-                </p>
-                <p className="mt-0.5 text-[13px] text-amber-800/90 dark:text-amber-300/80">
-                  {t('failureInsight.intro')}
-                </p>
-                <ul className="mt-2 space-y-1 text-[13px] text-amber-800/90 dark:text-amber-300/80">
-                  {['reasonNotOnWhatsapp', 'reasonWarmup', 'reasonDisconnected', 'reasonInvalid'].map((k) => (
-                    <li key={k} className="flex gap-2">
-                      <span aria-hidden="true" className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-                      <span>{t(`failureInsight.${k}`)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2.5 text-[13px] font-medium text-amber-900 dark:text-amber-200">
-                  {t('failureInsight.tip')}
-                </p>
-              </div>
-            </div>
-          </div>
+          <FailureInsight failed={totals.failed} />
         )
       )}
 

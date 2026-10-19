@@ -457,7 +457,22 @@ export class BroadcastsService {
    */
   static async getHealth() {
     const { getChannel } = await import('../providers/channel.service');
-    const channel = await getChannel();
+    let channel = await getChannel();
+    // The limit is read from Meta only when the number is connected, and Meta
+    // raises it over time. Re-read it when it's missing or more than 6h old so
+    // the daily-limit bar never says "unknown" for a working number.
+    const age = channel.lastSyncedAt ? Date.now() - new Date(channel.lastSyncedAt).getTime() : Infinity;
+    // Missing limit: retry at most every 10 min, so a number Meta reports no
+    // limit for doesn't cost a Meta call on every page load.
+    if (channel.cloud && (age > 6 * 60 * 60 * 1000 || (!channel.messagingLimit && age > 10 * 60 * 1000))) {
+      try {
+        const { providerManager } = await import('../providers/manager');
+        await providerManager.connect();
+        channel = await getChannel();
+      } catch {
+        /* keep what we had; Settings shows connection errors */
+      }
+    }
     const { dailyUsage } = await import('./preflight.service');
     return {
       daily: await dailyUsage(channel.messagingLimit),

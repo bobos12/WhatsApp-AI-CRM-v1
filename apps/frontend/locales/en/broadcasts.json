@@ -62,7 +62,8 @@
     "reasonNotOnWhatsapp": "Some numbers don't have a WhatsApp account",
     "reasonWarmup": "Your number hit its daily warm-up limit — new numbers are throttled to avoid bans",
     "reasonInvalid": "A number couldn't be read as a phone number. Check it has all its digits, e.g. 05XXXXXXXX or +9665XXXXXXXX",
-    "tip": "Keep WhatsApp connected while broadcasts run, and make sure numbers are valid and on WhatsApp."
+    "tip": "Keep WhatsApp connected while broadcasts run, and make sure numbers are valid and on WhatsApp.",
+    "dismiss": "Dismiss"
   },
   "form": {
     "createTitle": "New Broadcast",
