@@ -487,8 +487,8 @@
         "detail": "Every selected contact was left out or has a phone number WhatsApp can’t use."
       },
       "over_messaging_tier": {
-        "label": "Your number can start {{capacity}} new conversations a day",
-        "detail": "This campaign goes to {{count}} people. WhatsApp will hold back the rest until your limit resets, and sending continues by itself the next day."
+        "label": "Only {{remaining}} of today's {{capacity}} new conversations are left",
+        "detail": "{{used}} people were already messaged in the last 24 hours and this campaign goes to {{count}}, so WhatsApp will refuse the excess. Send to fewer people now, or schedule the rest for tomorrow."
       },
       "quality_rating_low": {
         "label": "WhatsApp rates your number’s quality as {{rating}}",
@@ -614,5 +614,15 @@
     "cancel": "Go back",
     "sendNow": "Send now",
     "schedule": "Schedule"
+  },
+  "dailyLimit": {
+    "title": "WhatsApp daily limit",
+    "used": "Sent",
+    "remaining": "Left",
+    "scheduled": "Scheduled in 24h",
+    "of": "of",
+    "hint": "WhatsApp lets you start {{limit}} new conversations a day (different people in the last 24 hours). Anything above that is refused.",
+    "over": "Scheduled sends in the next 24h exceed what is left — WhatsApp will refuse about {{excess}} messages. Move some campaigns later.",
+    "unknown": "Your sending limit isn't known yet. Check WhatsApp is connected in Settings."
   }
 }

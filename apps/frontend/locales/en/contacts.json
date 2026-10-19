@@ -214,5 +214,26 @@
     "startAll": "Import {{count}} rows",
     "phoneCountry": "Numbers without + are from",
     "phoneCountryHint": "Numbers from other countries must have their code (+971…, +20…) or a country_code column. Anything else is listed as an error, not guessed."
+  },
+  "export": {
+    "button": "Export ({{count}})",
+    "yes": "Yes",
+    "no": "No",
+    "cols": {
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email",
+      "company": "Company",
+      "status": "Status",
+      "stage": "Lifecycle stage",
+      "source": "Source",
+      "tags": "Tags",
+      "notes": "Notes",
+      "optOut": "Marketing opt-out",
+      "optOutAt": "Opt-out date",
+      "consentAt": "Consent date",
+      "createdAt": "Created",
+      "updatedAt": "Last updated"
+    }
   }
 }

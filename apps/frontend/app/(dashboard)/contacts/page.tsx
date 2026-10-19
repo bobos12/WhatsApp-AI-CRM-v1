@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Plus, Upload, Search, Users2, Filter, X, BriefcaseBusiness,
   CheckSquare, MessageSquare, PlusCircle, SlidersHorizontal,
-  Trash2, CalendarRange, UserCheck, Tag as TagIcon, StickyNote, Check,
+  Trash2, CalendarRange, UserCheck, Tag as TagIcon, StickyNote, Check, Download,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ContactsTable, { type ContactSortKey } from '../../../components/contacts/ContactsTable';
@@ -20,6 +20,8 @@ import { useSession } from 'next-auth/react';
 import { useSocket } from '../../../hooks/useSocket';
 import { useTags } from '../../../hooks/useTags';
 import { useCustomFields } from '../../../hooks/useCustomFields';
+import { exportContacts, type ExportableContact } from '../../../lib/exportContacts';
+import { isManager } from '../../../lib/roles';
 import { formatFieldValue, type CustomFieldValues } from '../../../lib/custom-fields';
 import AudienceFilterBuilder from '../../../components/contacts/AudienceFilterBuilder';
 import {
@@ -89,7 +91,8 @@ interface ContactDetails {
 
 export default function ContactsPage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  const canExport = isManager((session?.user as { role?: string } | undefined)?.role);
   const { t } = useTranslation('contacts');
   const { t: tc } = useTranslation('common');
   const searchParams = useSearchParams();
@@ -383,6 +386,18 @@ export default function ContactsPage() {
               <SlidersHorizontal aria-hidden="true" />
               {t('customFields', { defaultValue: 'Fields' })}
             </Link>
+            {/* Exactly what the list shows (all contacts when nothing is filtered). */}
+            {canExport && (
+              <button
+                type="button"
+                onClick={() => exportContacts(processedContacts as unknown as ExportableContact[], customFieldDefs, t)}
+                disabled={processedContacts.length === 0}
+                className="btn btn-secondary"
+              >
+                <Download aria-hidden="true" />
+                {t('export.button', { count: processedContacts.length })}
+              </button>
+            )}
             <button type="button" onClick={() => setShowImport(true)} className="btn btn-secondary">
               <Upload aria-hidden="true" />
               {t('importContacts')}

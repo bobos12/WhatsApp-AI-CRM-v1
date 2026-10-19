@@ -458,7 +458,9 @@ export class BroadcastsService {
   static async getHealth() {
     const { getChannel } = await import('../providers/channel.service');
     const channel = await getChannel();
+    const { dailyUsage } = await import('./preflight.service');
     return {
+      daily: await dailyUsage(channel.messagingLimit),
       connected: Boolean(channel.cloud),
       qualityRating: channel.qualityRating,
       messagingLimit: channel.messagingLimit,

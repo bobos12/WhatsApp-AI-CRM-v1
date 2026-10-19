@@ -33,6 +33,9 @@ const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 /** Arabic-Indic and Persian digits → 0-9; full-width plus → +. */
 function westernize(text: string): string {
   return text
+    // Invisible direction marks ride along when a number is copied from Arabic
+    // text or an exported CSV; left in, "+966…" stops starting with "+".
+    .replace(/[‎‏‪-‮⁦-⁩]/g, '')
     .replace(ARABIC_DIGITS, (d) => String((d.charCodeAt(0) & 0xf) % 10))
     .replace(/＋/g, '+');
 }

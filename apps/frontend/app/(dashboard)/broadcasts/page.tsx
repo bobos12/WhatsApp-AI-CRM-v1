@@ -24,6 +24,7 @@ import {
   RiskBadge, deliveryStats, useCountdownLabel, type BroadcastSummary as Broadcast,
 } from '../../../components/broadcasts/shared';
 import ConfirmRiskDialog from '../../../components/broadcasts/ConfirmRiskDialog';
+import DailyLimit from '../../../components/broadcasts/DailyLimit';
 import { useRemembered } from '@/hooks/useRemembered';
 import { useLiveData } from '../../../hooks/useLiveData';
 
@@ -468,6 +469,8 @@ export default function BroadcastsPage() {
           { label: t('stats.inFlight'), value: totals.scheduled + totals.sending + totals.drafts, sub: t('stats.inFlightSub'), live: totals.sending > 0 },
         ]}
       />
+
+      <DailyLimit refreshKey={broadcasts} />
 
       {/* ── Why did messages fail? — friendly, actionable explanation ── */}
       {totals.failed > 0 && (

@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+import { getTenantId } from '../lib/tenant-context';
 import { providerManager } from '../providers/manager';
 import { getChannel } from '../providers/channel.service';
 import { resolveAudienceDetailed, type AudienceFilter } from './audience';
@@ -125,7 +128,7 @@ export function contentFingerprint(input: {
  * Used only to warn when an audience obviously exceeds the tier — Meta enforces
  * the real limit, we just say so before the run rather than after.
  */
-const TIER_CAPACITY: Record<string, number> = {
+export const TIER_CAPACITY: Record<string, number> = {
   TIER_50: 50,
   TIER_250: 250,
   TIER_1K: 1_000,
@@ -134,6 +137,74 @@ const TIER_CAPACITY: Record<string, number> = {
   TIER_100K: 100_000,
   TIER_UNLIMITED: Number.MAX_SAFE_INTEGER,
 };
+
+export interface DailyUsage {
+  /** Meta's limit for this number, or null when unknown / unlimited. */
+  limit: number | null;
+  /** Unique people sent a template (campaign or one-off) in the last 24h. */
+  used: number;
+  /** limit - used, floored at 0; null when the limit is unknown. */
+  remaining: number | null;
+  /** Recipients still waiting in campaigns due to send within the next 24h. */
+  scheduledSoon: number;
+}
+
+/**
+ * How much of Meta's rolling-24h messaging limit is already spent. Meta counts
+ * unique customers who received a business-initiated (template) message, so we
+ * count distinct phone numbers across campaign sends and one-off template sends.
+ * One aggregate query each — the composer calls this on every edit, and a list of
+ * phones would cost database egress for nothing.
+ */
+export async function dailyUsage(messagingLimit: string | null): Promise<DailyUsage> {
+  try {
+    return await countDailyUsage(messagingLimit);
+  } catch (err) {
+    // Advisory only — a failed count must never block creating a campaign.
+    logger.warn('broadcast.daily_usage_failed', { error: err instanceof Error ? err.message : String(err) });
+    const cap = messagingLimit ? TIER_CAPACITY[messagingLimit] : undefined;
+    const limit = cap && cap !== Number.MAX_SAFE_INTEGER ? cap : null;
+    return { limit, used: 0, remaining: limit, scheduledSoon: 0 };
+  }
+}
+
+async function countDailyUsage(messagingLimit: string | null): Promise<DailyUsage> {
+  const now = Date.now();
+  const since = new Date(now - 24 * 60 * 60 * 1000);
+  const soon = new Date(now + 24 * 60 * 60 * 1000);
+  const tenantId = getTenantId();
+  const tenantFilter = (alias: string) =>
+    tenantId ? Prisma.sql`AND ${Prisma.raw(alias)}."tenantId" = ${tenantId}` : Prisma.empty;
+
+  const [usedRows, scheduledSoon] = await Promise.all([
+    prisma.$queryRaw<Array<{ used: bigint }>>(Prisma.sql`
+      SELECT COUNT(DISTINCT regexp_replace(phone, '\D', '', 'g')) AS used FROM (
+        SELECT r.phone FROM "BroadcastRecipient" r
+         WHERE r."sentAt" >= ${since} ${tenantFilter('r')}
+        UNION ALL
+        SELECT m.phone FROM "Message" m
+         WHERE m."direction" = 'OUTBOUND' AND m."kind" = 'template'
+           AND m."timestamp" >= ${since} ${tenantFilter('m')}
+      ) sent
+    `),
+    prisma.broadcastRecipient.count({
+      where: {
+        status: 'pending',
+        broadcast: {
+          OR: [
+            { status: 'SCHEDULED', scheduledAt: { lte: soon } },
+            { status: 'SENDING' },
+          ],
+        },
+      },
+    }),
+  ]);
+
+  const used = Number(usedRows[0]?.used ?? 0);
+  const cap = messagingLimit ? TIER_CAPACITY[messagingLimit] : undefined;
+  const limit = cap && cap !== Number.MAX_SAFE_INTEGER ? cap : null;
+  return { limit, used, remaining: limit === null ? null : Math.max(0, limit - used), scheduledSoon };
+}
 
 /**
  * The template gate.
@@ -386,17 +457,20 @@ export async function runPreflight(input: PreflightInput): Promise<PreflightResu
     });
   }
 
-  // 5. Messaging tier headroom — informational, because Meta enforces it.
-  const capacity = channel.messagingLimit ? TIER_CAPACITY[channel.messagingLimit] : undefined;
-  if (capacity && plan.length > capacity) {
+  // 5. Messaging tier headroom — what is LEFT today, not the bare tier: a campaign
+  // of 700 is fine on a 2,000 limit, unless 1,500 people were already messaged.
+  const usage = await dailyUsage(channel.messagingLimit);
+  const capacity = usage.limit;
+  if (capacity !== null && usage.remaining !== null && plan.length > usage.remaining) {
     findings.push({
       key: 'over_messaging_tier',
       kind: 'warning',
-      params: { capacity, count: plan.length },
-      label: `Your number can start ${capacity.toLocaleString()} conversations per day`,
+      params: { capacity, count: plan.length, used: usage.used, remaining: usage.remaining },
+      label: `Only ${usage.remaining.toLocaleString()} of today's ${capacity.toLocaleString()} new conversations are left`,
       detail:
-        `This campaign targets ${plan.length.toLocaleString()} people, so WhatsApp will refuse the excess until your ` +
-        'limit resets or Meta raises your tier. Delivery continues automatically the next day.',
+        `${usage.used.toLocaleString()} people were already messaged in the last 24 hours and this campaign targets ` +
+        `${plan.length.toLocaleString()}, so WhatsApp will refuse the excess until the limit frees up. ` +
+        'Send to fewer people now, or schedule the rest for tomorrow.',
     });
   }
 
