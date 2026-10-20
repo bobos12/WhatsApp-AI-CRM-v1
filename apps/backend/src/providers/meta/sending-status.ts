@@ -14,7 +14,7 @@
 
 import { logger } from '../../lib/logger';
 import type { MetaApiError } from './graph';
-import { lastProbeRefusal, probeSendPermission } from './onboarding';
+import { lastProbeRefusal, numberHealth, probeSendPermission } from './onboarding';
 
 export type SendingBlockReason = 'BILLING_OR_PERMISSION' | 'PAYMENT_FAILED';
 
@@ -99,4 +99,23 @@ export async function getSendingStatus(
     ...(s?.blocked ? { reason: s.reason, message: s.message, since: s.since ? new Date(s.since).toISOString() : undefined } : {}),
     checkedAt: new Date(s?.checkedAt ?? now).toISOString(),
   };
+}
+
+/**
+ * The Meta business that owns the number — so "Pay in Meta" opens billing in
+ * the right business for people who belong to several. Rarely changes; cached.
+ */
+const businessIds = new Map<string, { id: string | null; at: number }>();
+export async function owningBusinessId(cloud: { accessToken: string; phoneNumberId: string }): Promise<string | null> {
+  const hit = businessIds.get(cloud.phoneNumberId);
+  if (hit && Date.now() - hit.at < 6 * 60 * 60 * 1000) return hit.id;
+  try {
+    const health = await numberHealth(cloud.accessToken, cloud.phoneNumberId);
+    businessIds.set(cloud.phoneNumberId, { id: health.businessId, at: Date.now() });
+    return health.businessId;
+  } catch {
+    // Without it the links still open billing, just in the user's default business.
+    businessIds.set(cloud.phoneNumberId, { id: hit?.id ?? null, at: Date.now() - 5 * 60 * 60 * 1000 });
+    return hit?.id ?? null;
+  }
 }

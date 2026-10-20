@@ -14,15 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { CreditCard, Loader2, RefreshCw, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { billingAccountsUrl, type SendingStatus } from '@/lib/meta-billing';
 
-interface SendingStatus {
-  blocked: boolean;
-  reason?: 'BILLING_OR_PERMISSION' | 'PAYMENT_FAILED';
-  message?: string;
-  wabaId?: string | null;
-}
-
-const BILLING_URL = 'https://business.facebook.com/billing_hub/accounts';
 const POLL_MS = 5 * 60 * 1000;
 
 export default function SendingBlockedBanner() {
@@ -73,7 +66,7 @@ export default function SendingBlockedBanner() {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <a href={BILLING_URL} target="_blank" rel="noopener noreferrer" className="btn btn-sm bg-rose-600 text-white hover:bg-rose-700">
+          <a href={billingAccountsUrl(status.businessId)} target="_blank" rel="noopener noreferrer" className="btn btn-sm bg-rose-600 text-white hover:bg-rose-700">
             <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
             {t('sendingBlocked.pay')}
           </a>

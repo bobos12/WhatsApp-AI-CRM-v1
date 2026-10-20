@@ -397,9 +397,12 @@ router.get('/sending-status', async (req: AuthRequest, res) => {
     const tenantId = getTenantId()!;
     const channel = await getChannel();
     if (!channel.cloud) return res.json({ blocked: false, connected: false });
-    const { getSendingStatus } = await import('../../providers/meta/sending-status');
-    const status = await getSendingStatus(tenantId, channel.cloud, { fresh: req.query.fresh === '1' });
-    res.json({ ...status, connected: true, wabaId: channel.cloud.wabaId ?? null });
+    const { getSendingStatus, owningBusinessId } = await import('../../providers/meta/sending-status');
+    const [status, businessId] = await Promise.all([
+      getSendingStatus(tenantId, channel.cloud, { fresh: req.query.fresh === '1' }),
+      owningBusinessId(channel.cloud),
+    ]);
+    res.json({ ...status, connected: true, wabaId: channel.cloud.wabaId ?? null, businessId });
   } catch (err) {
     handle(res, err);
   }

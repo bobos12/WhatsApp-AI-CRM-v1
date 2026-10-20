@@ -238,5 +238,21 @@
     "pay": "Pay in Meta",
     "recheck": "Check again",
     "stillBlocked": "Meta is still refusing sends. It can take a few minutes after paying — try again shortly."
+  },
+  "billing": {
+    "title": "Billing & payments",
+    "ok": "Sending works",
+    "blocked": "Sending stopped",
+    "okBody": "Meta is letting your number send. If a balance is due or you need to change the card, use the buttons below.",
+    "blockedBody": "Meta has stopped sending from your number — usually an unpaid balance or a payment-method problem. Pay, then press \"Check now\"; paused campaigns resume by themselves.",
+    "accountId": "WhatsApp Business account ID (find it in Meta’s list)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "payNow": "Pay now in Meta",
+    "cards": "Cards & payment methods",
+    "recheck": "Check now",
+    "step1": "Press \"Pay now in Meta\", then open the \"WhatsApp Business accounts\" tab.",
+    "step2": "Find account {{waba}} — if it shows \"Pay Now\", pay the balance, and make sure the payment method is your card, not another company such as 360dialog.",
+    "step3": "Come back and press \"Check now\". It can take a few minutes after paying."
   }
 }
