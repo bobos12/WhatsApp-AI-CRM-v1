@@ -133,6 +133,12 @@ export default function HealthChecklist({
                   <p className="mt-0.5 break-words text-xs leading-5 text-ink-3">
                     {t(`health.codes.${c.code}`, { detail: c.detail, defaultValue: c.detail ?? c.code })}
                   </p>
+                  {/* Meta's exact reason — what to quote to Meta support or to us. */}
+                  {c.id === 'sending' && c.status === 'fail' && c.detail && (
+                    <p dir="ltr" className="mt-1 break-words rounded-md bg-raised px-2 py-1 text-start font-mono text-2xs leading-4 text-ink-3">
+                      Meta: {c.detail}
+                    </p>
+                  )}
                 </div>
               </div>
               {canManage && c.fix && c.status !== 'ok' && c.status !== 'skip' && (

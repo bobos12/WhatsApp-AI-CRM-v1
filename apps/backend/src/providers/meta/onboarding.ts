@@ -309,6 +309,12 @@ export async function configureWebhook(appId: string, appSecret: string): Promis
  * #190, and anything else — a complaint about the recipient — means sending is
  * permitted.
  */
+/** Meta's own words for the last refused probe per number — the generic code alone can't say why. */
+const probeRefusals = new Map<string, string>();
+export function lastProbeRefusal(phoneNumberId: string): string | undefined {
+  return probeRefusals.get(phoneNumberId);
+}
+
 export async function probeSendPermission(
   accessToken: string,
   phoneNumberId: string,
@@ -324,7 +330,13 @@ export async function probeSendPermission(
     return 'ok';
   } catch (err) {
     const meta = asMetaError(err);
-    if (meta.code === 200 || meta.code === 10) return 'not_registered';
+    if (meta.code === 200 || meta.code === 10) {
+      const said = [`#${meta.code}${meta.subcode ? `/${meta.subcode}` : ''}`, meta.message].filter(Boolean).join(' ');
+      probeRefusals.set(phoneNumberId, said);
+      logger.warn('meta.send_probe_refused', { phoneNumberId, code: meta.code, subcode: meta.subcode, message: meta.message, trace: meta.traceId });
+      return 'not_registered';
+    }
+    probeRefusals.delete(phoneNumberId);
     if (meta.code === 190 || meta.code === 0) return 'token';
     if (meta.kind === 'TRANSIENT') return 'unknown';
     return 'ok';
@@ -445,7 +457,7 @@ export async function runHealthChecks(cloud: {
   const probe = await probeSendPermission(cloud.accessToken, cloud.phoneNumberId);
   checks.push(
     probe === 'ok' ? { id: 'sending', status: 'ok', code: 'SENDING_OK' }
-    : probe === 'not_registered' ? { id: 'sending', status: 'fail', code: 'NOT_REGISTERED_HERE', fix: 'register' }
+    : probe === 'not_registered' ? { id: 'sending', status: 'fail', code: 'NOT_REGISTERED_HERE', fix: 'register', detail: lastProbeRefusal(cloud.phoneNumberId) }
     : probe === 'token' ? { id: 'sending', status: 'fail', code: 'TOKEN_INVALID', fix: 'reconnect' }
     : { id: 'sending', status: 'warn', code: 'SENDING_UNKNOWN' },
   );

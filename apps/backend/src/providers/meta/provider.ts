@@ -250,7 +250,10 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         phone: to,
         kind: built.kind,
         code: meta.code,
+        subcode: meta.subcode,
         failure: meta.kind,
+        // Meta's own explanation; the code alone is ambiguous (#200 has several causes).
+        message: meta.message,
         trace: meta.traceId,
       });
       throw Object.assign(
