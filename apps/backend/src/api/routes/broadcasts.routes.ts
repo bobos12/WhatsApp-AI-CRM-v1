@@ -167,6 +167,8 @@ router.get('/:id', checkPermission('read', 'broadcasts'), async (req, res) => {
 const recipientQuerySchema = z.object({
   status: z.enum(['pending', 'sent', 'failed', 'skipped']).optional(),
   search: z.string().trim().max(64).optional(),
+  /** Failed recipients with this error code ('none' = no code recorded). */
+  errorCode: z.string().trim().max(64).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(25),
 });

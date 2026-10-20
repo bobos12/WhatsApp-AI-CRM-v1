@@ -384,9 +384,10 @@ export class BroadcastsService {
       teamId,
       status,
       search,
+      errorCode,
       page = 1,
       pageSize = 25,
-    }: { teamId?: string; status?: string; search?: string; page?: number; pageSize?: number },
+    }: { teamId?: string; status?: string; search?: string; errorCode?: string; page?: number; pageSize?: number },
   ) {
     const broadcast = await prisma.broadcast.findFirst({
       where: teamId ? { id, teamId } : { id },
@@ -398,9 +399,10 @@ export class BroadcastsService {
       broadcastId: id,
       ...(status ? { status } : {}),
       ...(search ? { phone: { contains: search } } : {}),
+      ...(errorCode ? { errorCode: errorCode === 'none' ? null : errorCode } : {}),
     };
 
-    const [rows, total, grouped] = await Promise.all([
+    const [rows, total, grouped, reasonGroups] = await Promise.all([
       prisma.broadcastRecipient.findMany({
         where,
         select: {
@@ -425,7 +427,28 @@ export class BroadcastsService {
         where: { broadcastId: id },
         _count: { _all: true },
       }),
+      // Why the failures failed, once per reason — not repeated on every row.
+      prisma.broadcastRecipient.groupBy({
+        by: ['errorCode'],
+        where: { broadcastId: id, status: 'failed' },
+        _count: { _all: true },
+      }),
     ]);
+
+    // One sample message per reason, for codes the UI has no wording for.
+    const failureReasons = await Promise.all(
+      reasonGroups
+        .sort((a, b) => b._count._all - a._count._all)
+        .map(async (g) => ({
+          errorCode: g.errorCode ?? 'none',
+          count: g._count._all,
+          sample:
+            (await prisma.broadcastRecipient.findFirst({
+              where: { broadcastId: id, status: 'failed', errorCode: g.errorCode },
+              select: { lastError: true },
+            }))?.lastError ?? null,
+        })),
+    );
 
     const counts = { pending: 0, sent: 0, failed: 0, skipped: 0, total: 0 };
     for (const group of grouped) {
@@ -435,7 +458,7 @@ export class BroadcastsService {
       counts.total += n;
     }
 
-    return { rows, total, page, pageSize, counts };
+    return { rows, total, page, pageSize, counts, failureReasons };
   }
 
   /**

@@ -324,7 +324,9 @@
     "nothingToDeliver": "No recipients yet.",
     "openFile": "Open",
     "searchPhone": "Search phone…",
-    "replied": "Replied"
+    "replied": "Replied",
+    "whyFailed": "Why these failed — tap a reason to see only those numbers",
+    "showAllFailed": "Show every failed number"
   },
   "smart": {
     "title": "Smart Sending",
@@ -625,5 +627,16 @@
     "hint": "WhatsApp lets you start {{limit}} new conversations a day (different people in the last 24 hours). Anything above that is refused.",
     "over": "Scheduled sends in the next 24h exceed what is left — WhatsApp will refuse about {{excess}} messages. Move some campaigns later.",
     "unknown": "Your sending limit isn't known yet. Check WhatsApp is connected in Settings."
+  },
+  "errorAdvice": {
+    "131049": "Not your fault: WhatsApp caps how many marketing messages one person receives. Try them again in a few days.",
+    "130472": "A Meta experiment on some numbers — nothing to do.",
+    "131026": "The number isn't on WhatsApp or can't receive messages. Fix it or remove it from contacts.",
+    "131050": "This person turned off marketing messages from businesses. Don’t send them campaigns.",
+    "131047": "More than 24 hours since they last wrote, so an approved template is required.",
+    "131042": "A payment problem at Meta. Open Settings → WhatsApp → Billing & payments.",
+    "131021": "This is your own number — remove it from the audience.",
+    "RATE_LIMITED": "WhatsApp slowed sending for a while. Resend to the failed numbers later.",
+    "QUOTA": "You went over WhatsApp's daily limit. Send the rest tomorrow."
   }
 }

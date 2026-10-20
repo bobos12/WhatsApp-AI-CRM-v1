@@ -49,6 +49,8 @@ interface RecipientPage {
   rows: BroadcastRecipient[];
   total: number;
   counts: { pending: number; sent: number; failed: number; skipped: number; total: number };
+  /** Failed recipients grouped by reason, most common first. */
+  failureReasons?: Array<{ errorCode: string; count: number; sample: string | null }>;
 }
 
 const RECIPIENT_STATUS_STYLES: Record<string, string> = {
@@ -233,6 +235,10 @@ export default function BroadcastDetailPage() {
   const [recipients, setRecipients] = useState<RecipientPage | null>(null);
   const [recipientsLoading, setRecipientsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'' | 'pending' | 'sent' | 'failed' | 'skipped'>('');
+  /** Within "Failed": only this reason ('' = every reason). */
+  const [reasonFilter, setReasonFilter] = useState('');
+  /** Set once the user picks a tab, so the default never overrides their choice. */
+  const tabChosenRef = useRef(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -310,6 +316,7 @@ export default function BroadcastDetailPage() {
     try {
       const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (statusFilter) query.set('status', statusFilter);
+      if (statusFilter === 'failed' && reasonFilter) query.set('errorCode', reasonFilter);
       if (debouncedSearch.trim()) query.set('search', debouncedSearch.trim());
       setRecipients(await api.get<RecipientPage>(`/api/broadcasts/${id}/recipients?${query}`));
     } catch {
@@ -317,10 +324,33 @@ export default function BroadcastDetailPage() {
     } finally {
       setRecipientsLoading(false);
     }
-  }, [id, page, pageSize, statusFilter, debouncedSearch]);
+  }, [id, page, pageSize, statusFilter, reasonFilter, debouncedSearch]);
   useLiveData('broadcasts', fetchRecipients, { id });
 
   useEffect(() => { fetchRecipients(); }, [fetchRecipients]);
+
+  // Open on the delivered list rather than a mix of delivered and failed;
+  // failures get their own tab with the reasons summarised once.
+  useEffect(() => {
+    const c = recipients?.counts;
+    if (tabChosenRef.current || !c || statusFilter !== '') return;
+    tabChosenRef.current = true;
+    if (c.sent > 0) setStatusFilter('sent');
+    else if (c.failed > 0) setStatusFilter('failed');
+  }, [recipients, statusFilter]);
+
+  const pickTab = (key: '' | 'pending' | 'sent' | 'failed' | 'skipped') => {
+    tabChosenRef.current = true;
+    setStatusFilter(key);
+    setReasonFilter('');
+    setPage(1);
+  };
+
+  /** One failure reason in plain words: our wording, else what Meta said. */
+  const reasonText = (code: string, sample?: string | null) =>
+    code === 'none'
+      ? (sample ?? t('errorCode.UNKNOWN'))
+      : t(`errorCode.${code}`, { defaultValue: ERROR_CODE_FALLBACK[code] ?? sample ?? t('errorCode.UNKNOWN') });
 
   // ─── Live progress ────────────────────────────────────────────────────────
 
@@ -476,18 +506,22 @@ export default function BroadcastDetailPage() {
   const counts = recipients?.counts;
   const totalRecipients = counts?.total ?? broadcast?.recipientCount ?? 0;
 
-  const statusTabs: Array<{ key: '' | 'pending' | 'sent' | 'failed' | 'skipped'; label: string; count?: number }> = [
-    { key: '',        label: t('detail.allRecipients', { defaultValue: 'All' }), count: counts?.total },
-    { key: 'sent',    label: t('recipientStatus.sent', { defaultValue: 'Sent' }), count: counts?.sent },
-    { key: 'failed',  label: t('recipientStatus.failed', { defaultValue: 'Failed' }), count: counts?.failed },
-    { key: 'pending', label: t('recipientStatus.pending', { defaultValue: 'Pending' }), count: counts?.pending },
+  // Delivered and failed first and apart; "All" last for the rare full view.
+  const statusTabs: Array<{ key: '' | 'pending' | 'sent' | 'failed' | 'skipped'; label: string; count?: number; tone?: string }> = [
+    { key: 'sent',    label: t('recipientStatus.sent', { defaultValue: 'Sent' }), count: counts?.sent, tone: 'text-brand' },
+    { key: 'failed',  label: t('recipientStatus.failed', { defaultValue: 'Failed' }), count: counts?.failed, tone: (counts?.failed ?? 0) > 0 ? 'text-red-500' : undefined },
+    ...((counts?.pending ?? 0) > 0
+      ? [{ key: 'pending' as const, label: t('recipientStatus.pending', { defaultValue: 'Pending' }), count: counts?.pending }]
+      : []),
     // Only offered when there is something to see. An "Excluded (0)" tab on
     // every clean campaign is noise; on a campaign that filtered 200 opt-outs it
     // is the answer to the first question the user will ask.
     ...(counts?.skipped
       ? [{ key: 'skipped' as const, label: t('recipientStatus.skipped', { defaultValue: 'Excluded' }), count: counts.skipped }]
       : []),
+    { key: '',        label: t('detail.allRecipients', { defaultValue: 'All' }), count: counts?.total },
   ];
+  const failureReasons = recipients?.failureReasons ?? [];
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -658,7 +692,7 @@ export default function BroadcastDetailPage() {
                   <button
                     key={tab.key || 'all'}
                     type="button"
-                    onClick={() => { setStatusFilter(tab.key); setPage(1); }}
+                    onClick={() => pickTab(tab.key)}
                     className={cn(
                       'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                       statusFilter === tab.key
@@ -668,7 +702,7 @@ export default function BroadcastDetailPage() {
                   >
                     {tab.label}
                     {typeof tab.count === 'number' && (
-                      <span className="tabular-nums opacity-70">{tab.count.toLocaleString()}</span>
+                      <span className={cn('tabular-nums', statusFilter === tab.key ? 'opacity-80' : tab.tone ?? 'opacity-70')}>{tab.count.toLocaleString()}</span>
                     )}
                   </button>
                 ))}
@@ -696,6 +730,46 @@ export default function BroadcastDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Failed: each reason once, with its count, meaning and what to do —
+                instead of the same sentence under every number. */}
+            {statusFilter === 'failed' && failureReasons.length > 0 && (
+              <div className="space-y-2 border-b border-line bg-red-500/[0.03] px-4 py-3.5 sm:px-5">
+                <p className="text-xs font-semibold text-ink-2">{t('detail.whyFailed', { defaultValue: 'Why these failed' })}</p>
+                <ul className="space-y-1.5">
+                  {failureReasons.map((r) => {
+                    const active = reasonFilter === r.errorCode;
+                    const advice = t(`errorAdvice.${r.errorCode}`, { defaultValue: '' });
+                    return (
+                      <li key={r.errorCode}>
+                        <button
+                          type="button"
+                          onClick={() => { setReasonFilter(active ? '' : r.errorCode); setPage(1); }}
+                          aria-pressed={active}
+                          className={cn(
+                            'flex w-full items-start gap-3 rounded-lg border px-3 py-2 text-start transition-colors',
+                            active ? 'border-red-500/40 bg-red-500/10' : 'border-line bg-surface hover:border-red-500/30',
+                          )}
+                        >
+                          <span className="mt-px min-w-[2.5rem] rounded-md bg-red-500/10 px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums text-red-600 dark:text-red-400">
+                            {r.count.toLocaleString()}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-medium text-ink">{reasonText(r.errorCode, r.sample)}</span>
+                            {advice && <span className="mt-0.5 block text-xs leading-5 text-ink-3">{advice}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {reasonFilter && (
+                  <button type="button" onClick={() => { setReasonFilter(''); setPage(1); }} className="text-xs font-medium text-brand hover:underline">
+                    {t('detail.showAllFailed', { defaultValue: 'Show every failed number' })}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* rows — a two-column list, not a table: there is nothing to sort */}
             {recipientsLoading ? (
@@ -727,7 +801,7 @@ export default function BroadcastDetailPage() {
                         {/* Why this one did not go out, in plain words. A phone
                             number next to "Excluded" with no reason is the kind
                             of gap that gets a safety feature reported as a bug. */}
-                        {(recipient.skipReason || recipient.errorCode) && (
+                        {(recipient.skipReason || recipient.errorCode) && !(statusFilter === 'failed' && reasonFilter) && (
                           <span
                             className="mt-0.5 block text-[11px] leading-snug text-ink-3 line-clamp-2"
                             title={recipient.lastError ?? undefined}
