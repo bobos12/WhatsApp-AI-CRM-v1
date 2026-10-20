@@ -11,6 +11,7 @@ import Toaster from '../../components/ui/Toaster';
 import LeadAlertPopup from '../../components/notifications/LeadAlertPopup';
 import CrmAssistantBubble from '../../components/layout/CrmAssistantBubble';
 import WhatsAppConnectBanner from '../../components/whatsapp/WhatsAppConnectBanner';
+import SendingBlockedBanner from '../../components/whatsapp/SendingBlockedBanner';
 import { WhatsAppConnectProvider } from '../../components/whatsapp/WhatsAppConnectProvider';
 import SetupGate from '../../components/whatsapp/setup/SetupGate';
 import AppUpdateBanner from '../../components/layout/AppUpdateBanner';
@@ -42,6 +43,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <ImpersonationBanner />
               <AppUpdateBanner />
               <WhatsAppConnectBanner />
+              <SendingBlockedBanner />
               <AppMain>{children}</AppMain>
             </div>
             <BottomNav />

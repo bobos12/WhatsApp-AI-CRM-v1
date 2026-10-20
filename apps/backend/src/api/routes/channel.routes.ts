@@ -385,6 +385,26 @@ function invalidateHealth() {
   if (tenantId) healthCache.delete(tenantId);
 }
 
+/**
+ * Is Meta letting this number send right now? Read by the app-wide banner for
+ * every signed-in user (not only managers): a salesperson whose sends fail
+ * should see why and where to pay, instead of waiting on the admin. Cheap — the
+ * underlying Meta probe runs at most every 10 minutes.
+ */
+router.get('/sending-status', async (req: AuthRequest, res) => {
+  try {
+    requireTenant();
+    const tenantId = getTenantId()!;
+    const channel = await getChannel();
+    if (!channel.cloud) return res.json({ blocked: false, connected: false });
+    const { getSendingStatus } = await import('../../providers/meta/sending-status');
+    const status = await getSendingStatus(tenantId, channel.cloud, { fresh: req.query.fresh === '1' });
+    res.json({ ...status, connected: true, wabaId: channel.cloud.wabaId ?? null });
+  } catch (err) {
+    handle(res, err);
+  }
+});
+
 router.get('/health', checkPermission('read', 'whatsapp'), async (req: AuthRequest, res) => {
   try {
     requireTenant();

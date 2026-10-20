@@ -230,5 +230,13 @@
     "askManager": "A manager can fix this in Settings → WhatsApp.",
     "expand": "WhatsApp needs attention — tap for details",
     "collapse": "Minimize"
+  },
+  "sendingBlocked": {
+    "title": "WhatsApp sending has stopped",
+    "body": "Meta is refusing to send from your number — usually an unpaid balance or a changed payment method. Open \"Pay in Meta\" → WhatsApp Business accounts tab → account {{waba}}, pay the balance or set your card as the payment method, then press \"Check again\". Paused campaigns resume by themselves.",
+    "bodyPayment": "Meta couldn't charge the WhatsApp account, so sending stopped. Open \"Pay in Meta\" → account {{waba}}, update the card or pay the balance, then press \"Check again\". Paused campaigns resume by themselves.",
+    "pay": "Pay in Meta",
+    "recheck": "Check again",
+    "stillBlocked": "Meta is still refusing sends. It can take a few minutes after paying — try again shortly."
   }
 }

@@ -14,7 +14,8 @@ import { getChannel, recordSync, type CloudApiConfig } from '../channel.service'
 import { normalizePhone } from '../../lib/phone';
 import { logger } from '../../lib/logger';
 import { prisma } from '../../lib/prisma';
-import { requireTenantId } from '../../lib/tenant-context';
+import { getTenantId, requireTenantId } from '../../lib/tenant-context';
+import { noteSendFailure, noteSendOk } from './sending-status';
 import { loadMedia } from '../../lib/media';
 import { getOrCreateConversationByPhone } from '../../conversations/conversation-resolver';
 import { buildMetaOutbound } from '../../messaging/normalizers/meta.normalizer';
@@ -256,11 +257,14 @@ export class MetaWhatsAppProvider implements MessagingProvider {
         message: meta.message,
         trace: meta.traceId,
       });
+      noteSendFailure(getTenantId(), meta);
       throw Object.assign(
         new HttpError(meta.requiresTemplate ? 409 : 502, meta.userMessage, `META_${meta.kind}`),
         { cause: meta },
       );
     }
+
+    noteSendOk(getTenantId());
 
     // From here the message is on its way to the customer. A failure to record
     // it must not surface as a failed send — the caller would retry it, or a
