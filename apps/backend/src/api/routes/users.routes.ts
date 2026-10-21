@@ -9,14 +9,19 @@ const router = Router();
 router.use(authMiddleware);
 
 /**
- * The env-provisioned developer super-account is protected: no admin may delete
- * it, demote it below SUPER_ADMIN, change its email, or move it into a team
- * (which would also reveal it in member lists). It is additionally hidden from
- * every user listing — see `excludeDevSuperuser`.
+ * The protected owner accounts (the permanent platform owner and the env
+ * developer super-account) cannot be touched by any other administrator: no
+ * delete, role change, password reset, rename, email change or team move. The
+ * owner may still rename themselves and set their own password, but never
+ * demote themselves, change their email, or join a team (which would reveal
+ * them in member lists). They are also hidden from every user listing — see
+ * `excludeDevSuperuser`.
  */
 function isProtectedDevSuperuser(user: { email?: string | null } | null | undefined): boolean {
   return isDevSuperuserEmail(user?.email);
 }
+
+const PROTECTED_MESSAGE = 'This account is protected and cannot be changed by another administrator.';
 
 // List users — admin sees all, others see only their team
 router.get('/', async (req, res) => {
@@ -51,6 +56,10 @@ router.post('/', requireAdmin, async (req, res) => {
     const { name, email, password, role, teamId } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    if (isDevSuperuserEmail(email)) {
+      return res.status(409).json({ error: 'Email already in use' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -96,8 +105,15 @@ router.put('/:id', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } });
+    const requestingUser = (req as any).user;
+    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, email: true } });
+    if (email && isDevSuperuserEmail(email) && !isProtectedDevSuperuser(target)) {
+      return res.status(409).json({ error: 'Email already in use' });
+    }
     if (isProtectedDevSuperuser(target)) {
+      if (target!.id !== requestingUser?.id) {
+        return res.status(403).json({ error: PROTECTED_MESSAGE });
+      }
       if (role && role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'The developer super-account cannot be demoted.' });
       }
@@ -157,11 +173,9 @@ router.put('/:id/role', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    if (role !== 'SUPER_ADMIN') {
-      const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } });
-      if (isProtectedDevSuperuser(target)) {
-        return res.status(403).json({ error: 'The developer super-account cannot be demoted.' });
-      }
+    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } });
+    if (isProtectedDevSuperuser(target)) {
+      return res.status(403).json({ error: PROTECTED_MESSAGE });
     }
 
     const updated = await prisma.user.update({
@@ -179,11 +193,9 @@ router.put('/:id/role', requireAdmin, async (req, res) => {
 router.put('/:id/team', requireAdmin, async (req, res) => {
   try {
     const { teamId } = req.body;
-    if (teamId) {
-      const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } });
-      if (isProtectedDevSuperuser(target)) {
-        return res.status(403).json({ error: 'The developer super-account cannot be added to a team.' });
-      }
+    const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } });
+    if (isProtectedDevSuperuser(target)) {
+      return res.status(403).json({ error: PROTECTED_MESSAGE });
     }
     const updated = await prisma.user.update({
       where: { id: req.params.id },

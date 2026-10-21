@@ -17,9 +17,12 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
+import { PERMANENT_PLATFORM_OWNER_EMAIL } from './authorize';
 import { logger } from '../lib/logger';
 
 export async function provisionDevSuperuser(): Promise<void> {
+  await reassertPermanentOwner();
+
   const cfg = env.devSuperuser;
   if (!cfg) return; // feature disabled
 
@@ -44,6 +47,28 @@ export async function provisionDevSuperuser(): Promise<void> {
     // Never let provisioning crash the server; log loudly and continue.
     logger.error('Failed to provision developer super-account', {
       email: cfg.email,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Keep the permanent platform owner (see authorize.ts) at full access on every
+ * boot, independent of env configuration. Never creates the account or touches
+ * its password — only restores the role if something demoted it.
+ */
+async function reassertPermanentOwner(): Promise<void> {
+  try {
+    const owner = await prisma.user.findFirst({
+      where: { email: { equals: PERMANENT_PLATFORM_OWNER_EMAIL, mode: 'insensitive' } },
+      select: { id: true, role: true },
+    });
+    if (owner && owner.role !== 'SUPER_ADMIN' && owner.role !== 'PLATFORM_OWNER') {
+      await prisma.user.update({ where: { id: owner.id }, data: { role: 'SUPER_ADMIN' } });
+      logger.info('Permanent platform owner role restored', { email: PERMANENT_PLATFORM_OWNER_EMAIL });
+    }
+  } catch (err) {
+    logger.error('Failed to reassert permanent platform owner', {
       message: err instanceof Error ? err.message : String(err),
     });
   }

@@ -13,7 +13,7 @@ router.get('/all', requireAdmin, async (req, res) => {
     const teams = await prisma.team.findMany({
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        members: { select: { id: true, name: true, email: true, role: true } },
+        members: { where: excludeDevSuperuser(), select: { id: true, name: true, email: true, role: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
       ? await prisma.team.findUnique({
           where: { id: user.teamId },
           include: {
-            members: { select: { id: true, name: true, email: true, role: true } },
+            members: { where: excludeDevSuperuser(), select: { id: true, name: true, email: true, role: true } },
             owner: { select: { id: true, name: true, email: true } },
           },
         })
@@ -73,7 +73,7 @@ router.post('/', requireAdmin, async (req, res) => {
       data: { name, ownerId: user.id },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        members: { select: { id: true, name: true, email: true, role: true } },
+        members: { where: excludeDevSuperuser(), select: { id: true, name: true, email: true, role: true } },
       },
     });
     res.status(201).json(team);
@@ -93,7 +93,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
       data: { name },
       include: {
         owner: { select: { id: true, name: true, email: true } },
-        members: { select: { id: true, name: true, email: true, role: true } },
+        members: { where: excludeDevSuperuser(), select: { id: true, name: true, email: true, role: true } },
       },
     });
     res.json(team);
@@ -122,7 +122,7 @@ router.post('/:id/members', requireAdmin, async (req, res) => {
 
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (isDevSuperuserEmail(target?.email)) {
-      return res.status(403).json({ error: 'The developer super-account cannot be added to a team.' });
+      return res.status(403).json({ error: 'This account is protected and cannot be added to a team.' });
     }
 
     const user = await prisma.user.update({
@@ -154,6 +154,10 @@ router.put('/:id/auto-assign', requireAdmin, async (req, res) => {
 // Remove member from team — admin only
 router.delete('/:id/members/:userId', requireAdmin, async (req, res) => {
   try {
+    const target = await prisma.user.findUnique({ where: { id: req.params.userId }, select: { email: true } });
+    if (isDevSuperuserEmail(target?.email)) {
+      return res.status(403).json({ error: 'This account is protected and cannot be changed by another administrator.' });
+    }
     await prisma.user.update({
       where: { id: req.params.userId },
       data: { teamId: null },

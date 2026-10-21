@@ -17,7 +17,7 @@ import jwt from 'jsonwebtoken';
 import { prismaUnscoped } from '../../lib/prisma';
 import { env } from '../../lib/env';
 import { authMiddleware } from '../../auth/auth.middleware';
-import { isDevSuperuserEmail } from '../../auth/authorize';
+import { isDevSuperuserEmail, excludeDevSuperuser, onlyProtectedOwners } from '../../auth/authorize';
 import { provisionTenant } from '../../tenants/provision-tenant.service';
 import { aiConfigService } from '../../services/ai-config.service';
 import { logger } from '../../lib/logger';
@@ -53,6 +53,14 @@ router.get('/access', (req, res) =>
 
 // Everything below is operator-only.
 router.use(requirePlatformOwner);
+
+/** True when the tenant is home to a protected owner account (suspending or deleting it would lock them out). */
+async function hostsProtectedOwner(tenantId: string): Promise<boolean> {
+  const count = await prismaUnscoped.user.count({ where: { tenantId, ...onlyProtectedOwners() } });
+  return count > 0;
+}
+
+const PROTECTED_TENANT_MESSAGE = "This tenant is home to the platform owner's account and cannot be suspended or deleted.";
 
 // ── List tenants ──────────────────────────────────────────────────────────────
 router.get('/tenants', async (_req, res) => {
@@ -95,6 +103,9 @@ router.post('/tenants', async (req, res) => {
   if (ownerEmail && !ownerPassword) {
     return res.status(400).json({ error: 'ownerPassword is required when ownerEmail is set' });
   }
+  if (isDevSuperuserEmail(ownerEmail)) {
+    return res.status(400).json({ error: 'Could not create tenant: that email is already in use' });
+  }
   try {
     const result = await provisionTenant({ name, slug, ownerEmail, ownerPassword, ownerName });
     res.status(201).json(result);
@@ -111,6 +122,7 @@ router.post('/tenants/:id/suspend', async (req, res) => {
   const { id } = req.params;
   const tenant = await prismaUnscoped.tenant.findUnique({ where: { id }, select: { id: true } });
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+  if (await hostsProtectedOwner(id)) return res.status(403).json({ error: PROTECTED_TENANT_MESSAGE });
 
   await prismaUnscoped.tenant.update({ where: { id }, data: { status: 'SUSPENDED' } });
   // Nothing to disconnect: the Cloud API is stateless HTTP. A suspended tenant
@@ -136,7 +148,8 @@ router.post('/tenants/:id/activate', async (req, res) => {
 router.post('/tenants/:id/impersonate', async (req, res) => {
   const { id } = req.params;
   const owner = await prismaUnscoped.user.findFirst({
-    where: { tenantId: id, role: 'SUPER_ADMIN' },
+    // Never mint a token for a protected owner account.
+    where: { tenantId: id, role: 'SUPER_ADMIN', ...excludeDevSuperuser() },
     select: { id: true, email: true, name: true, role: true, teamId: true, tenantId: true },
     orderBy: { createdAt: 'asc' },
   });
@@ -157,6 +170,7 @@ router.delete('/tenants/:id', async (req, res) => {
   const { id } = req.params;
   const tenant = await prismaUnscoped.tenant.findUnique({ where: { id }, select: { id: true } });
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+  if (await hostsProtectedOwner(id)) return res.status(403).json({ error: PROTECTED_TENANT_MESSAGE });
 
   try {
     const where = { tenantId: id };

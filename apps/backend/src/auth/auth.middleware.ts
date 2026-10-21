@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { env } from '../lib/env';
-import { isManager, type Role } from './authorize';
+import { isDevSuperuserEmail, isManager, type Role } from './authorize';
 import { runAsPlatform, runWithContext } from '../lib/tenant-context';
 
 export interface AuthRequest extends Request {
@@ -52,7 +52,8 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     }
 
     // A suspended tenant's users cannot use the app; their data is preserved.
-    if (user.tenantId) {
+    // The protected platform owner is never locked out this way.
+    if (user.tenantId && !isDevSuperuserEmail(user.email)) {
       const tenant = await runAsPlatform(async () => {
         return await prisma.tenant.findUnique({ where: { id: user.tenantId! }, select: { status: true } });
       });
