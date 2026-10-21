@@ -106,6 +106,8 @@
     "ANALYST": "موظف",
     "VIEWER": "موظف",
     "MEMBER": "موظف"
+,
+    "PLATFORM_OWNER": "مالك المنصة"
   },
   "labels": {
     "name": "الاسم",

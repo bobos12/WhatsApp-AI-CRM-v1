@@ -47,7 +47,8 @@ router.get('/access', (req, res) =>
   authMiddleware(req as any, res, () => {
     const user = (req as any).user;
     const isOperator = user?.role === 'PLATFORM_OWNER' || isDevSuperuserEmail(user?.email);
-    res.json({ isOperator: Boolean(isOperator) });
+    // `isOwner` marks the protected platform owner so the UI can title them apart from ordinary admins.
+    res.json({ isOperator: Boolean(isOperator), isOwner: isDevSuperuserEmail(user?.email) });
   }),
 );
 
@@ -63,17 +64,19 @@ async function hostsProtectedOwner(tenantId: string): Promise<boolean> {
 const PROTECTED_TENANT_MESSAGE = "This tenant is home to the platform owner's account and cannot be suspended or deleted.";
 
 // ── List tenants ──────────────────────────────────────────────────────────────
-router.get('/tenants', async (_req, res) => {
+router.get('/tenants', async (req, res) => {
+  const homeTenantId = (req as any).user?.tenantId ?? null;
   const tenants = await prismaUnscoped.tenant.findMany({ orderBy: { createdAt: 'desc' } });
   const rows = await Promise.all(
     tenants.map(async (t) => {
-      const [users, contacts, channel] = await Promise.all([
-        prismaUnscoped.user.count({ where: { tenantId: t.id } }),
+      const [users, contacts, channel, isProtected] = await Promise.all([
+        prismaUnscoped.user.count({ where: { tenantId: t.id, ...excludeDevSuperuser() } }),
         prismaUnscoped.contact.count({ where: { tenantId: t.id } }),
         prismaUnscoped.whatsAppChannel.findFirst({
           where: { tenantId: t.id },
           select: { phoneNumberId: true, displayPhoneNumber: true },
         }),
+        hostsProtectedOwner(t.id),
       ]);
       return {
         id: t.id,
@@ -81,6 +84,10 @@ router.get('/tenants', async (_req, res) => {
         slug: t.slug,
         status: t.status,
         createdAt: t.createdAt,
+        // The operator's own business: "Open" enters it directly, no impersonation.
+        isHome: t.id === homeTenantId,
+        // Home of a protected owner: cannot be suspended or deleted.
+        protected: isProtected,
         users,
         contacts,
         whatsapp: {
@@ -117,6 +124,32 @@ router.post('/tenants', async (req, res) => {
   }
 });
 
+// ── Edit tenant ───────────────────────────────────────────────────────────────
+router.patch('/tenants/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, slug } = req.body ?? {};
+  const tenant = await prismaUnscoped.tenant.findUnique({ where: { id }, select: { id: true, slug: true } });
+  if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+  const data: { name?: string; slug?: string } = {};
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'A tenant name is required' });
+    data.name = name.trim();
+  }
+  if (slug !== undefined && slug !== tenant.slug) {
+    if (typeof slug !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      return res.status(400).json({ error: 'The handle may only use lowercase letters, numbers and dashes' });
+    }
+    const taken = await prismaUnscoped.tenant.findUnique({ where: { slug }, select: { id: true } });
+    if (taken) return res.status(409).json({ error: 'That handle is already used by another client' });
+    data.slug = slug;
+  }
+
+  const updated = await prismaUnscoped.tenant.update({ where: { id }, data, select: { id: true, name: true, slug: true } });
+  logger.info('platform.tenant_updated', { tenantId: id });
+  res.json(updated);
+});
+
 // ── Suspend / activate ────────────────────────────────────────────────────────
 router.post('/tenants/:id/suspend', async (req, res) => {
   const { id } = req.params;
@@ -147,12 +180,23 @@ router.post('/tenants/:id/activate', async (req, res) => {
 // exactly what the client sees. Uses the tenant's first SUPER_ADMIN.
 router.post('/tenants/:id/impersonate', async (req, res) => {
   const { id } = req.params;
-  const owner = await prismaUnscoped.user.findFirst({
-    // Never mint a token for a protected owner account.
-    where: { tenantId: id, role: 'SUPER_ADMIN', ...excludeDevSuperuser() },
-    select: { id: true, email: true, name: true, role: true, teamId: true, tenantId: true },
-    orderBy: { createdAt: 'asc' },
-  });
+  // The operator's own business needs no impersonation: the client just navigates in.
+  if ((req as any).user?.tenantId === id) return res.json({ home: true });
+
+  // Prefer the tenant's earliest SUPER_ADMIN, then any other manager. Never mint
+  // a token for a protected owner account.
+  const select = { id: true, email: true, name: true, role: true, teamId: true, tenantId: true } as const;
+  const owner =
+    (await prismaUnscoped.user.findFirst({
+      where: { tenantId: id, role: 'SUPER_ADMIN', ...excludeDevSuperuser() },
+      select,
+      orderBy: { createdAt: 'asc' },
+    })) ??
+    (await prismaUnscoped.user.findFirst({
+      where: { tenantId: id, role: { in: ['ADMIN', 'TEAM_LEAD'] }, ...excludeDevSuperuser() },
+      select,
+      orderBy: { createdAt: 'asc' },
+    }));
   if (!owner) return res.status(404).json({ error: 'Tenant has no owner to impersonate' });
 
   const token = jwt.sign(

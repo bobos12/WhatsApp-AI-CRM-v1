@@ -19,10 +19,11 @@ import {
   Settings2, Globe, CheckCircle2, MessageCircle,
   User, LogOut, SlidersHorizontal,
   Wifi, WifiOff, RefreshCw,
-  ChevronRight, ShieldCheck, Eye, EyeOff, Loader, Lock,
+  ChevronRight, ShieldCheck, Eye, EyeOff, Loader, Lock, Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SIMPLE_ROLE_LABEL, SIMPLE_ROLE_BADGE, toSimpleRole } from '@/lib/roles';
+import { useOperatorAccess } from '@/hooks/useOperatorAccess';
 
 type Section = 'whatsapp' | 'account' | 'password' | 'language';
 
@@ -35,6 +36,8 @@ function initials(name?: string | null, email?: string | null): string {
 export default function SettingsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
+  const { isOwner } = useOperatorAccess();
   const { language } = useLanguage();
   const { isRTL } = useDirection();
   const searchParams = useSearchParams();
@@ -136,9 +139,16 @@ export default function SettingsPage() {
           <div className="min-w-0 flex-1">
             {name && <p className="truncate text-base font-semibold text-ink">{name}</p>}
             <p className="truncate text-sm text-ink-3">{email}</p>
-            <span className={cn('mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide', SIMPLE_ROLE_BADGE[toSimpleRole(role)])}>
-              {t(`team.roles.${toSimpleRole(role)}`, { defaultValue: SIMPLE_ROLE_LABEL[toSimpleRole(role)] })}
-            </span>
+            {isOwner ? (
+              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                <Crown className="h-3 w-3" aria-hidden="true" />
+                {tCommon('roles.PLATFORM_OWNER')}
+              </span>
+            ) : (
+              <span className={cn('mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide', SIMPLE_ROLE_BADGE[toSimpleRole(role)])}>
+                {t(`team.roles.${toSimpleRole(role)}`, { defaultValue: SIMPLE_ROLE_LABEL[toSimpleRole(role)] })}
+              </span>
+            )}
           </div>
         </div>
 

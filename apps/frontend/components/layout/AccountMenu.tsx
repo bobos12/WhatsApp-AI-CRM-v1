@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSession, signOut } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
-import { Moon, Globe, RefreshCw, RotateCw, LogOut, Settings, ChevronsUpDown } from 'lucide-react';
+import { Moon, Globe, RefreshCw, RotateCw, LogOut, Settings, ChevronsUpDown, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { useLanguage } from '@/components/providers/I18nProvider';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { hardRefresh } from '@/lib/hard-refresh';
 import { toSimpleRole } from '@/lib/roles';
+import { useOperatorAccess } from '@/hooks/useOperatorAccess';
 import { Switch } from '@/components/ui/page';
 
 /**
@@ -45,7 +46,8 @@ export default function AccountMenu({
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   const name = user?.name || user?.email || '—';
   const email = user?.email || '';
-  const role = toSimpleRole(user?.role);
+  const { isOwner } = useOperatorAccess();
+  const role = isOwner ? 'PLATFORM_OWNER' : toSimpleRole(user?.role);
   const initials = name.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
   useEffect(() => {
@@ -85,7 +87,12 @@ export default function AccountMenu({
           <>
             <span className={cn("min-w-0 flex-1 leading-tight", railBelowLg && "hidden lg:block")}>
               <span className={cn('block truncate font-medium', variant === 'nav' ? 'text-[13px] text-nav-ink' : 'text-[15px] text-ink')}>{name}</span>
-              <span className={cn('block truncate', variant === 'nav' ? 'text-2xs text-nav-muted' : 'mt-0.5 text-xs text-ink-3')}>
+              <span className={cn(
+                'flex items-center gap-1 truncate',
+                variant === 'nav' ? 'text-2xs' : 'mt-0.5 text-xs',
+                isOwner ? 'font-semibold text-amber-500 dark:text-amber-400' : variant === 'nav' ? 'text-nav-muted' : 'text-ink-3',
+              )}>
+                {isOwner && <Crown className="h-3 w-3 shrink-0" aria-hidden="true" />}
                 {tCommon(`roles.${role}`)}
               </span>
             </span>

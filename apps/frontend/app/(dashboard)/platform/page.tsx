@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/page';
 import { useRouter } from 'next/navigation';
 import {
   Building2, Plus, Trash2, Search, Users, Smartphone, CheckCircle2, PauseCircle,
-  Play, Pause, LogIn, Copy, ShieldCheck, RefreshCw, X, Circle,
+  Play, Pause, LogIn, Copy, ShieldCheck, RefreshCw, X, Circle, Pencil,
 } from 'lucide-react';
 import { api, startImpersonation } from '../../../lib/api';
 import { Modal } from '../../../components/ui/modal';
@@ -21,6 +21,10 @@ type Tenant = {
   slug: string;
   status: 'ACTIVE' | 'SUSPENDED';
   createdAt: string;
+  /** The operator's own business — "Open" enters it without impersonation. */
+  isHome?: boolean;
+  /** Home of the platform owner — cannot be suspended or deleted. */
+  protected?: boolean;
   users: number;
   contacts: number;
   whatsapp: { hasSession: boolean; status: WaStatus; connectedNumber: string | null };
@@ -72,6 +76,12 @@ export default function PlatformPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+
+  // edit modal
+  const [editing, setEditing] = useState<Tenant | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', slug: '' });
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   // per-row busy + delete confirm
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -178,7 +188,35 @@ export default function PlatformPage() {
     }
   };
 
+  const openEdit = (t: Tenant) => {
+    setEditing(t);
+    setEditForm({ name: t.name, slug: t.slug });
+    setEditError('');
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    setEditError('');
+    const name = editForm.name.trim();
+    const slug = editForm.slug.trim().toLowerCase();
+    if (!name) { setEditError('Business name is required.'); return; }
+    setEditSaving(true);
+    try {
+      await api.patch(`/api/platform/tenants/${editing.id}`, { name, slug });
+      success('Client updated.');
+      setEditing(null);
+      await loadTenants(true);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Failed to update client');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const impersonate = async (t: Tenant) => {
+    // Your own business: just go in.
+    if (t.isHome) { router.push('/dashboard'); return; }
     setBusyId(t.id);
     try {
       const { token } = await api.post<{ token: string }>(`/api/platform/tenants/${t.id}/impersonate`, {});
@@ -330,6 +368,15 @@ export default function PlatformPage() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => openEdit(t)}
+                            disabled={busyId === t.id}
+                            className="btn btn-secondary btn-sm inline-flex disabled:opacity-40"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                          {!t.protected && (<>
+                          <button
+                            type="button"
                             onClick={() => toggleStatus(t)}
                             disabled={busyId === t.id}
                             className={cn(
@@ -349,6 +396,7 @@ export default function PlatformPage() {
                           >
                             <Trash2 className="h-3 w-3" /> Delete
                           </button>
+                          </>)}
                         </div>
                       )}
                     </td>
@@ -359,6 +407,38 @@ export default function PlatformPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Edit client modal ── */}
+      <Modal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        aria-label="Edit client"
+        overlayClassName="bg-black/70"
+        className="w-full max-w-md rounded-xl border border-line bg-surface p-6 shadow-pop"
+      >
+        <form onSubmit={handleEdit}>
+          <div className="mb-5 flex items-center gap-3">
+            <Pencil className="h-5 w-5 text-brand" />
+            <h2 className="text-lg font-semibold text-white">Edit client</h2>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-ink-3">Business name</label>
+              <input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="field w-full" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-ink-3">Handle</label>
+              <input value={editForm.slug} onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })} placeholder="acme-dental" dir="ltr" className="field w-full" />
+              <p className="mt-1 text-[11px] text-ink-4">Lowercase letters, numbers and dashes. Used in logs and links.</p>
+            </div>
+          </div>
+          {editError && <p className="mt-3 text-xs text-red-400">{editError}</p>}
+          <div className="mt-6 flex justify-end gap-3">
+            <button type="button" onClick={() => setEditing(null)} className="btn btn-secondary">Cancel</button>
+            <button type="submit" disabled={editSaving} className="btn btn-primary disabled:opacity-50">{editSaving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </form>
+      </Modal>
 
       {/* ── Create client modal ── */}
       <Modal

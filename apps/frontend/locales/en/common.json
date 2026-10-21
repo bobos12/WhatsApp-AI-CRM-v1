@@ -106,6 +106,8 @@
     "ANALYST": "Employee",
     "VIEWER": "Employee",
     "MEMBER": "Employee"
+,
+    "PLATFORM_OWNER": "Platform Owner"
   },
   "labels": {
     "name": "Name",
