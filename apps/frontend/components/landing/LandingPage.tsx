@@ -55,10 +55,7 @@ const SHOT: Record<string, { src: string; w: number; h: number }> = {
 const TOUR_MS = 7000
 
 /** Messages pre-filled into the WhatsApp chat each CTA opens. */
-function ctaMessage(isAr: boolean, kind: 'start' | 'question' | { plan: string }) {
-  if (typeof kind === 'object') {
-    return isAr ? `مرحبًا، أنا مهتم بخطة ${kind.plan}` : `Hi, I'm interested in the ${kind.plan} plan`
-  }
+function ctaMessage(isAr: boolean, kind: 'start' | 'question') {
   if (kind === 'question') return isAr ? 'مرحبًا، لدي سؤال عن NexusCRM' : 'Hi, I have a question about NexusCRM'
   return isAr ? 'مرحبًا، أرغب في البدء مع NexusCRM' : "Hi, I'd like to get started with NexusCRM"
 }
@@ -272,11 +269,12 @@ function Hero({ t, isAr }: { t: LandingContent; isAr: boolean }) {
             {t.hero.subtitle}
           </p>
 
-          <div className="nx-rise mt-10 flex flex-col gap-3 sm:flex-row" style={d(370)}>
+          <div className="nx-rise mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap" style={d(370)}>
             <a href={waLink(ctaMessage(isAr, 'start'))} target="_blank" rel="noopener noreferrer" className="nx-btn nx-btn-primary">
               <WhatsAppGlyph />
               {t.hero.ctaPrimary}
             </a>
+            <InstallButton variant="hero" label={t.hero.download} installedLabel={t.appInstalled} />
             <a href="#product" className="nx-btn nx-btn-ghost">
               {t.hero.ctaSecondary}
               <ArrowRight className="nx-arrow h-4 w-4" />
@@ -641,79 +639,6 @@ function Customers({ t }: { t: LandingContent }) {
   )
 }
 
-// ─── Pricing (sand) ────────────────────────────────────────────────────────────
-function Pricing({ t, isAr }: { t: LandingContent; isAr: boolean }) {
-  return (
-    <section id="pricing" className="nx-sand scroll-mt-16 border-t border-[var(--nx-sand-line)] px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
-      <div className="mx-auto max-w-[76rem]">
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-end">
-          <Reveal>
-            <Eyebrow n="05">{t.pricing.eyebrow}</Eyebrow>
-            <h2 className="nx-h2 mt-5">{t.pricing.title}</h2>
-          </Reveal>
-          <Reveal delay={80}>
-            <p className="nx-c2 lg:text-end">{t.pricing.subtitle}</p>
-          </Reveal>
-        </div>
-
-        <div className="mt-14 grid items-stretch gap-4 md:grid-cols-3">
-          {t.pricing.plans.map((p, i) => {
-            const hi = p.highlight
-            return (
-              <Reveal key={p.key} delay={i * 90}>
-                <div
-                  className={`relative flex h-full flex-col rounded-2xl p-7 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 sm:p-8 ${
-                    hi
-                      ? 'nx-cut bg-[var(--nx-ink)] text-[var(--nx-text)] shadow-[0_40px_80px_-40px_rgba(6,16,12,0.7)]'
-                      : 'border border-[var(--nx-sand-line)] bg-[var(--nx-sand-2)]'
-                  }`}
-                  style={hi ? ({ '--cut': '30px' } as CSSProperties) : undefined}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className={`text-[15px] font-semibold ${hi ? 'text-[var(--nx-text)]' : 'nx-c1'}`}>{p.name}</p>
-                    {hi && (
-                      <span className="me-4 rounded-md bg-[var(--nx-signal)] px-2 py-0.5 text-xs font-semibold text-[var(--nx-signal-ink)]">
-                        {t.pricing.mostPopular}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-6 flex items-baseline gap-2">
-                    <span className="nx-num text-[2.75rem] font-semibold leading-none tracking-[-0.04em]">{p.price}</span>
-                    {/\d/.test(p.price) && (
-                      <span className={`text-sm ${hi ? 'text-[var(--nx-text-3)]' : 'nx-c2'}`}>{t.pricing.perMonth}</span>
-                    )}
-                  </div>
-                  <p className={`mt-3 text-sm ${hi ? 'text-[var(--nx-text-3)]' : 'nx-c2'}`}>{p.sub}</p>
-
-                  <ul className={`mt-7 flex-1 space-y-3 border-t pt-7 ${hi ? 'border-[var(--nx-line)]' : 'border-[var(--nx-sand-line)]'}`}>
-                    {p.features.map((f) => (
-                      <li key={f} className={`flex items-start gap-3 text-sm ${hi ? 'text-[var(--nx-text-2)]' : 'nx-c1'}`}>
-                        <Check className={`mt-0.5 h-4 w-4 shrink-0 ${hi ? 'text-[var(--nx-signal)]' : 'text-[var(--nx-signal-deep)]'}`} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <a
-                    href={waLink(ctaMessage(isAr, { plan: p.name }))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`nx-btn mt-8 w-full ${hi ? 'nx-btn-primary' : 'nx-btn-sand-ghost'}`}
-                  >
-                    {p.cta}
-                    <ArrowRight className="nx-arrow h-4 w-4" />
-                  </a>
-                </div>
-              </Reveal>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // ─── FAQ (sand) ────────────────────────────────────────────────────────────────
 function FaqItem({ q, a, open, onToggle }: { q: string; a: string; open: boolean; onToggle: () => void }) {
   return (
@@ -737,7 +662,7 @@ function Faq({ t, isAr }: { t: LandingContent; isAr: boolean }) {
     <section id="faq" className="nx-sand scroll-mt-16 border-t border-[var(--nx-sand-line)] px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
       <div className="mx-auto grid max-w-[76rem] gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
         <Reveal>
-          <Eyebrow n="06">{t.faq.eyebrow}</Eyebrow>
+          <Eyebrow n="05">{t.faq.eyebrow}</Eyebrow>
           <h2 className="nx-h2 mt-5">{t.faq.title}</h2>
           <p className="mt-5 nx-c2">{t.faq.subtitle}</p>
           <a href={waLink(ctaMessage(isAr, 'question'))} target="_blank" rel="noopener noreferrer" className="nx-link mt-8 text-[var(--nx-signal-deep)]">
@@ -862,7 +787,6 @@ export default function LandingPage() {
         <AiSection t={t} isAr={isAr} />
         <MobileSection t={t} isAr={isAr} />
         <Customers t={t} />
-        <Pricing t={t} isAr={isAr} />
         <Faq t={t} isAr={isAr} />
         <FinalCta t={t} isAr={isAr} />
       </main>

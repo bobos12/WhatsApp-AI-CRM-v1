@@ -21,6 +21,7 @@ export interface LandingContent {
     subtitle: string
     ctaPrimary: string
     ctaSecondary: string
+    download: string
     reassurance: string
     /** The animated conversation beside the headline. */
     chat: {
@@ -89,22 +90,6 @@ export interface LandingContent {
     title: string
     items: { quote: string; author: string; role: string }[]
   }
-  pricing: {
-    eyebrow: string
-    title: string
-    subtitle: string
-    perMonth: string
-    mostPopular: string
-    plans: {
-      key: string
-      name: string
-      price: string
-      sub: string
-      features: string[]
-      cta: string
-      highlight: boolean
-    }[]
-  }
   faq: {
     eyebrow: string
     title: string
@@ -136,7 +121,6 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         { id: 'product', label: 'Product' },
         { id: 'ai', label: 'AI' },
         { id: 'customers', label: 'Customers' },
-        { id: 'pricing', label: 'Pricing' },
         { id: 'faq', label: 'FAQ' },
       ],
       signIn: 'Sign in',
@@ -151,6 +135,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         'One inbox for your whole team, an AI assistant that answers in Arabic and English around the clock, and a CRM that remembers every customer — in one place.',
       ctaPrimary: 'Talk to us on WhatsApp',
       ctaSecondary: 'See the product',
+      download: 'Download the app',
       reassurance: 'Set up in 10 minutes · Arabic & English · Cancel anytime',
       chat: {
         contactName: 'Sara Al-Otaibi',
@@ -288,18 +273,6 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         { quote: 'The AI handles 70% of inbound questions before a human even sees them. Our small team now performs like an enterprise call center.', author: 'Noura Al-Qahtani', role: 'CEO, FastShip Logistics' },
       ],
     },
-    pricing: {
-      eyebrow: 'Pricing',
-      title: 'Simple, transparent pricing',
-      subtitle: 'Start free. Scale when you grow. No hidden fees, cancel anytime.',
-      perMonth: '/ month',
-      mostPopular: 'Most popular',
-      plans: [
-        { key: 'starter', name: 'Starter', price: 'Free', sub: 'Free forever for small teams', features: ['1 WhatsApp number', 'Up to 500 contacts', '3 team members', 'Basic automation', 'Community support'], cta: 'Get started free', highlight: false },
-        { key: 'pro', name: 'Professional', price: '199 ﷼', sub: 'Billed monthly · save 20% yearly', features: ['3 WhatsApp numbers', 'Up to 10,000 contacts', 'Unlimited team members', 'AI assistant + advanced automation', 'Broadcast campaigns', 'Priority support'], cta: 'Start free trial', highlight: true },
-        { key: 'enterprise', name: 'Enterprise', price: 'Custom', sub: 'Self-hosted or managed cloud', features: ['Unlimited numbers & contacts', 'White-label option', 'Custom integrations', 'Dedicated infrastructure', 'SLA + onboarding manager'], cta: 'Contact sales', highlight: false },
-      ],
-    },
     faq: {
       eyebrow: 'FAQ',
       title: 'Questions, answered',
@@ -322,7 +295,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
     footer: {
       tagline: 'The WhatsApp CRM for businesses across the Gulf.',
       columns: [
-        { title: 'Product', links: ['Features', 'AI Assistant', 'Pricing', 'Roadmap'] },
+        { title: 'Product', links: ['Features', 'AI Assistant', 'Roadmap'] },
         { title: 'Solutions', links: ['Restaurants', 'Healthcare', 'Real Estate', 'E-commerce'] },
         { title: 'Company', links: ['About', 'Privacy', 'Terms', 'Contact'] },
       ],
@@ -340,7 +313,6 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         { id: 'product', label: 'المنتج' },
         { id: 'ai', label: 'الذكاء الاصطناعي' },
         { id: 'customers', label: 'عملاؤنا' },
-        { id: 'pricing', label: 'الأسعار' },
         { id: 'faq', label: 'الأسئلة' },
       ],
       signIn: 'تسجيل الدخول',
@@ -355,6 +327,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         'صندوق وارد واحد لفريقك كله، ومساعد ذكي يرد بالعربية والإنجليزية على مدار الساعة، ونظام عملاء يحفظ تفاصيل كل عميل — في مكان واحد.',
       ctaPrimary: 'تحدّث معنا على واتساب',
       ctaSecondary: 'شاهد المنتج',
+      download: 'حمّل التطبيق',
       reassurance: 'الإعداد خلال 10 دقائق · عربي وإنجليزي · إلغاء في أي وقت',
       chat: {
         contactName: 'سارة العتيبي',
@@ -492,18 +465,6 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         { quote: 'يتولّى الذكاء الاصطناعي 70% من الأسئلة الواردة قبل أن يراها موظف. فريقنا الصغير صار يؤدّي كمركز اتصال مؤسسي.', author: 'نورة القحطاني', role: 'الرئيسة التنفيذية، فاست شيب' },
       ],
     },
-    pricing: {
-      eyebrow: 'الأسعار',
-      title: 'أسعار بسيطة وشفافة',
-      subtitle: 'ابدأ مجانًا. توسّع عند النمو. بدون رسوم خفية، وإلغاء في أي وقت.',
-      perMonth: '/ شهريًا',
-      mostPopular: 'الأكثر اختيارًا',
-      plans: [
-        { key: 'starter', name: 'المبتدئ', price: 'مجاني', sub: 'مجاني للأبد للفرق الصغيرة', features: ['رقم واتساب واحد', 'حتى 500 جهة اتصال', '3 أعضاء فريق', 'أتمتة أساسية', 'دعم المجتمع'], cta: 'ابدأ مجانًا', highlight: false },
-        { key: 'pro', name: 'الاحترافي', price: '199 ﷼', sub: 'فوترة شهرية · وفّر 20% سنويًا', features: ['3 أرقام واتساب', 'حتى 10,000 جهة اتصال', 'أعضاء فريق بلا حدود', 'مساعد ذكي + أتمتة متقدمة', 'حملات جماعية', 'دعم ذو أولوية'], cta: 'ابدأ تجربة مجانية', highlight: true },
-        { key: 'enterprise', name: 'المؤسسات', price: 'مخصص', sub: 'استضافة ذاتية أو سحابة مُدارة', features: ['أرقام وجهات اتصال بلا حدود', 'خيار العلامة البيضاء', 'تكاملات مخصصة', 'بنية تحتية مخصصة', 'اتفاقية مستوى خدمة + مدير إعداد'], cta: 'تواصل مع المبيعات', highlight: false },
-      ],
-    },
     faq: {
       eyebrow: 'الأسئلة الشائعة',
       title: 'إجابات لأسئلتك',
@@ -526,7 +487,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
     footer: {
       tagline: 'نظام واتساب لإدارة العملاء للأعمال في أنحاء الخليج.',
       columns: [
-        { title: 'المنتج', links: ['المميزات', 'المساعد الذكي', 'الأسعار', 'خارطة الطريق'] },
+        { title: 'المنتج', links: ['المميزات', 'المساعد الذكي', 'خارطة الطريق'] },
         { title: 'الحلول', links: ['المطاعم', 'الرعاية الصحية', 'العقارات', 'التجارة الإلكترونية'] },
         { title: 'الشركة', links: ['من نحن', 'الخصوصية', 'الشروط', 'تواصل معنا'] },
       ],
