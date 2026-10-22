@@ -12,16 +12,16 @@ export const metadata: Metadata = {
     template: '%s | Nexus CRM',
   },
   description:
-    'Turn WhatsApp conversations into revenue. The premium, AI-powered WhatsApp CRM for Saudi businesses — shared inbox, automation, broadcast campaigns, and analytics. Full Arabic & English support. حوّل محادثات واتساب إلى مبيعات حقيقية.',
+    'Turn WhatsApp conversations into revenue. The AI-powered WhatsApp CRM for businesses across the Gulf — shared inbox, automation, broadcast campaigns, and analytics. Full Arabic & English support. حوّل محادثات واتساب إلى مبيعات حقيقية.',
   keywords: [
-    'WhatsApp CRM', 'WhatsApp CRM Saudi Arabia', 'نظام واتساب', 'CRM واتساب',
+    'WhatsApp CRM', 'WhatsApp CRM Saudi Arabia', 'WhatsApp CRM UAE', 'WhatsApp CRM Gulf', 'نظام واتساب', 'CRM واتساب',
     'WhatsApp automation', 'business messaging', 'WhatsApp campaigns', 'AI WhatsApp assistant',
   ],
   authors: [{ name: 'Nexus CRM' }],
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
   openGraph: {
-    title: 'Nexus CRM — WhatsApp Business Platform for Saudi Arabia',
-    description: 'Turn WhatsApp conversations into revenue. AI-powered, bilingual (Arabic & English) WhatsApp CRM for Saudi businesses.',
+    title: 'Nexus CRM — WhatsApp CRM for the Gulf',
+    description: 'Turn WhatsApp conversations into revenue. AI-powered, bilingual (Arabic & English) WhatsApp CRM for businesses across the Gulf.',
     type: 'website',
     locale: 'en_US',
     alternateLocale: ['ar_SA'],

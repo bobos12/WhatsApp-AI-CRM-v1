@@ -48,7 +48,7 @@ export function PageHeader({
         {/* Phones keep the description to two lines so the content starts above the fold. */}
         {description && <p className="mt-1 line-clamp-2 max-w-2xl text-[13px] leading-5 text-ink-3 sm:line-clamp-none">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }

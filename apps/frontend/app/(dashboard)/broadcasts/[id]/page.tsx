@@ -639,7 +639,7 @@ export default function BroadcastDetailPage() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5 [&>*]:min-w-0">
 
         {/* ── Left: message + audience ── */}
         <div className="space-y-5 lg:col-span-3">
@@ -649,7 +649,7 @@ export default function BroadcastDetailPage() {
               <MediaPreview broadcast={broadcast} />
               {broadcast.message.trim() ? (
                 <div className="rounded-xl rounded-ss-sm bg-[#DCF8C6] p-3 text-sm text-slate-900 dark:bg-[#005C4B] dark:text-white">
-                  <p className="whitespace-pre-wrap break-words">{broadcast.message}</p>
+                  <p dir="auto" className="whitespace-pre-wrap [overflow-wrap:anywhere]">{broadcast.message}</p>
                 </div>
               ) : (
                 <p className="text-sm text-ink-3">

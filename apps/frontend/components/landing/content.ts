@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Bilingual marketing content for the premium landing page.
+// Bilingual marketing content for the landing page.
 // Self-contained (not wired into the global i18n namespaces) so the marketing
 // site can evolve independently. Keyed by language; the page reads the active
 // language from useLanguage() and re-renders on switch — RTL flips seamlessly.
@@ -15,83 +15,74 @@ export interface LandingContent {
     menu: string
   }
   hero: {
-    badge: string
-    titlePre: string
-    titleGold: string
-    titlePost: string
+    eyebrow: string
+    titleLine1: string
+    titleLine2: string
     subtitle: string
     ctaPrimary: string
     ctaSecondary: string
-    ratingLabel: string
-    noCard: string
-    floating: { online: string; replies: string; csat: string; aiHandled: string }
+    reassurance: string
+    /** The animated conversation beside the headline. */
     chat: {
       contactName: string
       status: string
+      today: string
       inbound1: string
       outbound1: string
       inbound2: string
-      orderTag: string
+      aiLabel: string
+      typing: string
+      composer: string
+      repliedIn: string
+    }
+    /** The CRM record that updates as the conversation plays. */
+    crm: {
+      label: string
+      stage: string
+      stageFrom: string
+      stageTo: string
+      owner: string
+      ownerFrom: string
+      ownerTo: string
+      value: string
+      valueAmount: string
+      tag: string
     }
   }
-  trust: { label: string }
   stats: { value: number; suffix: string; label: string }[]
-  features: {
+  industries: {
+    title: string
+    items: { key: string; label: string }[]
+  }
+  /** Product tour — one tab per screen, each backed by a product screenshot. */
+  tour: {
     eyebrow: string
     title: string
     titleMuted: string
     subtitle: string
-    items: { key: string; title: string; desc: string }[]
+    items: { key: string; label: string; title: string; desc: string; bullets: string[] }[]
   }
   ai: {
     eyebrow: string
     title: string
-    titleGold: string
+    titleMuted: string
     subtitle: string
     capabilities: { key: string; title: string; desc: string }[]
-    panelTitle: string
-    suggestionLabel: string
-    suggestion: string
-    sentimentLabel: string
-    sentiment: string
-    insertCta: string
-    customerMsg: string
-    composerPlaceholder: string
+    firstReply: string
+    resolved: string
   }
   workflow: {
-    eyebrow: string
     title: string
     subtitle: string
     steps: { key: string; title: string; desc: string }[]
   }
-  industries: {
-    eyebrow: string
-    title: string
-    subtitle: string
-    items: { key: string; label: string }[]
-  }
-  showcase: {
-    eyebrow: string
-    title: string
-    titleGold: string
-    subtitle: string
-    bullets: string[]
-    url: string
-  }
-  /** Product tour — one tab per screen, each backed by a real screenshot. */
-  tour: {
-    eyebrow: string
-    title: string
-    titleGold: string
-    subtitle: string
-    items: { key: string; label: string; title: string; desc: string; bullets: string[] }[]
-  }
   mobile: {
     eyebrow: string
     title: string
-    titleGold: string
+    titleMuted: string
     subtitle: string
     bullets: string[]
+    install: string
   }
   testimonials: {
     eyebrow: string
@@ -118,13 +109,13 @@ export interface LandingContent {
     eyebrow: string
     title: string
     subtitle: string
+    askUs: string
     items: { q: string; a: string }[]
   }
   finalCta: {
     title: string
     subtitle: string
     primary: string
-    secondary: string
     reassurance: string
   }
   footer: {
@@ -134,6 +125,7 @@ export interface LandingContent {
     disclaimer: string
     badges: string[]
   }
+  appInstalled: string
 }
 
 export const LANDING: Record<LandingLang, LandingContent> = {
@@ -142,139 +134,79 @@ export const LANDING: Record<LandingLang, LandingContent> = {
     nav: {
       links: [
         { id: 'product', label: 'Product' },
-        { id: 'features', label: 'Features' },
         { id: 'ai', label: 'AI' },
-        { id: 'industries', label: 'Solutions' },
+        { id: 'customers', label: 'Customers' },
         { id: 'pricing', label: 'Pricing' },
         { id: 'faq', label: 'FAQ' },
       ],
       signIn: 'Sign in',
-      getStarted: 'Get Started',
+      getStarted: 'Get started',
       menu: 'Menu',
     },
     hero: {
-      badge: 'The WhatsApp Business Platform for Saudi Arabia',
-      titlePre: 'Turn WhatsApp conversations into ',
-      titleGold: 'real revenue',
-      titlePost: '',
+      eyebrow: 'WhatsApp CRM for the Gulf',
+      titleLine1: 'Your business runs on WhatsApp.',
+      titleLine2: 'Run WhatsApp like a business.',
       subtitle:
-        'One intelligent platform to manage every customer chat, automate replies with AI, run broadcast campaigns, and grow your team — all on the channel your customers already use every day.',
-      ctaPrimary: 'Start Free — No Card Needed',
-      ctaSecondary: 'Book a Demo',
-      ratingLabel: '4.9 / 5 from Saudi businesses',
-      noCard: 'No credit card required · Set up in 10 minutes · Cancel anytime',
-      floating: {
-        online: 'Live now',
-        replies: 'Avg. reply time',
-        csat: 'Customer satisfaction',
-        aiHandled: 'Handled by AI',
-      },
+        'One inbox for your whole team, an AI assistant that answers in Arabic and English around the clock, and a CRM that remembers every customer — in one place.',
+      ctaPrimary: 'Talk to us on WhatsApp',
+      ctaSecondary: 'See the product',
+      reassurance: 'Set up in 10 minutes · Arabic & English · Cancel anytime',
       chat: {
         contactName: 'Sara Al-Otaibi',
         status: 'online',
+        today: 'Today',
         inbound1: 'Hi! Is my order ready?',
-        outbound1: 'Yes! Order #2847 is confirmed and ships today 🎉',
-        inbound2: 'Perfect, thank you so much 🙏',
-        orderTag: 'AI replied in 2s',
+        outbound1: 'Yes — order #2847 is confirmed and ships today. You’ll get tracking by 6 PM.',
+        inbound2: 'Perfect, thank you!',
+        aiLabel: 'AI assistant',
+        typing: 'typing…',
+        composer: 'Type a reply…',
+        repliedIn: 'AI replied in 2s',
+      },
+      crm: {
+        label: 'Contact record',
+        stage: 'Stage',
+        stageFrom: 'New',
+        stageTo: 'Qualified',
+        owner: 'Owner',
+        ownerFrom: 'AI assistant',
+        ownerTo: 'Omar · Sales',
+        value: 'Deal value',
+        valueAmount: 'SAR 1,240',
+        tag: 'Repeat customer',
       },
     },
-    trust: { label: 'Trusted by ambitious teams across the Kingdom' },
     stats: [
       { value: 500, suffix: '+', label: 'businesses onboard' },
-      { value: 2, suffix: 'M+', label: 'messages / day' },
+      { value: 2, suffix: 'M+', label: 'messages a day' },
       { value: 99.9, suffix: '%', label: 'uptime SLA' },
       { value: 10, suffix: 'x', label: 'faster responses' },
     ],
-    features: {
-      eyebrow: 'Platform',
-      title: 'Everything your business needs',
-      titleMuted: 'on WhatsApp',
-      subtitle:
-        'Messaging, automation, contacts, campaigns, and analytics — unified in one premium platform, so your team never switches tools again.',
-      items: [
-        { key: 'inbox', title: 'Shared Team Inbox', desc: 'Route, assign, and reply to thousands of conversations together — with internal notes, tags, and zero missed messages.' },
-        { key: 'ai', title: 'AI Assistant', desc: 'An always-on agent that qualifies leads, answers FAQs, and drafts smart replies in Arabic and English, 24/7.' },
-        { key: 'broadcast', title: 'Broadcast Campaigns', desc: 'Send approved WhatsApp templates to segmented audiences and watch delivery, opens, and replies update live.' },
-        { key: 'automation', title: 'Visual Automation', desc: 'Build no-code flows that trigger on keywords, events, and customer behaviour — follow-ups that never sleep.' },
-        { key: 'crm', title: 'Customer Profiles', desc: 'Every contact, order, note, and conversation in one rich timeline your whole team can see and act on.' },
-        { key: 'analytics', title: 'Live Analytics', desc: 'Track response times, campaign conversions, agent performance, and revenue impact in real time.' },
-      ],
-    },
-    ai: {
-      eyebrow: 'AI-first',
-      title: 'Let AI handle the busywork,',
-      titleGold: 'your team closes the deals',
-      subtitle:
-        'Our AI reads every conversation, understands intent in Arabic and English, and acts — so your agents focus on what humans do best.',
-      capabilities: [
-        { key: 'replies', title: 'Smart auto-replies', desc: 'Instant, on-brand answers to common questions.' },
-        { key: 'qualify', title: 'Lead qualification', desc: 'Scores and routes hot leads to the right agent.' },
-        { key: 'summary', title: 'Conversation summaries', desc: 'One-line recaps of long chats before you reply.' },
-        { key: 'sentiment', title: 'Sentiment detection', desc: 'Flags unhappy customers before they churn.' },
-        { key: 'suggest', title: 'Suggested replies', desc: 'AI-drafted responses your agents send in a tap.' },
-        { key: 'translate', title: 'Arabic ↔ English', desc: 'Understands and replies fluently in both.' },
-      ],
-      panelTitle: 'AI Copilot',
-      suggestionLabel: 'Suggested reply',
-      suggestion: 'Your order #2847 has shipped and will arrive tomorrow before 6 PM. Here is your tracking link 📦',
-      sentimentLabel: 'Sentiment',
-      sentiment: 'Positive · ready to buy',
-      insertCta: 'Insert reply',
-      customerMsg: 'Hi! Is my order ready? 😊',
-      composerPlaceholder: 'Type a reply…',
-    },
-    workflow: {
-      eyebrow: 'How it works',
-      title: 'From first message to closed deal',
-      subtitle: 'A connected flow where every step updates the next — automatically.',
-      steps: [
-        { key: 'customer', title: 'Customer messages', desc: 'A customer reaches out on WhatsApp — day or night.' },
-        { key: 'ai', title: 'AI responds instantly', desc: 'The assistant answers, qualifies, and gathers context.' },
-        { key: 'team', title: 'Team takes over', desc: 'Hot conversations route to the right agent with full history.' },
-        { key: 'crm', title: 'CRM stays in sync', desc: 'Contacts, deals, and notes update automatically.' },
-        { key: 'reports', title: 'Reports reveal growth', desc: 'Live dashboards show what is working and what to scale.' },
-      ],
-    },
     industries: {
-      eyebrow: 'Solutions',
-      title: 'Built for every Saudi business',
-      subtitle: 'From a single boutique to a national enterprise — the platform adapts to how you sell.',
+      title: 'Built for businesses that live on WhatsApp',
       items: [
-        { key: 'restaurants', label: 'Restaurants & Cafés' },
-        { key: 'clinics', label: 'Clinics & Healthcare' },
-        { key: 'realestate', label: 'Real Estate' },
-        { key: 'retail', label: 'Retail & Stores' },
+        { key: 'restaurants', label: 'Restaurants & cafés' },
+        { key: 'clinics', label: 'Clinics' },
+        { key: 'realestate', label: 'Real estate' },
+        { key: 'retail', label: 'Retail' },
         { key: 'ecommerce', label: 'E-commerce' },
         { key: 'education', label: 'Education' },
         { key: 'automotive', label: 'Automotive' },
-        { key: 'agencies', label: 'Marketing Agencies' },
+        { key: 'agencies', label: 'Agencies' },
       ],
-    },
-    showcase: {
-      eyebrow: 'The product',
-      title: 'A command center for',
-      titleGold: 'every conversation',
-      subtitle:
-        'Real WhatsApp rendering — bubbles, ticks, reactions, replies, and interactive buttons exactly as your customers see them. No broken previews, no surprises.',
-      bullets: [
-        'Pixel-perfect WhatsApp message previews',
-        'Multi-agent inbox with live presence',
-        'Drag-and-drop campaign builder',
-        'Official Meta WhatsApp Business API — no unofficial libraries',
-      ],
-      url: 'app.nexuscrm.sa/inbox',
     },
     tour: {
-      eyebrow: 'Product tour',
-      title: 'Six systems.',
-      titleGold: 'One platform.',
-      subtitle: 'Every screen below is the real product, captured from the running app — not a mockup.',
+      eyebrow: 'Product',
+      title: 'Everything your team does on WhatsApp,',
+      titleMuted: 'in one place.',
+      subtitle: 'Pick a tool to see how it works.',
       items: [
         {
           key: 'inbox',
-          label: 'Shared Inbox',
-          title: 'One line. Your whole team.',
-          desc: 'Sales, support and design work the same WhatsApp number without two people answering the same customer.',
+          label: 'Shared inbox',
+          title: 'One number. Your whole team.',
+          desc: 'Sales, support and operations work the same WhatsApp number without two people answering the same customer.',
           bullets: ['Round-robin assignment inside working hours', 'Internal notes, tags and saved views', 'Full customer history beside every thread'],
         },
         {
@@ -307,20 +239,49 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         },
       ],
     },
+    ai: {
+      eyebrow: 'AI',
+      title: 'AI handles the busywork.',
+      titleMuted: 'Your team closes the deals.',
+      subtitle:
+        'The assistant reads every conversation, understands intent in Arabic and English, and acts — so your people spend their time where it counts.',
+      capabilities: [
+        { key: 'replies', title: 'Smart auto-replies', desc: 'Instant, on-brand answers to common questions.' },
+        { key: 'qualify', title: 'Lead qualification', desc: 'Scores and routes hot leads to the right agent.' },
+        { key: 'summary', title: 'Conversation summaries', desc: 'One-line recaps of long chats before you reply.' },
+        { key: 'sentiment', title: 'Sentiment detection', desc: 'Flags unhappy customers before they churn.' },
+        { key: 'suggest', title: 'Suggested replies', desc: 'Drafted responses your agents send in a tap.' },
+        { key: 'translate', title: 'Arabic ↔ English', desc: 'Understands and replies fluently in both.' },
+      ],
+      firstReply: 'average AI first reply',
+      resolved: 'resolved without an agent',
+    },
+    workflow: {
+      title: 'From first message to closed deal',
+      subtitle: 'Every step updates the next — automatically.',
+      steps: [
+        { key: 'customer', title: 'Customer messages', desc: 'Day or night, on the app they already use.' },
+        { key: 'ai', title: 'AI responds', desc: 'Answers, qualifies and gathers context.' },
+        { key: 'team', title: 'Team takes over', desc: 'Hot chats route to the right agent with full history.' },
+        { key: 'crm', title: 'CRM stays in sync', desc: 'Contacts, deals and notes update themselves.' },
+        { key: 'reports', title: 'Reports show growth', desc: 'See what works and what to scale.' },
+      ],
+    },
     mobile: {
       eyebrow: 'Mobile',
       title: 'Your inbox,',
-      titleGold: 'in your pocket',
+      titleMuted: 'in your pocket.',
       subtitle: 'Install it like a native app. The same inbox, the same CRM, the same notifications — on the phone your team already carries.',
       bullets: [
-        'Installable PWA — no app store review',
-        'Web push for hot leads and SLA breaches',
-        'Works offline-first and syncs on reconnect',
+        'Installable app — no app store review',
+        'Push alerts for hot leads and slow replies',
+        'Keeps working offline and syncs on reconnect',
       ],
+      install: 'Install the app',
     },
     testimonials: {
-      eyebrow: 'Customer stories',
-      title: 'Loved by leading Saudi teams',
+      eyebrow: 'Customers',
+      title: 'Trusted by teams across the Gulf',
       items: [
         { quote: 'We went from juggling WhatsApp on personal phones to routing 3,000 conversations a day through one team inbox. Response time dropped by 80%.', author: 'Sara Al-Rashid', role: 'Head of Support, NovaMart' },
         { quote: 'The broadcast templates render exactly like real WhatsApp messages — finally a tool that does not embarrass us in front of customers.', author: 'Khalid Al-Harbi', role: 'Growth Lead, Tamkeen' },
@@ -332,34 +293,34 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       title: 'Simple, transparent pricing',
       subtitle: 'Start free. Scale when you grow. No hidden fees, cancel anytime.',
       perMonth: '/ month',
-      mostPopular: 'Most Popular',
+      mostPopular: 'Most popular',
       plans: [
-        { key: 'starter', name: 'Starter', price: 'Free', sub: 'Forever free for small teams', features: ['1 WhatsApp number', 'Up to 500 contacts', '3 team members', 'Basic automation', 'Community support'], cta: 'Get Started Free', highlight: false },
-        { key: 'pro', name: 'Professional', price: '199 ﷼', sub: 'Billed monthly · save 20% yearly', features: ['3 WhatsApp numbers', 'Up to 10,000 contacts', 'Unlimited team members', 'AI assistant + advanced automation', 'Broadcast campaigns', 'Priority support'], cta: 'Start Free Trial', highlight: true },
-        { key: 'enterprise', name: 'Enterprise', price: 'Custom', sub: 'Self-hosted or managed cloud', features: ['Unlimited numbers & contacts', 'White-label option', 'Custom integrations', 'Dedicated infrastructure', 'SLA + onboarding manager'], cta: 'Contact Sales', highlight: false },
+        { key: 'starter', name: 'Starter', price: 'Free', sub: 'Free forever for small teams', features: ['1 WhatsApp number', 'Up to 500 contacts', '3 team members', 'Basic automation', 'Community support'], cta: 'Get started free', highlight: false },
+        { key: 'pro', name: 'Professional', price: '199 ﷼', sub: 'Billed monthly · save 20% yearly', features: ['3 WhatsApp numbers', 'Up to 10,000 contacts', 'Unlimited team members', 'AI assistant + advanced automation', 'Broadcast campaigns', 'Priority support'], cta: 'Start free trial', highlight: true },
+        { key: 'enterprise', name: 'Enterprise', price: 'Custom', sub: 'Self-hosted or managed cloud', features: ['Unlimited numbers & contacts', 'White-label option', 'Custom integrations', 'Dedicated infrastructure', 'SLA + onboarding manager'], cta: 'Contact sales', highlight: false },
       ],
     },
     faq: {
       eyebrow: 'FAQ',
       title: 'Questions, answered',
       subtitle: 'Everything you need to know before getting started.',
+      askUs: 'Still have a question? Ask us on WhatsApp',
       items: [
         { q: 'Do I need the official WhatsApp Business API?', a: 'You can start in minutes by scanning a QR code with our Baileys provider, or connect the official Meta Business API for higher volume and verified templates. The platform supports both — and fails over automatically.' },
-        { q: 'Does it fully support Arabic?', a: 'Yes. The entire platform, the AI assistant, and message templates are fully bilingual with native right-to-left support, built specifically for the Saudi market.' },
+        { q: 'Does it fully support Arabic?', a: 'Yes. The entire platform, the AI assistant and message templates are fully bilingual with native right-to-left support, built for Gulf and Arab markets.' },
         { q: 'How long does setup take?', a: 'Most businesses are live in under 10 minutes — connect your number, import contacts, and start messaging. No developers required.' },
         { q: 'Is my data secure and private?', a: 'Your data is encrypted in transit and at rest, hosted in compliant infrastructure. Enterprise plans can be fully self-hosted on your own servers.' },
         { q: 'Can I migrate my existing contacts?', a: 'Absolutely. Import via CSV, sync from your current CRM, or let conversations auto-create contacts as customers message you.' },
       ],
     },
     finalCta: {
-      title: 'Ready to turn WhatsApp into your #1 sales channel?',
-      subtitle: 'Join hundreds of Saudi businesses delivering faster support, smarter campaigns, and more closed deals — every single day.',
-      primary: 'Start Free Today',
-      secondary: 'Talk to Sales',
-      reassurance: 'No credit card required · Set up in 10 minutes · Cancel anytime',
+      title: 'Ready to make WhatsApp your #1 sales channel?',
+      subtitle: 'Join businesses across the Gulf delivering faster support, smarter campaigns and more closed deals — every day.',
+      primary: 'Talk to us on WhatsApp',
+      reassurance: 'Set up in 10 minutes · Arabic & English · Cancel anytime',
     },
     footer: {
-      tagline: 'The premium WhatsApp CRM for modern Saudi businesses.',
+      tagline: 'The WhatsApp CRM for businesses across the Gulf.',
       columns: [
         { title: 'Product', links: ['Features', 'AI Assistant', 'Pricing', 'Roadmap'] },
         { title: 'Solutions', links: ['Restaurants', 'Healthcare', 'Real Estate', 'E-commerce'] },
@@ -369,6 +330,7 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       disclaimer: 'Not affiliated with Meta Platforms Inc.',
       badges: ['GDPR ready', '99.9% uptime SLA', 'Hosted in-region'],
     },
+    appInstalled: 'App installed',
   },
 
   // ═══════════════════════════════════════════ ARABIC ════════════════════════
@@ -376,9 +338,8 @@ export const LANDING: Record<LandingLang, LandingContent> = {
     nav: {
       links: [
         { id: 'product', label: 'المنتج' },
-        { id: 'features', label: 'المميزات' },
         { id: 'ai', label: 'الذكاء الاصطناعي' },
-        { id: 'industries', label: 'الحلول' },
+        { id: 'customers', label: 'عملاؤنا' },
         { id: 'pricing', label: 'الأسعار' },
         { id: 'faq', label: 'الأسئلة' },
       ],
@@ -387,128 +348,69 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       menu: 'القائمة',
     },
     hero: {
-      badge: 'منصة واتساب للأعمال في المملكة العربية السعودية',
-      titlePre: 'حوّل محادثات واتساب إلى ',
-      titleGold: 'مبيعات حقيقية',
-      titlePost: '',
+      eyebrow: 'نظام واتساب لإدارة العملاء في الخليج',
+      titleLine1: 'عملك يقوم على واتساب.',
+      titleLine2: 'فأدِره كما تُدار الشركات.',
       subtitle:
-        'منصة ذكية واحدة لإدارة كل محادثة مع عملائك، وأتمتة الردود بالذكاء الاصطناعي، وإطلاق الحملات الجماعية، وتنمية فريقك — عبر القناة التي يستخدمها عملاؤك كل يوم.',
-      ctaPrimary: 'ابدأ مجانًا — بدون بطاقة',
-      ctaSecondary: 'احجز عرضًا توضيحيًا',
-      ratingLabel: '4.9 / 5 من تقييم الشركات السعودية',
-      noCard: 'بدون بطاقة ائتمان · الإعداد خلال 10 دقائق · إلغاء في أي وقت',
-      floating: {
-        online: 'متصل الآن',
-        replies: 'متوسط زمن الرد',
-        csat: 'رضا العملاء',
-        aiHandled: 'يديرها الذكاء الاصطناعي',
-      },
+        'صندوق وارد واحد لفريقك كله، ومساعد ذكي يرد بالعربية والإنجليزية على مدار الساعة، ونظام عملاء يحفظ تفاصيل كل عميل — في مكان واحد.',
+      ctaPrimary: 'تحدّث معنا على واتساب',
+      ctaSecondary: 'شاهد المنتج',
+      reassurance: 'الإعداد خلال 10 دقائق · عربي وإنجليزي · إلغاء في أي وقت',
       chat: {
         contactName: 'سارة العتيبي',
-        status: 'متصل',
+        status: 'متصلة',
+        today: 'اليوم',
         inbound1: 'مرحبًا! هل طلبي جاهز؟',
-        outbound1: 'نعم! تم تأكيد الطلب رقم 2847 وسيُشحن اليوم 🎉',
-        inbound2: 'ممتاز، شكرًا جزيلًا 🙏',
-        orderTag: 'رد الذكاء الاصطناعي خلال ثانيتين',
+        outbound1: 'أهلًا سارة — تم تأكيد الطلب رقم 2847 وسيُشحن اليوم، ويصلك رابط التتبّع قبل 6 مساءً.',
+        inbound2: 'ممتاز، شكرًا جزيلًا!',
+        aiLabel: 'المساعد الذكي',
+        typing: 'يكتب…',
+        composer: 'اكتب ردًا…',
+        repliedIn: 'ردّ المساعد خلال ثانيتين',
+      },
+      crm: {
+        label: 'ملف العميل',
+        stage: 'المرحلة',
+        stageFrom: 'جديد',
+        stageTo: 'مؤهَّل',
+        owner: 'المسؤول',
+        ownerFrom: 'المساعد الذكي',
+        ownerTo: 'عمر · المبيعات',
+        value: 'قيمة الصفقة',
+        valueAmount: '1,240 ر.س',
+        tag: 'عميل متكرر',
       },
     },
-    trust: { label: 'موثوق به من فرق طموحة في جميع أنحاء المملكة' },
     stats: [
       { value: 500, suffix: '+', label: 'شركة منضمة' },
-      { value: 2, suffix: 'M+', label: 'رسالة / يوميًا' },
+      { value: 2, suffix: 'M+', label: 'رسالة يوميًا' },
       { value: 99.9, suffix: '%', label: 'جاهزية الخدمة' },
       { value: 10, suffix: 'x', label: 'ردود أسرع' },
     ],
-    features: {
-      eyebrow: 'المنصة',
-      title: 'كل ما يحتاجه عملك',
-      titleMuted: 'على واتساب',
-      subtitle:
-        'المراسلة والأتمتة وجهات الاتصال والحملات والتحليلات — موحّدة في منصة واحدة متكاملة، فلا يحتاج فريقك للتنقل بين الأدوات بعد اليوم.',
-      items: [
-        { key: 'inbox', title: 'صندوق وارد مشترك', desc: 'وزّع المحادثات وأسندها وردّ على آلاف الرسائل معًا — مع ملاحظات داخلية ووسوم وبدون أي رسالة ضائعة.' },
-        { key: 'ai', title: 'مساعد ذكي', desc: 'وكيل لا يتوقف يؤهّل العملاء المحتملين ويجيب عن الأسئلة الشائعة ويصوغ ردودًا ذكية بالعربية والإنجليزية على مدار الساعة.' },
-        { key: 'broadcast', title: 'الحملات الجماعية', desc: 'أرسل قوالب واتساب المعتمدة لجماهير مقسّمة وراقب التسليم والفتح والردود لحظة بلحظة.' },
-        { key: 'automation', title: 'أتمتة مرئية', desc: 'ابنِ مسارات بدون برمجة تنطلق عند الكلمات المفتاحية والأحداث وسلوك العملاء — متابعات لا تنام.' },
-        { key: 'crm', title: 'ملفات العملاء', desc: 'كل جهة اتصال وطلب وملاحظة ومحادثة في سجلّ واحد غني يراه فريقك بالكامل ويتصرّف بناءً عليه.' },
-        { key: 'analytics', title: 'تحليلات مباشرة', desc: 'تابع أزمنة الرد وتحويلات الحملات وأداء الموظفين وأثر الإيرادات في الوقت الفعلي.' },
-      ],
-    },
-    ai: {
-      eyebrow: 'الذكاء الاصطناعي أولًا',
-      title: 'دع الذكاء الاصطناعي يتولّى المهام الروتينية،',
-      titleGold: 'وفريقك يُغلق الصفقات',
-      subtitle:
-        'يقرأ الذكاء الاصطناعي كل محادثة، ويفهم النية بالعربية والإنجليزية، ويتصرّف — ليتفرّغ فريقك لما يتقنه البشر.',
-      capabilities: [
-        { key: 'replies', title: 'ردود تلقائية ذكية', desc: 'إجابات فورية ومتوافقة مع هوية علامتك.' },
-        { key: 'qualify', title: 'تأهيل العملاء', desc: 'تقييم وتوجيه العملاء المهمين للموظف المناسب.' },
-        { key: 'summary', title: 'تلخيص المحادثات', desc: 'ملخص بسطر واحد للمحادثات الطويلة قبل ردّك.' },
-        { key: 'sentiment', title: 'تحليل المشاعر', desc: 'ينبّهك للعملاء غير الراضين قبل أن يغادروا.' },
-        { key: 'suggest', title: 'ردود مقترحة', desc: 'ردود يصوغها الذكاء الاصطناعي يرسلها فريقك بنقرة.' },
-        { key: 'translate', title: 'عربي ↔ إنجليزي', desc: 'يفهم ويردّ بطلاقة في كلتا اللغتين.' },
-      ],
-      panelTitle: 'مساعد الذكاء الاصطناعي',
-      suggestionLabel: 'رد مقترح',
-      suggestion: 'تم شحن طلبك رقم 2847 وسيصل غدًا قبل الساعة 6 مساءً. هذا رابط التتبّع 📦',
-      sentimentLabel: 'المشاعر',
-      sentiment: 'إيجابي · جاهز للشراء',
-      insertCta: 'إدراج الرد',
-      customerMsg: 'مرحبًا! هل طلبي جاهز؟ 😊',
-      composerPlaceholder: 'اكتب ردًا…',
-    },
-    workflow: {
-      eyebrow: 'كيف تعمل',
-      title: 'من أول رسالة إلى إتمام الصفقة',
-      subtitle: 'تدفّق مترابط تُحدّث فيه كل خطوة ما يليها — تلقائيًا.',
-      steps: [
-        { key: 'customer', title: 'العميل يراسلك', desc: 'يتواصل العميل عبر واتساب — ليلًا أو نهارًا.' },
-        { key: 'ai', title: 'رد فوري بالذكاء الاصطناعي', desc: 'يجيب المساعد ويؤهّل ويجمع السياق.' },
-        { key: 'team', title: 'الفريق يستلم', desc: 'تُوجَّه المحادثات المهمة للموظف المناسب بكامل السجل.' },
-        { key: 'crm', title: 'النظام يبقى متزامنًا', desc: 'تُحدَّث جهات الاتصال والصفقات والملاحظات تلقائيًا.' },
-        { key: 'reports', title: 'التقارير تكشف النمو', desc: 'لوحات حية تُظهر ما ينجح وما يستحق التوسّع.' },
-      ],
-    },
     industries: {
-      eyebrow: 'الحلول',
-      title: 'مصممة لكل عمل سعودي',
-      subtitle: 'من متجر صغير إلى مؤسسة وطنية — تتكيّف المنصة مع طريقة بيعك.',
+      title: 'صُمّم للأعمال التي تعيش على واتساب',
       items: [
         { key: 'restaurants', label: 'المطاعم والمقاهي' },
-        { key: 'clinics', label: 'العيادات والرعاية الصحية' },
+        { key: 'clinics', label: 'العيادات' },
         { key: 'realestate', label: 'العقارات' },
-        { key: 'retail', label: 'المتاجر والتجزئة' },
+        { key: 'retail', label: 'التجزئة' },
         { key: 'ecommerce', label: 'التجارة الإلكترونية' },
         { key: 'education', label: 'التعليم' },
         { key: 'automotive', label: 'السيارات' },
-        { key: 'agencies', label: 'وكالات التسويق' },
+        { key: 'agencies', label: 'الوكالات' },
       ],
-    },
-    showcase: {
-      eyebrow: 'المنتج',
-      title: 'مركز قيادة',
-      titleGold: 'لكل محادثة',
-      subtitle:
-        'عرض واتساب حقيقي — فقاعات وعلامات قراءة وتفاعلات وردود وأزرار تفاعلية تمامًا كما يراها عملاؤك. بدون معاينات مكسورة وبدون مفاجآت.',
-      bullets: [
-        'معاينات رسائل واتساب بدقة كاملة',
-        'صندوق وارد متعدد الموظفين مع حضور مباشر',
-        'منشئ حملات بالسحب والإفلات',
-        'واجهة Meta الرسمية + Baileys مع تبديل تلقائي',
-      ],
-      url: 'app.nexuscrm.sa/inbox',
     },
     tour: {
-      eyebrow: 'جولة في المنتج',
-      title: 'ستة أنظمة.',
-      titleGold: 'منصة واحدة.',
-      subtitle: 'كل شاشة بالأسفل هي المنتج الحقيقي، مأخوذة من التطبيق نفسه — وليست تصميمًا وهميًا.',
+      eyebrow: 'المنتج',
+      title: 'كل ما يفعله فريقك على واتساب،',
+      titleMuted: 'في مكان واحد.',
+      subtitle: 'اختر أداة لترى كيف تعمل.',
       items: [
         {
           key: 'inbox',
           label: 'الصندوق المشترك',
           title: 'رقم واحد. فريقك بالكامل.',
-          desc: 'المبيعات والدعم والتصميم يعملون على نفس رقم الواتساب دون أن يرد شخصان على العميل نفسه.',
+          desc: 'المبيعات والدعم والعمليات يعملون على نفس رقم الواتساب دون أن يرد شخصان على العميل نفسه.',
           bullets: ['توزيع دوري ضمن ساعات العمل', 'ملاحظات داخلية ووسوم وعروض محفوظة', 'سجل العميل كاملًا بجانب كل محادثة'],
         },
         {
@@ -541,20 +443,49 @@ export const LANDING: Record<LandingLang, LandingContent> = {
         },
       ],
     },
-    mobile: {
-      eyebrow: 'الجوال',
-      title: 'صندوق وارِدك،',
-      titleGold: 'في جيبك',
-      subtitle: 'ثبّته كتطبيق أصلي. نفس الصندوق ونفس نظام العملاء ونفس الإشعارات — على الجوال الذي يحمله فريقك أصلًا.',
-      bullets: [
-        'تطبيق ويب قابل للتثبيت — بلا مراجعة متجر',
-        'إشعارات فورية للعملاء المهمين وتجاوز زمن الرد',
-        'يعمل دون اتصال ويزامن عند العودة',
+    ai: {
+      eyebrow: 'الذكاء الاصطناعي',
+      title: 'الذكاء الاصطناعي يتولّى الروتين.',
+      titleMuted: 'وفريقك يُغلق الصفقات.',
+      subtitle:
+        'يقرأ المساعد كل محادثة، ويفهم النية بالعربية والإنجليزية، ويتصرّف — ليتفرّغ فريقك لما يصنع الفرق.',
+      capabilities: [
+        { key: 'replies', title: 'ردود تلقائية ذكية', desc: 'إجابات فورية ومتوافقة مع هوية علامتك.' },
+        { key: 'qualify', title: 'تأهيل العملاء', desc: 'تقييم وتوجيه العملاء المهمين للموظف المناسب.' },
+        { key: 'summary', title: 'تلخيص المحادثات', desc: 'ملخص بسطر واحد للمحادثات الطويلة قبل ردّك.' },
+        { key: 'sentiment', title: 'تحليل المشاعر', desc: 'ينبّهك للعملاء غير الراضين قبل أن يغادروا.' },
+        { key: 'suggest', title: 'ردود مقترحة', desc: 'ردود جاهزة يرسلها فريقك بنقرة.' },
+        { key: 'translate', title: 'عربي ↔ إنجليزي', desc: 'يفهم ويردّ بطلاقة في كلتا اللغتين.' },
+      ],
+      firstReply: 'متوسط أول رد من المساعد',
+      resolved: 'محادثات لا تصل لموظف',
+    },
+    workflow: {
+      title: 'من أول رسالة إلى إتمام الصفقة',
+      subtitle: 'كل خطوة تُحدّث ما يليها — تلقائيًا.',
+      steps: [
+        { key: 'customer', title: 'العميل يراسلك', desc: 'ليلًا أو نهارًا، على التطبيق الذي يستخدمه أصلًا.' },
+        { key: 'ai', title: 'المساعد يرد', desc: 'يجيب ويؤهّل ويجمع السياق.' },
+        { key: 'team', title: 'الفريق يستلم', desc: 'المحادثات المهمة تصل للموظف المناسب بكامل السجل.' },
+        { key: 'crm', title: 'النظام متزامن', desc: 'جهات الاتصال والصفقات والملاحظات تُحدَّث تلقائيًا.' },
+        { key: 'reports', title: 'التقارير تكشف النمو', desc: 'اعرف ما ينجح وما يستحق التوسّع.' },
       ],
     },
+    mobile: {
+      eyebrow: 'الجوال',
+      title: 'صندوق واردك،',
+      titleMuted: 'في جيبك.',
+      subtitle: 'ثبّته كتطبيق أصلي. نفس الصندوق ونفس نظام العملاء ونفس الإشعارات — على الجوال الذي يحمله فريقك أصلًا.',
+      bullets: [
+        'تطبيق قابل للتثبيت — بلا مراجعة متجر',
+        'تنبيهات فورية للعملاء المهمين والردود المتأخرة',
+        'يعمل دون اتصال ويزامن عند العودة',
+      ],
+      install: 'ثبّت التطبيق',
+    },
     testimonials: {
-      eyebrow: 'قصص العملاء',
-      title: 'محل ثقة أفضل الفرق السعودية',
+      eyebrow: 'عملاؤنا',
+      title: 'فرق في أنحاء الخليج تعتمد علينا',
       items: [
         { quote: 'انتقلنا من إدارة واتساب على هواتف شخصية إلى توجيه 3000 محادثة يوميًا عبر صندوق وارد واحد. انخفض زمن الرد بنسبة 80%.', author: 'سارة الراشد', role: 'مديرة الدعم، نوفامارت' },
         { quote: 'قوالب الحملات تظهر تمامًا كرسائل واتساب الحقيقية — أخيرًا أداة لا تُحرجنا أمام العملاء.', author: 'خالد الحربي', role: 'مدير النمو، تمكين' },
@@ -577,23 +508,23 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       eyebrow: 'الأسئلة الشائعة',
       title: 'إجابات لأسئلتك',
       subtitle: 'كل ما تحتاج معرفته قبل أن تبدأ.',
+      askUs: 'لديك سؤال آخر؟ اسألنا على واتساب',
       items: [
         { q: 'هل أحتاج واجهة واتساب للأعمال الرسمية؟', a: 'يمكنك البدء خلال دقائق بمسح رمز QR عبر مزوّد Baileys، أو ربط واجهة Meta الرسمية للحجم الأكبر والقوالب الموثّقة. المنصة تدعم الاثنين — وتبدّل بينهما تلقائيًا.' },
-        { q: 'هل يدعم اللغة العربية بالكامل؟', a: 'نعم. المنصة بالكامل والمساعد الذكي وقوالب الرسائل ثنائية اللغة بالكامل مع دعم أصيل للكتابة من اليمين لليسار، مبنية خصيصًا للسوق السعودي.' },
+        { q: 'هل يدعم اللغة العربية بالكامل؟', a: 'نعم. المنصة بالكامل والمساعد الذكي وقوالب الرسائل ثنائية اللغة مع دعم أصيل للكتابة من اليمين لليسار، ومبنية للسوق الخليجي والعربي.' },
         { q: 'كم يستغرق الإعداد؟', a: 'معظم الشركات تعمل خلال أقل من 10 دقائق — اربط رقمك واستورد جهات الاتصال وابدأ المراسلة. بدون مطوّرين.' },
         { q: 'هل بياناتي آمنة وخاصة؟', a: 'بياناتك مشفّرة أثناء النقل والتخزين، ومستضافة في بنية تحتية متوافقة. خطط المؤسسات يمكن استضافتها ذاتيًا بالكامل على خوادمك.' },
         { q: 'هل يمكنني نقل جهات اتصالي الحالية؟', a: 'بالتأكيد. استورد عبر ملف CSV، أو زامن من نظامك الحالي، أو دع المحادثات تنشئ جهات الاتصال تلقائيًا عند مراسلة العملاء.' },
       ],
     },
     finalCta: {
-      title: 'جاهز لتحويل واتساب إلى قناة مبيعاتك الأولى؟',
-      subtitle: 'انضم لمئات الشركات السعودية التي تقدّم دعمًا أسرع وحملات أذكى وصفقات أكثر — كل يوم.',
-      primary: 'ابدأ مجانًا اليوم',
-      secondary: 'تحدّث مع المبيعات',
-      reassurance: 'بدون بطاقة ائتمان · الإعداد خلال 10 دقائق · إلغاء في أي وقت',
+      title: 'جاهز لتجعل واتساب قناة مبيعاتك الأولى؟',
+      subtitle: 'انضم لشركات في أنحاء الخليج تقدّم دعمًا أسرع وحملات أذكى وصفقات أكثر — كل يوم.',
+      primary: 'تحدّث معنا على واتساب',
+      reassurance: 'الإعداد خلال 10 دقائق · عربي وإنجليزي · إلغاء في أي وقت',
     },
     footer: {
-      tagline: 'نظام واتساب CRM المتميّز للأعمال السعودية الحديثة.',
+      tagline: 'نظام واتساب لإدارة العملاء للأعمال في أنحاء الخليج.',
       columns: [
         { title: 'المنتج', links: ['المميزات', 'المساعد الذكي', 'الأسعار', 'خارطة الطريق'] },
         { title: 'الحلول', links: ['المطاعم', 'الرعاية الصحية', 'العقارات', 'التجارة الإلكترونية'] },
@@ -603,5 +534,6 @@ export const LANDING: Record<LandingLang, LandingContent> = {
       disclaimer: 'غير تابع لشركة Meta Platforms Inc.',
       badges: ['متوافق مع GDPR', 'جاهزية 99.9%', 'استضافة داخل المنطقة'],
     },
+    appInstalled: 'التطبيق مثبّت',
   },
 }

@@ -13,7 +13,7 @@ interface RevealProps {
 }
 
 /**
- * Lightweight scroll-reveal wrapper (fade + rise + blur) driven by
+ * Lightweight scroll-reveal wrapper (fade + rise) driven by
  * IntersectionObserver. No animation library, RTL-safe (translateY only),
  * and fully disabled under prefers-reduced-motion via CSS.
  */
@@ -49,7 +49,7 @@ export default function Reveal({
   return (
     <Tag
       ref={ref}
-      className={`lux-reveal ${visible ? 'is-visible' : ''} ${className}`}
+      className={`nx-reveal ${visible ? 'is-visible' : ''} ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}

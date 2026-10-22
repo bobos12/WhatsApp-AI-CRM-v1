@@ -36,7 +36,7 @@ export default function Header() {
   if (headerHidden || chatWindowOpen || pathname?.startsWith('/conversations')) return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 pt-safe backdrop-blur-md sm:hidden">
+    <header className="sticky top-0 z-40 border-b border-line bg-surface pt-safe sm:hidden">
       <div className="flex h-14 items-center gap-2 px-3">
         <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-2.5" aria-label={t('appName')}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

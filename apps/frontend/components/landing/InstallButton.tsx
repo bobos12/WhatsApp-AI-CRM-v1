@@ -20,7 +20,7 @@ function detectPlatform(): Platform {
 }
 
 interface InstallButtonProps {
-  variant?: 'hero' | 'section'
+  variant?: 'hero' | 'section' | 'onSignal'
   className?: string
   label?: string
   installedLabel?: string
@@ -89,6 +89,9 @@ export function InstallButton({ variant = 'hero', className = '', label, install
     applyUpdate()
   }
 
+  const surface =
+    variant === 'hero' ? 'nx-btn-ghost' : variant === 'onSignal' ? 'nx-btn-outline-ink' : 'nx-btn-primary'
+
   if (isInstalled) {
     if (updateAvailable) {
       return (
@@ -96,12 +99,7 @@ export function InstallButton({ variant = 'hero', className = '', label, install
           type="button"
           onClick={applyUpdate}
           disabled={updating}
-          className={`group relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-xl font-bold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait ${variant === 'hero' ? 'px-7 py-3.5 text-base' : 'px-5 py-3 text-sm'} ${className}`}
-          style={{
-            background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.08))',
-            border: '1px solid rgba(212,175,55,0.4)',
-            color: '#f3d98b',
-          }}
+          className={`nx-btn disabled:cursor-wait ${surface} ${className}`}
         >
           <RefreshCw className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
           {updating ? 'Updating…' : 'Update Available — Tap to Update'}
@@ -109,7 +107,7 @@ export function InstallButton({ variant = 'hero', className = '', label, install
       )
     }
     return (
-      <span className={`inline-flex items-center gap-2 rounded-xl border border-[#25D366]/30 bg-[#25D366]/10 px-4 py-2.5 text-sm font-semibold text-[#5cf0a0] ${className}`}>
+      <span className={`inline-flex h-[3.25rem] items-center gap-2 text-sm font-semibold ${variant === 'onSignal' ? 'text-[var(--nx-signal-ink)]' : 'text-[var(--nx-signal)]'} ${className}`}>
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
         </svg>
@@ -118,16 +116,6 @@ export function InstallButton({ variant = 'hero', className = '', label, install
     )
   }
 
-  const surface =
-    variant === 'hero'
-      ? 'lux-glass border border-white/15 text-white hover:border-[#d4af37]/45 hover:shadow-[0_18px_48px_-14px_rgba(212,175,55,0.40)]'
-      : 'lux-btn-primary text-white'
-  const chip =
-    variant === 'hero'
-      ? 'bg-gradient-to-br from-[#2ee676] to-[#0f9b6c] text-white shadow-md shadow-emerald-900/40'
-      : 'bg-white/20 text-white'
-
-  const sizing = variant === 'hero' ? 'px-7 py-3.5 text-base' : 'px-5 py-3 text-sm'
   const PlatformIcon = platform === 'ios' ? Apple : platform === 'android' ? Smartphone : Monitor
 
   return (
@@ -136,15 +124,12 @@ export function InstallButton({ variant = 'hero', className = '', label, install
         type="button"
         onClick={handleClick}
         disabled={updating}
-        className={`group relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-xl font-bold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait ${sizing} ${surface} ${className}`}
+        className={`group nx-btn disabled:cursor-wait ${surface} ${className}`}
       >
-        <span className="lux-sheen" />
-        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${chip}`}>
-          {updating
-            ? <RefreshCw className="h-4 w-4 animate-spin" />
-            : <Download className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />}
-        </span>
-        <span className="relative">
+        {updating
+          ? <RefreshCw className="h-4 w-4 animate-spin" />
+          : <Download className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />}
+        <span>
           {updating
             ? 'Getting latest version…'
             : label ??
@@ -156,7 +141,7 @@ export function InstallButton({ variant = 'hero', className = '', label, install
                 ? 'Install Desktop App'
                 : 'Get Latest Version')}
         </span>
-        <PlatformIcon className="relative h-4 w-4 opacity-60" />
+        <PlatformIcon className="h-4 w-4 opacity-50" />
       </button>
 
       {showIOSGuide && (
@@ -165,7 +150,7 @@ export function InstallButton({ variant = 'hero', className = '', label, install
           onClick={() => setShowIOSGuide(false)}
         >
           <div
-            className="w-full max-w-sm bg-[#0f1a2e] border border-white/10 rounded-2xl p-6 mb-4"
+            className="w-full max-w-sm bg-[#0a1712] border border-white/10 rounded-2xl p-6 mb-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
@@ -194,7 +179,7 @@ export function InstallButton({ variant = 'hero', className = '', label, install
             <button
               type="button"
               onClick={() => setShowIOSGuide(false)}
-              className="mt-5 w-full py-2.5 rounded-xl bg-[#25D366] text-white font-semibold text-sm hover:bg-[#1db954] transition-colors"
+              className="mt-5 w-full py-2.5 rounded-xl bg-[#25D366] text-[#04130b] font-semibold text-sm hover:bg-[#3fe07d] transition-colors"
             >
               Got it
             </button>

@@ -702,225 +702,368 @@ html[dir="rtl"] .tf-prog-fill {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PREMIUM LANDING PAGE — emerald-charcoal + luxury gold design system
+   LANDING PAGE — Nexus brand system: ink · signal green · sand
+   Everything is scoped to .nx-root so none of it reaches the app.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  --lux-gold: #d4af37;
-  --lux-gold-light: #f3d98b;
-  --lux-gold-deep: #b8860b;
-  --lux-emerald: #25d366;
-  --lux-emerald-deep: #128c7e;
-  --lux-ink: #050b14;
-  --lux-ink-2: #081320;
-  --font-display-latin: 'Inter', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display-arabic: 'Tajawal', 'Readex Pro', system-ui, sans-serif;
-}
+.nx-root {
+  --nx-ink: #06100c;
+  --nx-ink-2: #0a1712;
+  --nx-ink-3: #10211a;
+  --nx-line: rgba(232, 240, 235, 0.09);
+  --nx-line-strong: rgba(232, 240, 235, 0.17);
+  --nx-text: #eef3f0;
+  --nx-text-2: rgba(238, 243, 240, 0.68);
+  --nx-text-3: rgba(238, 243, 240, 0.46);
+  --nx-signal: #25d366;
+  --nx-signal-hi: #3fe07d;
+  --nx-signal-deep: #138a45;
+  --nx-signal-ink: #04130b;
+  --nx-sand: #f4f0e8;
+  --nx-sand-2: #fbf9f4;
+  --nx-sand-line: #e0d8c9;
+  --nx-sand-text: #0d1a14;
+  --nx-sand-text-2: #56635c;
 
-/* Landing root uses Inter for LTR; RTL keeps the global IBM Plex Arabic body */
-.lux-root { font-family: var(--font-display-latin); }
-html[dir="rtl"] .lux-root,
-html.lang-ar .lux-root { font-family: 'IBM Plex Arabic', system-ui, sans-serif; }
+  /* Motion language — one curve family, three speeds. */
+  --nx-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --nx-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --nx-fast: 160ms;
+  --nx-base: 300ms;
+  --nx-slow: 700ms;
 
-/* ─── Gradient text utilities ───────────────────────────── */
-.text-gold-gradient {
-  background-image: linear-gradient(120deg, #f3d98b 0%, #d4af37 45%, #b8860b 70%, #f3d98b 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-family: var(--nx-font-latin), var(--nx-font-arabic), system-ui, sans-serif;
+  background: var(--nx-ink);
+  color: var(--nx-text);
+  -webkit-font-smoothing: antialiased;
 }
-.text-emerald-gradient {
-  background-image: linear-gradient(120deg, #5cf0a0 0%, #25d366 50%, #0f9b6c 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+html.lang-ar .nx-root {
+  font-family: var(--nx-font-arabic), var(--nx-font-latin), system-ui, sans-serif;
 }
-.text-lux-gradient {
-  background-image: linear-gradient(120deg, #ffffff 0%, #d8e4dd 40%, #9fb3a8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+/* Arabic letters join — any tracking tears the words apart. */
+html.lang-ar .nx-root * { letter-spacing: 0 !important; }
+.nx-root ::selection { background: rgba(37, 211, 102, 0.3); }
 
-/* ─── Gradient borders / glass surfaces ─────────────────── */
-.lux-glass {
-  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+/* ─── Type ─────────────────────────────────────────────── */
+.nx-display {
+  font-weight: 600;
+  letter-spacing: -0.038em;
+  line-height: 1.02;
+  text-wrap: balance;
 }
-.lux-ring-gold {
-  box-shadow: 0 0 0 1px rgba(212,175,55,0.28), 0 18px 60px -18px rgba(212,175,55,0.25);
+.nx-h2 {
+  font-size: clamp(1.95rem, 3.4vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.06;
+  text-wrap: balance;
 }
-.lux-hairline {
+html.lang-ar .nx-display { font-weight: 700; line-height: 1.32; }
+html.lang-ar .nx-h2 { font-weight: 700; line-height: 1.38; font-size: clamp(1.75rem, 3vw, 2.6rem); }
+
+.nx-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--nx-text-3);
+}
+.nx-eyebrow b { color: var(--nx-signal); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nx-eyebrow i { width: 1.75rem; height: 1px; background: currentColor; opacity: 0.55; }
+html.lang-ar .nx-eyebrow { font-size: 0.875rem; }
+.nx-sand .nx-eyebrow { color: var(--nx-sand-text-2); }
+.nx-sand .nx-eyebrow b { color: var(--nx-signal-deep); }
+
+.nx-num { font-variant-numeric: tabular-nums; }
+
+/* ─── Buttons ──────────────────────────────────────────── */
+.nx-btn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  height: 3.25rem;
+  padding-inline: 1.5rem;
+  border-radius: 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--nx-fast) var(--nx-ease),
+    background-color var(--nx-base) var(--nx-ease),
+    border-color var(--nx-base) var(--nx-ease),
+    box-shadow var(--nx-base) var(--nx-ease),
+    color var(--nx-base) var(--nx-ease);
 }
-.lux-hairline::before {
-  content: '';
+.nx-btn:hover { transform: translateY(-1px); }
+.nx-btn:active { transform: translateY(0) scale(0.98); transition-duration: 80ms; }
+.nx-btn:focus-visible { outline: 2px solid var(--nx-signal); outline-offset: 3px; }
+.nx-btn-sm { height: 2.375rem; padding-inline: 1rem; font-size: 0.875rem; border-radius: 0.5rem; }
+
+.nx-btn-primary {
+  background: var(--nx-signal);
+  color: var(--nx-signal-ink);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.nx-btn-primary:hover {
+  background: var(--nx-signal-hi);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 12px 30px -12px rgba(37, 211, 102, 0.65);
+}
+.nx-btn-ghost {
+  border: 1px solid var(--nx-line-strong);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--nx-text);
+}
+.nx-btn-ghost:hover { border-color: rgba(238, 243, 240, 0.34); background: rgba(255, 255, 255, 0.05); }
+.nx-btn-ink { background: var(--nx-ink); color: var(--nx-text); }
+.nx-btn-ink:hover { background: #10241b; box-shadow: 0 14px 30px -14px rgba(4, 19, 11, 0.85); }
+.nx-btn-outline-ink { border: 1.5px solid rgba(4, 19, 11, 0.4); color: var(--nx-signal-ink); }
+.nx-btn-outline-ink:hover { border-color: var(--nx-signal-ink); background: rgba(4, 19, 11, 0.06); }
+.nx-btn-sand { background: var(--nx-sand-text); color: var(--nx-sand); }
+.nx-btn-sand:hover { background: #1b2d24; }
+.nx-btn-sand-ghost { border: 1px solid var(--nx-sand-line); color: var(--nx-sand-text); background: var(--nx-sand-2); }
+.nx-btn-sand-ghost:hover { border-color: #c9bfac; }
+
+.nx-arrow { transition: transform var(--nx-base) var(--nx-ease); }
+.nx-btn:hover .nx-arrow, .nx-link:hover .nx-arrow { transform: translateX(3px); }
+[dir='rtl'] .nx-arrow { transform: scaleX(-1); }
+[dir='rtl'] .nx-btn:hover .nx-arrow, [dir='rtl'] .nx-link:hover .nx-arrow { transform: scaleX(-1) translateX(3px); }
+
+.nx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 600;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size var(--nx-base) var(--nx-ease), color var(--nx-base);
+}
+[dir='rtl'] .nx-link { background-position: 100% 100%; }
+.nx-link:hover { background-size: 100% 1px; }
+
+/* ─── Brand motif: the logo's 45° cut ──────────────────────
+   A plate whose top-end corner is chamfered, with a signal-green
+   stroke along the cut. The stroke lives on the wrapper so the
+   clip-path on the plate can't clip it. */
+.nx-frame { position: relative; --cut: 28px; }
+.nx-frame > .nx-plate {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02) 45%, transparent 78%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+  border-radius: 18px;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
-
-/* ─── Premium card surface (modern, near-borderless) ────── */
-.lux-card {
-  position: relative;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.018) 100%);
-  border: 1px solid rgba(255,255,255,0.055);
-  border-radius: 1rem;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.05),
-    0 22px 45px -30px rgba(0,0,0,0.9);
-  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1),
-              border-color 0.35s ease,
-              box-shadow 0.35s ease,
-              background 0.35s ease;
+[dir='rtl'] .nx-frame > .nx-plate {
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% 100%, 0 100%, 0 var(--cut));
 }
-.lux-card:hover {
-  border-color: rgba(37,211,102,0.22);
-  background: linear-gradient(180deg, rgba(37,211,102,0.06) 0%, rgba(255,255,255,0.015) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    0 30px 60px -28px rgba(0,0,0,0.95),
-    0 0 36px -14px rgba(37,211,102,0.22);
-}
-/* Gold-accent variant for highlighted / featured cards */
-.lux-card-gold {
-  border-color: rgba(212,175,55,0.30);
-  background: linear-gradient(180deg, rgba(212,175,55,0.10) 0%, rgba(37,211,102,0.04) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 30px 64px -26px rgba(0,0,0,0.95),
-    0 0 44px -16px rgba(212,175,55,0.28);
-}
-.lux-card-gold:hover {
-  border-color: rgba(212,175,55,0.45);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    0 36px 70px -26px rgba(0,0,0,1),
-    0 0 56px -14px rgba(212,175,55,0.38);
-}
-
-/* ─── Background textures ───────────────────────────────── */
-.lux-grid {
-  background-image:
-    linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 35%, transparent 75%);
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 35%, transparent 75%);
-}
-
-/* ─── Floating animation for hero stat cards ────────────── */
-@keyframes luxFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-12px); }
-}
-.lux-float       { animation: luxFloat 6s ease-in-out infinite; }
-.lux-float-slow  { animation: luxFloat 8s ease-in-out infinite; }
-.lux-float-delay { animation: luxFloat 7s ease-in-out infinite; animation-delay: 1.2s; }
-
-@media (prefers-reduced-motion: reduce) {
-  .lux-float, .lux-float-slow, .lux-float-delay { animation: none; }
-}
-
-/* ─── Scroll reveal ─────────────────────────────────────── */
-.lux-reveal {
-  opacity: 0;
-  transform: translateY(28px);
-  filter: blur(6px);
-  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1),
-              transform 0.7s cubic-bezier(0.16,1,0.3,1),
-              filter 0.7s ease;
-  will-change: transform, opacity;
-}
-.lux-reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-  filter: blur(0);
-}
-@media (prefers-reduced-motion: reduce) {
-  .lux-reveal { opacity: 1; transform: none; filter: none; transition: none; }
-}
-
-/* ─── Logo marquee ──────────────────────────────────────── */
-@keyframes luxMarquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-.lux-marquee-track {
-  display: flex;
-  width: max-content;
-  animation: luxMarquee 32s linear infinite;
-}
-html[dir="rtl"] .lux-marquee-track { animation-direction: reverse; }
-.lux-marquee:hover .lux-marquee-track { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) {
-  .lux-marquee-track { animation: none; }
-}
-
-/* ─── Conic glow accent ─────────────────────────────────── */
-.lux-aurora {
-  background:
-    radial-gradient(40% 50% at 20% 10%, rgba(37,211,102,0.18), transparent 60%),
-    radial-gradient(35% 45% at 85% 15%, rgba(212,175,55,0.14), transparent 60%),
-    radial-gradient(45% 55% at 50% 100%, rgba(18,140,126,0.16), transparent 60%);
-}
-
-/* Premium primary button sheen */
-.lux-btn-primary {
-  background: linear-gradient(180deg, #2ee676 0%, #1fbf63 100%);
-  box-shadow: 0 10px 30px -8px rgba(37,211,102,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
-}
-.lux-btn-primary:hover {
-  box-shadow: 0 14px 40px -8px rgba(37,211,102,0.7), inset 0 1px 0 rgba(255,255,255,0.3);
-}
-.lux-btn-gold {
-  background: linear-gradient(180deg, #f3d98b 0%, #d4af37 100%);
-  color: #1a1407;
-  box-shadow: 0 10px 30px -8px rgba(212,175,55,0.5), inset 0 1px 0 rgba(255,255,255,0.35);
-}
-
-/* Sheen sweep for premium buttons (parent must have the `group` class) */
-.lux-sheen {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  pointer-events: none;
-}
-.lux-sheen::before {
+.nx-frame::after {
   content: '';
   position: absolute;
   top: 0;
-  bottom: 0;
-  left: -60%;
-  width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
-  transform: skewX(-20deg);
-  transition: left 0.7s cubic-bezier(0.16,1,0.3,1);
+  right: calc(var(--cut) * -0.4142);
+  width: calc(var(--cut) * 1.4142);
+  height: 2px;
+  background: var(--nx-signal);
+  transform-origin: 0 0;
+  transform: rotate(45deg);
+  pointer-events: none;
 }
-.group:hover .lux-sheen::before { left: 130%; }
-@media (prefers-reduced-motion: reduce) {
-  .lux-sheen::before { transition: none; }
+[dir='rtl'] .nx-frame::after {
+  right: auto;
+  left: calc(var(--cut) * -0.4142);
+  transform-origin: 100% 0;
+  transform: rotate(-45deg);
+}
+.nx-cut { clip-path: polygon(0 0, calc(100% - var(--cut, 22px)) 0, 100% var(--cut, 22px), 100% 100%, 0 100%); }
+[dir='rtl'] .nx-cut { clip-path: polygon(var(--cut, 22px) 0, 100% 0, 100% 100%, 0 100%, 0 var(--cut, 22px)); }
+
+/* The logo mark as a tintable watermark (paints in currentColor). */
+.nx-mark {
+  background: currentColor;
+  -webkit-mask: url('/icons/logo-tight.png') center / contain no-repeat;
+  mask: url('/icons/logo-tight.png') center / contain no-repeat;
 }
 
-/* Idle attention pulse ring for the hero download CTA */
-@keyframes luxPulseRing {
-  0%   { box-shadow: 0 0 0 0 rgba(37,211,102,0.30); }
-  70%  { box-shadow: 0 0 0 12px rgba(37,211,102,0); }
-  100% { box-shadow: 0 0 0 0 rgba(37,211,102,0); }
+/* ─── Surfaces ─────────────────────────────────────────── */
+.nx-hero-bg {
+  background:
+    radial-gradient(55% 60% at 80% 42%, rgba(37, 211, 102, 0.1), transparent 70%),
+    linear-gradient(180deg, #08160f 0%, var(--nx-ink) 78%);
 }
-.lux-pulse-ring { animation: luxPulseRing 2.6s cubic-bezier(0.16,1,0.3,1) infinite; }
-.lux-pulse-ring:hover { animation-play-state: paused; }
+[dir='rtl'] .nx-hero-bg {
+  background:
+    radial-gradient(55% 60% at 20% 42%, rgba(37, 211, 102, 0.1), transparent 70%),
+    linear-gradient(180deg, #08160f 0%, var(--nx-ink) 78%);
+}
+/* One slow drifting light behind the hero — the only ambient motion on the page. */
+.nx-glow {
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  top: -14rem;
+  inset-inline-end: -12rem;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(37, 211, 102, 0.13), transparent);
+  animation: nxDrift 22s var(--nx-ease-io) infinite alternate;
+  pointer-events: none;
+}
+@keyframes nxDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-6rem, 5rem, 0) scale(1.12); }
+}
+.nx-sand { background: var(--nx-sand); color: var(--nx-sand-text); }
+
+/* Surface-aware ink helpers: the same markup reads correctly on ink and on sand. */
+.nx-c1 { color: var(--nx-text); }
+.nx-c2 { color: var(--nx-text-2); }
+.nx-c3 { color: var(--nx-text-3); }
+.nx-sig { color: var(--nx-signal); }
+.nx-b { border-color: var(--nx-line); }
+.nx-sand .nx-c1 { color: var(--nx-sand-text); }
+.nx-sand .nx-c2 { color: var(--nx-sand-text-2); }
+.nx-sand .nx-c3 { color: rgba(86, 99, 92, 0.8); }
+.nx-sand .nx-sig { color: var(--nx-signal-deep); }
+.nx-sand .nx-b { border-color: var(--nx-sand-line); }
+
+/* ─── Entrance & reveal ────────────────────────────────── */
+@keyframes nxRise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: none; }
+}
+.nx-rise { animation: nxRise 900ms var(--nx-ease) both; animation-delay: var(--d, 0ms); }
+
+.nx-reveal {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition: opacity var(--nx-slow) var(--nx-ease), transform var(--nx-slow) var(--nx-ease);
+}
+.nx-reveal.is-visible { opacity: 1; transform: none; }
+
+@keyframes nxFade {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.nx-fade { animation: nxFade 600ms var(--nx-ease) both; }
+
+/* A rule that draws itself once its Reveal wrapper is visible. */
+.nx-draw { transform: scaleX(0); transform-origin: left; transition: transform 1400ms var(--nx-ease) 200ms; }
+[dir='rtl'] .nx-draw { transform-origin: right; }
+.is-visible .nx-draw { transform: scaleX(1); }
+
+/* ─── Hero conversation ────────────────────────────────── */
+.nx-chat {
+  background: #0b1511;
+  border: 1px solid var(--nx-line-strong);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 50px 90px -45px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.nx-chat-wall {
+  background-color: #08120e;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.nx-bubble {
+  max-width: 82%;
+  padding: 0.45rem 0.7rem 0.35rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.nx-bubble-in { align-self: flex-start; background: #1a2620; color: var(--nx-text); border-start-start-radius: 4px; transform-origin: 0% 100%; }
+.nx-bubble-out { align-self: flex-end; background: #0e5534; color: #eafbf0; border-start-end-radius: 4px; transform-origin: 100% 100%; }
+[dir='rtl'] .nx-bubble-in { transform-origin: 100% 100%; }
+[dir='rtl'] .nx-bubble-out { transform-origin: 0% 100%; }
+
+.nx-pop {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0) scale(0.95);
+  transition: opacity 380ms var(--nx-ease), transform 560ms var(--nx-ease);
+}
+.nx-pop.is-on { opacity: 1; transform: none; }
+
+.nx-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--nx-text-2);
+  animation: nxDot 1.1s ease-in-out infinite;
+}
+.nx-typing span:nth-child(2) { animation-delay: 0.15s; }
+.nx-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes nxDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+
+.nx-record {
+  background: rgba(13, 26, 20, 0.94);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--nx-line-strong);
+  border-radius: 14px;
+  box-shadow: 0 34px 70px -34px rgba(0, 0, 0, 0.95);
+}
+/* A field that just changed: the new value slides in over a brief signal wash. */
+@keyframes nxSwap {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nxFlash {
+  0% { background-color: rgba(37, 211, 102, 0.22); }
+  100% { background-color: rgba(37, 211, 102, 0); }
+}
+.nx-swap { animation: nxSwap 520ms var(--nx-ease) both; }
+.nx-flash { animation: nxFlash 1600ms var(--nx-ease) both; }
+
+/* ─── Product tour ─────────────────────────────────────── */
+.nx-progress { position: absolute; inset-inline: 0; bottom: -1px; height: 1px; overflow: hidden; }
+.nx-progress > i {
+  display: block;
+  height: 100%;
+  background: var(--nx-signal);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: nxProgress var(--dur, 7000ms) linear forwards;
+}
+[dir='rtl'] .nx-progress > i { transform-origin: right; }
+.nx-progress.is-paused > i { animation-play-state: paused; }
+@keyframes nxProgress { to { transform: scaleX(1); } }
+
+.nx-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 520ms var(--nx-ease), opacity 360ms var(--nx-ease);
+}
+.nx-collapse.is-open { grid-template-rows: 1fr; opacity: 1; }
+.nx-collapse > * { overflow: hidden; min-height: 0; }
+
+/* ─── Mobile dock ──────────────────────────────────────── */
+.nx-dock {
+  transform: translate3d(0, 120%, 0);
+  transition: transform 480ms var(--nx-ease);
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+.nx-dock.is-on { transform: none; }
+
+/* ─── Reduced motion ───────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .lux-pulse-ring { animation: none; }
+  .nx-root *, .nx-root *::before, .nx-root *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  .nx-glow { animation: none; }
+  .nx-reveal { opacity: 1; transform: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
