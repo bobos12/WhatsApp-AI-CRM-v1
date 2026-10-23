@@ -21,12 +21,22 @@ import { logger } from '../lib/logger';
  * broadcast recipient by the message id captured at send time.
  */
 
-/** How far back to look for receipts and replies on each pass. */
-const LOOKBACK_HOURS = Number(process.env.BROADCAST_ENGAGEMENT_LOOKBACK_HOURS ?? 72);
+/**
+ * How far back the receipt sweep looks. The webhook applies receipts as they
+ * arrive, so only rows linked in the last moments can have missed one. A long
+ * window re-read every unread recipient on every tick for days — that alone
+ * spent over 1 GB of database egress a day.
+ */
+const RECEIPT_LOOKBACK_HOURS = Number(process.env.BROADCAST_RECEIPT_LOOKBACK_HOURS ?? 1);
 /** A reply this long after the message is no longer plausibly a reply to it. */
 const REPLY_WINDOW_HOURS = Number(process.env.BROADCAST_REPLY_WINDOW_HOURS ?? 48);
+/** Inbound messages can be stamped slightly before they reach us; re-scan this much. */
+const REPLY_SCAN_OVERLAP_MS = 5 * 60 * 1000;
 /** Rows touched per pass, so a large backlog is drained over several ticks. */
 const PASS_LIMIT = 2_000;
+
+/** Inbound messages up to here have been checked for campaign replies. */
+let replyScanWatermark: Date | null = null;
 
 /**
  * Copy delivery/read timestamps from the CRM message onto the recipient row.
@@ -41,7 +51,7 @@ async function reconcileReceipts(since: Date): Promise<number> {
       status: 'sent',
       messageId: { not: null },
       sentAt: { gte: since },
-      OR: [{ deliveredAt: null }, { readAt: null }],
+      deliveredAt: null,
     },
     select: { id: true, messageId: true, deliveredAt: true, readAt: true },
     take: PASS_LIMIT,
@@ -79,30 +89,35 @@ async function reconcileReceipts(since: Date): Promise<number> {
  * The join is phone → conversation → first inbound message after `sentAt`. Doing
  * it as a sweep rather than inline on the inbound path keeps the hot message
  * pipeline free of broadcast bookkeeping, and a reply that arrives while the
- * campaign is still running is picked up on the next tick either way.
+ * campaign is still running is picked up on the next pass either way.
+ *
+ * Starts from the inbound messages that arrived since the last pass, not from
+ * the recipients still waiting: most never reply, and re-reading all of them on
+ * every pass is what made this sweep expensive.
  */
-async function reconcileReplies(since: Date): Promise<number> {
-  const candidates = await prisma.broadcastRecipient.findMany({
-    where: { status: 'sent', repliedAt: null, sentAt: { gte: since } },
-    select: { id: true, phone: true, sentAt: true, tenantId: true },
-    take: PASS_LIMIT,
-  });
-  if (!candidates.length) return 0;
+async function reconcileReplies(): Promise<number> {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - REPLY_WINDOW_HOURS * 60 * 60 * 1000);
+  const scanFrom = replyScanWatermark
+    ? new Date(Math.max(replyScanWatermark.getTime() - REPLY_SCAN_OVERLAP_MS, windowStart.getTime()))
+    : windowStart;
 
-  const phones = Array.from(new Set(candidates.map((row) => row.phone)));
-  const earliest = candidates.reduce(
-    (min, row) => (row.sentAt && row.sentAt < min ? row.sentAt : min),
-    new Date(),
-  );
-
-  // One query for every inbound message that could possibly match, then paired
-  // up in memory. The alternative — a query per recipient — is thousands of round
-  // trips for a single campaign.
   const inbound = await prisma.message.findMany({
-    where: { phone: { in: phones }, fromMe: false, timestamp: { gte: earliest } },
+    where: { fromMe: false, timestamp: { gt: scanFrom, lte: now } },
     select: { phone: true, timestamp: true },
     orderBy: { timestamp: 'asc' },
+    take: PASS_LIMIT,
   });
+  // A full page means more is waiting: resume from its last message next pass.
+  replyScanWatermark = inbound.length === PASS_LIMIT ? inbound[inbound.length - 1].timestamp : now;
+  if (!inbound.length) return 0;
+
+  const phones = Array.from(new Set(inbound.map((message) => message.phone)));
+  const candidates = await prisma.broadcastRecipient.findMany({
+    where: { status: 'sent', repliedAt: null, phone: { in: phones }, sentAt: { gte: windowStart } },
+    select: { id: true, phone: true, sentAt: true, tenantId: true },
+  });
+  if (!candidates.length) return 0;
 
   const inboundByPhone = new Map<string, Date[]>();
   for (const message of inbound) {
@@ -144,16 +159,16 @@ async function reconcileReplies(since: Date): Promise<number> {
  *
  * Runs from the scheduler tick in platform scope, which is what lets a single
  * sweep cover all tenants; the only tenant-scoped write it performs (the health
- * counter) is explicitly re-scoped per tenant above. Cheap enough for every tick
- * because both queries are bounded by `PASS_LIMIT` and an indexed `sentAt` range.
+ * counter) is explicitly re-scoped per tenant above. Each pass reads only what
+ * is new: rows sent in the last hour and messages since the previous pass.
  */
 export async function reconcileBroadcastEngagement(): Promise<void> {
-  const since = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000);
+  const since = new Date(Date.now() - RECEIPT_LOOKBACK_HOURS * 60 * 60 * 1000);
   try {
     // Sequential, not parallel: both passes write to BroadcastRecipient, and
     // running them together would have two updates racing for the same row.
     const receipts = await reconcileReceipts(since);
-    const replies = await reconcileReplies(since);
+    const replies = await reconcileReplies();
     if (receipts || replies) {
       logger.info('broadcast.engagement_reconciled', { receipts, replies });
     }

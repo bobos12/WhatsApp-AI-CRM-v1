@@ -21,6 +21,11 @@ const QUIET = [
   /^\/api\/analytics/,
   /^\/api\/broadcasts\/preflight/,
   /^\/api\/conversations\/[^/]+\/typing/,
+  // Chat traffic: the inbox patches itself from message:new / message:status.
+  // Announcing it made every open leads and contact page reload in full on
+  // every message sent and every chat opened.
+  /^\/api\/conversations\/[^/]+\/(read|reply|interactive|messages\/)/,
+  /^\/api\/conversations\/[^/]+\/bot\/(simulate|test)/,
   /^\/api\/whatsapp\/meta-webhook/,
 ];
 

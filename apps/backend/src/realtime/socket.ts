@@ -136,7 +136,12 @@ const pendingChanges = new Map<string, ReturnType<typeof setTimeout>>();
 /** Bursts (a campaign's thousand delivery receipts) collapse into one signal per window. */
 const CHANGE_COALESCE_MS = 400;
 
-export function emitDataChanged(resource: string, id?: string | null, tenantId?: string | null) {
+export function emitDataChanged(
+  resource: string,
+  id?: string | null,
+  tenantId?: string | null,
+  coalesceMs = CHANGE_COALESCE_MS,
+) {
   if (!socketServer) return;
   const tenant = tenantId ?? getTenantId();
   if (!tenant) return;
@@ -147,6 +152,6 @@ export function emitDataChanged(resource: string, id?: string | null, tenantId?:
     setTimeout(() => {
       pendingChanges.delete(key);
       socketServer?.to(`tenant:${tenant}`).emit('data:changed', { resource, id: id ?? null });
-    }, CHANGE_COALESCE_MS),
+    }, coalesceMs),
   );
 }

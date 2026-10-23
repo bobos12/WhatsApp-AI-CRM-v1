@@ -42,6 +42,9 @@ const RECOVERY_EVERY_TICKS = 4;
 /** A claimed run whose job has not started within this long is considered lost. */
 const STALE_CLAIM_MS = 2 * 60_000;
 let tickCount = 0;
+/** Receipts and replies land live via the webhook; the sweep is only a backstop. */
+const ENGAGEMENT_EVERY_MS = Number(process.env.BROADCAST_ENGAGEMENT_EVERY_MS ?? 5 * 60_000);
+let lastEngagementAt = 0;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let ticking = false;
@@ -219,9 +222,11 @@ async function tick(): Promise<void> {
       }
     }
 
-    // Delivery receipts and replies for recently-sent campaigns. Runs on the same
-    // tick because it feeds account health, which the very next slice reads.
-    await reconcileBroadcastEngagement();
+    // Delivery receipts and replies for recently-sent campaigns.
+    if (Date.now() - lastEngagementAt >= ENGAGEMENT_EVERY_MS) {
+      lastEngagementAt = Date.now();
+      await reconcileBroadcastEngagement();
+    }
 
     // A run whose job vanished (Redis restart, a worker that died mid-claim)
     // would otherwise sit at "Sending" until the next deploy. Checked every few

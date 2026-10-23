@@ -440,7 +440,9 @@ async function applyCampaignStatus(
     select: { id: true, broadcastId: true, status: true, contactId: true },
   });
   if (!recipient) return;
-  emitDataChanged('broadcasts', recipient.broadcastId);
+  // Receipts stream in for minutes after a send; one refresh every few seconds
+  // keeps the report current without every open screen reloading constantly.
+  emitDataChanged('broadcasts', recipient.broadcastId, undefined, 5_000);
 
   if (next === MsgStatus.FAILED) {
     const code = errorCode ?? -1;

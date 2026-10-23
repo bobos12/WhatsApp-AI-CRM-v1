@@ -13,13 +13,22 @@ async function checkNoReplyConversations() {
   // Sweep every tenant in its own scope: the guard fences each query to the
   // tenant, and triggerFlows sends via that tenant's own WhatsApp socket.
   await forEachActiveTenant(async () => {
+    // Most businesses have no such flow; then there is nothing to look for.
+    const flows = await prisma.automationFlow.count({
+      where: { isActive: true, trigger: 'NO_RESPONSE_TIME' as any },
+    });
+    if (!flows) return;
+
     const cutoff = new Date(Date.now() - NO_REPLY_THRESHOLD_MS);
+    // Only conversations that went quiet since the previous check. Re-reading
+    // every old open conversation on every pass grew without bound.
+    const windowStart = new Date(cutoff.getTime() - CHECK_INTERVAL_MS);
 
     // Find OPEN conversations where last message is INBOUND and older than threshold
     const conversations = await prisma.conversation.findMany({
       where: {
         status: 'OPEN',
-        lastMessageAt: { lte: cutoff },
+        lastMessageAt: { gt: windowStart, lte: cutoff },
       },
       select: {
         id: true,
