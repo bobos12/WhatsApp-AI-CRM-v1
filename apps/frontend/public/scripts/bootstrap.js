@@ -1,7 +1,11 @@
 try {
   var t = localStorage.getItem('crm-theme');
   var sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  if ((t || sys) === 'dark') document.documentElement.classList.add('dark');
+  var dark = (t || sys) === 'dark';
+  if (dark) document.documentElement.classList.add('dark');
+  // Status bar matches the header surface (see --surface in globals.css).
+  var tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', dark ? '#1D1F1F' : '#FFFFFF');
 } catch (e) {}
 try {
   var lang = localStorage.getItem('crm-lang') || 'en';

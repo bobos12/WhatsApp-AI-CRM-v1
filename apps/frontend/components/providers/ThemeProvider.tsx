@@ -18,6 +18,14 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+// Status bar colour tracks the header surface (--surface in globals.css).
+function applyTheme(theme: Theme) {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', theme === 'dark' ? '#1D1F1F' : '#FFFFFF');
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
 
@@ -28,14 +36,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       : 'light';
     const initial = stored ?? preferred;
     setTheme(initial);
-    document.documentElement.classList.toggle('dark', initial === 'dark');
+    applyTheme(initial);
   }, []);
 
   const toggle = () => {
     setTheme((prev) => {
       const next: Theme = prev === 'dark' ? 'light' : 'dark';
       localStorage.setItem('crm-theme', next);
-      document.documentElement.classList.toggle('dark', next === 'dark');
+      applyTheme(next);
       return next;
     });
   };

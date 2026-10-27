@@ -33,7 +33,9 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    // Solid bar: iOS reserves its own space and gives the app the full height.
+    // black-translucent drew content under the clock and cut off the bottom.
+    statusBarStyle: 'default',
     title: 'Nexus CRM',
   },
   formatDetection: { telephone: false },
@@ -48,7 +50,7 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-status-bar-style': 'default',
     'apple-mobile-web-app-title': 'Nexus CRM',
     'application-name': 'Nexus CRM',
     'msapplication-TileColor': '#25D366',
@@ -56,10 +58,9 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#25D366' },
-    { media: '(prefers-color-scheme: dark)', color: '#128C7E' },
-  ],
+  // Status bar blends into the header (bg-surface). Single value so JS can
+  // retint it when the in-app theme toggle changes (bootstrap.js, ThemeProvider).
+  themeColor: '#FFFFFF',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
