@@ -64,7 +64,7 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-safe backdrop-blur-md sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[max(0.25rem,calc(env(safe-area-inset-bottom)-0.875rem))] backdrop-blur-md sm:hidden"
         aria-label="Primary"
       >
         <div className="flex items-stretch">
