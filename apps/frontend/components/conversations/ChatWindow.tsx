@@ -805,9 +805,18 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     } catch {}
   }, [conversationId]);
 
+  // Poll fast only while the socket is down; when it is up, events deliver new
+  // messages and the reconnect handler fills gaps, so a slow safety net is enough.
+  // A 5 s poll in every open chat was the bulk of the database's egress.
   useEffect(() => {
     if (!conversationId) return;
-    const id = setInterval(pollForNewMessages, 5000);
+    let lastPoll = Date.now();
+    const id = setInterval(() => {
+      const interval = getSocket().connected ? 60_000 : 5000;
+      if (Date.now() - lastPoll < interval) return;
+      lastPoll = Date.now();
+      void pollForNewMessages();
+    }, 5000);
     return () => clearInterval(id);
   }, [conversationId, pollForNewMessages]);
 

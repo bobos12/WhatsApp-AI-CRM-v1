@@ -57,7 +57,9 @@ const WHERE_OPS = new Set<string>([
   'upsert',
 ]);
 
-const base = new PrismaClient();
+// Message.raw is the provider's full webhook payload. Nothing reads it back, and
+// fetching it on every message read was most of the database's egress bill.
+const base = new PrismaClient({ omit: { message: { raw: true } } });
 
 /**
  * The tenant-guarded Prisma client. A single query extension reads the ambient
