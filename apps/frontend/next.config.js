@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@crm/messaging-schema'],
+  // Stamped at build time: every deploy gets a new id, which the app compares
+  // against /api/version to tell users they are on the latest version.
+  env: { NEXT_PUBLIC_BUILD_ID: new Date().toISOString() },
   // No `experimental.optimizePackageImports` here on purpose. It looks like an
   // obvious win — 92 files import from lucide-react's barrel — but measured on
   // this project it made Turbopack *slower* (cold route compile 4.9s → 6.4s),

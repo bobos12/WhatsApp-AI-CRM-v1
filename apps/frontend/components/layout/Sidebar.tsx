@@ -10,6 +10,7 @@ import { Search, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLiveCounts } from '../../hooks/useLiveCounts';
 import { useLeadAlerts } from '../../hooks/useLeadAlerts';
+import { buildDate, useAppVersion } from '../../hooks/useAppVersion';
 import { useOperatorAccess } from '../../hooks/useOperatorAccess';
 import { isManager } from '../../lib/roles';
 import SidebarConnect from '../whatsapp/SidebarConnect';
@@ -29,7 +30,10 @@ const COLLAPSE_KEY = 'nx-sidebar-collapsed';
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { t } = useTranslation('sidebar');
+  const { t, i18n } = useTranslation('sidebar');
+  const version = useAppVersion();
+  const versionTitle =
+    version === 'stale' ? t('version.stale') : t('version.latest', { date: buildDate(i18n.language) });
   const reduceMotion = useReducedMotion();
   const { isOperator } = useOperatorAccess();
   const { openConversations } = useLiveCounts();
@@ -119,11 +123,23 @@ export default function Sidebar() {
       {/* Brand + notifications */}
       <div className={cn('flex h-14 items-center justify-center gap-2.5 px-3', wide && 'lg:justify-start lg:px-4')}>
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('appName')}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/logo-tight.png" alt="" className="h-7 w-7 shrink-0" />
+          <span className="relative shrink-0" title={versionTitle}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/logo-tight.png" alt="" className="h-7 w-7" />
+            <span
+              aria-hidden="true"
+              className={cn(
+                'absolute -bottom-0.5 -end-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-nav transition-colors duration-base',
+                version === 'stale' ? 'bg-warning-500 animate-pulse' : 'bg-success-500',
+                version === 'updated' && 'version-glow',
+              )}
+            />
+          </span>
           <span className={cn('min-w-0 leading-none', label)}>
             <span className="block text-[15px] font-semibold tracking-[-0.01em] text-nav-ink">{t('appName')}</span>
-            <span className="mt-1 block text-2xs text-nav-muted">{t('appSubtitle')}</span>
+            <span key={version} className={cn('mt-1 block truncate text-2xs', version === 'latest' ? 'text-nav-muted' : 'enter', version === 'updated' && 'font-medium text-success-500', version === 'stale' && 'font-medium text-warning-500')}>
+              {version === 'updated' ? t('version.updated') : version === 'stale' ? t('version.stale') : t('appSubtitle')}
+            </span>
           </span>
         </Link>
         <div className={cn('ms-auto hidden items-center gap-0.5', wide && 'lg:flex')}>

@@ -52,5 +52,10 @@
     "signOut": "Sign out",
     "settings": "Settings"
   },
-  "askAi": "Ask AI"
+  "askAi": "Ask AI",
+  "version": {
+    "latest": "Latest version · updated {{date}}",
+    "updated": "✓ Updated to the latest version",
+    "stale": "New version ready — refresh"
+  }
 }

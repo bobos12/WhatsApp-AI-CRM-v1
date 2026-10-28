@@ -568,6 +568,13 @@ html[dir="rtl"] .animate-slide-in {
 }
 .bell-ring { transform-origin: 50% 10%; animation: nxBellRing 1.4s var(--ease-out) 0.3s 1 both; }
 
+/* Version dot: a soft glow, twice, when the app opens on a fresh deploy. */
+@keyframes nxVersionGlow {
+  0% { box-shadow: 0 0 0 0 rgb(29 174 96 / 0.6); }
+  100% { box-shadow: 0 0 0 7px rgb(29 174 96 / 0); }
+}
+.version-glow { animation: nxVersionGlow 1.2s var(--ease-out) 0.4s 2; }
+
 /* ─── Donezo dashboard utilities ─────────────────────────── */
 
 /* Soft hatched fill used for inactive analytics bars */
