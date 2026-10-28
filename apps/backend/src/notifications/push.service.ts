@@ -216,12 +216,18 @@ class PushService {
     };
     // Expire on the push service when it would be stale anyway.
     const ttl = Math.max(60, Math.floor((STALE_MS - (Date.now() - item.createdAt.getTime())) / 1000));
+    const sub = { endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth } };
+    const body = JSON.stringify(payload);
     try {
-      await webpush.sendNotification(
-        { endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth } },
-        JSON.stringify(payload),
-        { TTL: ttl, urgency: item.high ? 'high' : 'normal', topic: topicFor(item.tag) },
-      );
+      try {
+        await webpush.sendNotification(sub, body, { TTL: ttl, urgency: item.high ? 'high' : 'normal', topic: topicFor(item.tag) });
+      } catch (err) {
+        if ((err as { statusCode?: number })?.statusCode !== 400) throw err;
+        // Some push services reject the optional Urgency/Topic headers — the
+        // notification matters more than the hints, so send it without them.
+        logger.warn('push.headers_rejected', { host: new URL(device.endpoint).host, reason: (err as { body?: string }).body });
+        await webpush.sendNotification(sub, body, { TTL: ttl });
+      }
       return true;
     } catch (err) {
       const code = (err as { statusCode?: number })?.statusCode;
@@ -229,7 +235,12 @@ class PushService {
         // The device unsubscribed or the browser dropped it — forget it.
         await prismaUnscoped.pushSubscription.deleteMany({ where: { endpoint: device.endpoint } }).catch(() => {});
       } else {
-        logger.warn('push.send_failed', { code, error: err instanceof Error ? err.message : String(err) });
+        logger.warn('push.send_failed', {
+          code,
+          host: new URL(device.endpoint).host,
+          reason: (err as { body?: string }).body,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
       return false;
     }
