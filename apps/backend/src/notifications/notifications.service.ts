@@ -1,8 +1,8 @@
 import { Prisma, type NotificationType, type Priority } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaUnscoped } from '../lib/prisma';
 import { logger } from '../lib/logger';
+import { getTenantId } from '../lib/tenant-context';
 import { emitToUser } from '../realtime/socket';
-import { excludeDevSuperuser } from '../auth/authorize';
 import { pushService } from './push.service';
 import {
   CATEGORY_OF,
@@ -61,14 +61,13 @@ const NON_RECIPIENT_ROLES = new Set(['VIEWER']);
 /**
  * Who hears about activity on a conversation:
  * - assigned conversation → just the assigned agent
- * - otherwise            → every actionable member of the team
- *   (team-less conversations notify all actionable users — single-org fallback).
+ * - otherwise            → every actionable member of the business, whatever
+ *   their team, so an unclaimed customer is never missed.
  */
-export async function conversationRecipients(teamId: string | null, assignedTo?: string | null): Promise<string[]> {
+export async function conversationRecipients(_teamId: string | null, assignedTo?: string | null): Promise<string[]> {
   if (assignedTo) return [assignedTo];
 
   const users = await prisma.user.findMany({
-    where: { ...(teamId ? { teamId } : {}), ...excludeDevSuperuser() },
     select: { id: true, role: true },
   });
   return users.filter((u) => !NON_RECIPIENT_ROLES.has(u.role)).map((u) => u.id);
@@ -97,9 +96,15 @@ class NotificationsService {
       );
       if (ids.length === 0) return [];
 
-      // Tenant-guarded: only people who still exist in this tenant come back.
-      const users = await prisma.user.findMany({
-        where: { id: { in: ids } },
+      // Only people who still exist in this tenant — plus the platform owner,
+      // who lives above every tenant (tenantId null) yet can be assigned work
+      // in one. The tenant-guarded client would silently drop them.
+      const tenantId = getTenantId();
+      const users = await prismaUnscoped.user.findMany({
+        where: {
+          id: { in: ids },
+          ...(tenantId ? { OR: [{ tenantId }, { tenantId: null, role: 'PLATFORM_OWNER' }] } : {}),
+        },
         select: { id: true, notificationPrefs: true },
       });
       const category = CATEGORY_OF[input.type];
