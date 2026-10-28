@@ -220,7 +220,9 @@ class PushService {
     const body = JSON.stringify(payload);
     try {
       try {
-        await webpush.sendNotification(sub, body, { TTL: ttl, urgency: item.high ? 'high' : 'normal', topic: topicFor(item.tag) });
+        // No Topic header: Apple rejects ours (BadWebPushTopic), and the
+        // notification tag already replaces an older push for the same chat.
+        await webpush.sendNotification(sub, body, { TTL: ttl, urgency: item.high ? 'high' : 'normal' });
       } catch (err) {
         if ((err as { statusCode?: number })?.statusCode !== 400) throw err;
         // Some push services reject the optional Urgency/Topic headers — the
@@ -331,8 +333,4 @@ function withNotificationId(url: string, id: string): string {
 }
 
 /** Push-service collapse key: a newer push with the same topic replaces an undelivered older one. */
-function topicFor(tag: string): string {
-  return tag.replace(/[^A-Za-z0-9\-_]/g, '').slice(0, 32) || 'nexus';
-}
-
 export const pushService = new PushService();

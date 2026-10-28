@@ -49,11 +49,9 @@ export function notifyInboundMessage(args: { conversationId: string; preview: st
       type: 'MESSAGE',
       recipients: await conversationRecipients(conv.teamId, conv.assignedTo),
       actorName: name,
-      title: { en: `${name} sent you a message`, ar: `رسالة جديدة من ${name}` },
-      foldTitle: (n) =>
-        n === 1
-          ? { en: `${name} sent you a message`, ar: `رسالة جديدة من ${name}` }
-          : { en: `${n} new messages from ${name}`, ar: `${n} رسائل جديدة من ${name}` },
+      // WhatsApp-style: the customer's name, then their latest message.
+      title: { en: name, ar: name },
+      foldTitle: () => ({ en: name, ar: name }),
       body: { en: preview, ar: preview },
       contactId: conv.contactId,
       conversationId: args.conversationId,
