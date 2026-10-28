@@ -56,6 +56,8 @@ model User {
   reactions         MessageReaction[]  @relation("UserReactions")
   notifications     Notification[]     @relation("UserNotifications")
   pushSubscriptions PushSubscription[] @relation("UserPushSubscriptions")
+  /// Notification categories this person switched off, e.g. { "off": ["messages"] }.
+  notificationPrefs Json?
 
   @@index([tenantId])
 }
@@ -70,6 +72,8 @@ model PushSubscription {
   p256dh    String
   auth      String
   userAgent String?
+  /// UI language of this device ("en" | "ar") — push text is written in it.
+  locale    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -1106,6 +1110,13 @@ enum NotificationType {
   BUYING_INTENT
   NEEDS_ATTENTION
   STATUS_UPGRADE
+  MESSAGE
+  ASSIGNMENT
+  MENTION
+  NOTE
+  TASK_DUE
+  REMINDER
+  TEST
 }
 
 /// Persistent per-recipient notifications. Targeting: assigned agent if the
@@ -1124,13 +1135,27 @@ model Notification {
   contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: Cascade)
   /// Target conversation for the "open conversation" action (plain id, no FK).
   conversationId String?
+  /// Who caused it (null for customers / the system) — never notified about it.
+  actorId        String?
+  /// Display name for the banner avatar ("Farah sent you a message").
+  actorName      String?
+  /// In-app path opened when the notification is tapped.
+  url            String?
+  /// Same key for the same recipient = the same notification (no duplicates).
+  dedupeKey      String?
+  /// Messages in one chat fold into one unread row; this counts them.
+  groupCount     Int              @default(1)
+  /// Set when the phone push was claimed for sending — guarantees one push per row.
+  pushedAt       DateTime?
   isRead         Boolean          @default(false)
   readAt         DateTime?
   createdAt      DateTime         @default(now())
 
+  @@unique([recipientId, dedupeKey])
   @@index([tenantId])
   @@index([recipientId, isRead, createdAt(sort: Desc)])
   @@index([recipientId, createdAt(sort: Desc)])
+  @@index([pushedAt, createdAt])
 }
 
 /// Generic key-value settings store. Used for chatbot config and future

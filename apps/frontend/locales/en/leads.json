@@ -75,7 +75,7 @@
   "notifications": {
     "title": "Notifications",
     "empty": "You're all caught up",
-    "emptyHint": "Important lead activity will show up here.",
+    "emptyHint": "New messages, assignments, mentions and deadlines will show up here.",
     "markAllRead": "Mark all read",
     "viewAll": "View all leads",
     "type": {

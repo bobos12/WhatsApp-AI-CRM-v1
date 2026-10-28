@@ -131,6 +131,8 @@ export class TasksService {
       priority?: TaskPriority;
       teamId?: string;
     },
+    /** Called when the task moves to a new assignee. */
+    onReassigned?: (assigneeId: string, task: any) => unknown,
   ) {
     await ensureTasksTable();
     const tenantId = currentTenantId();
@@ -164,7 +166,9 @@ export class TasksService {
       data.conversationId ?? null,
     );
     const [task] = await prisma.$queryRawUnsafe<any[]>(`${SELECT_TASK} WHERE t.id = $1 AND t."tenantId" = $2`, id, tenantId);
-    return mapTaskRow(task);
+    const mapped = mapTaskRow(task);
+    if (data.assigneeId && data.assigneeId !== existing[0].assigneeId) void onReassigned?.(data.assigneeId, mapped);
+    return mapped;
   }
 
   static async deleteTask(id: string, teamId?: string) {

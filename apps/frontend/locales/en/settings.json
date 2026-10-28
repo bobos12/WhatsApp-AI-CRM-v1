@@ -147,5 +147,117 @@
     "hidden": "Hidden",
     "moveUp": "Move up",
     "moveDown": "Move down"
+  },
+  "notify": {
+    "tab": "Notifications",
+    "title": "Notifications",
+    "description": "Get alerts on this phone or computer — even when Nexus is closed.",
+    "device": {
+      "label": "This device",
+      "on": "On — alerts arrive here even when the app is closed.",
+      "off": "Off — you'll only see alerts while Nexus is open.",
+      "blocked": "Blocked in your browser settings.",
+      "unsupported": "This browser can't show notifications.",
+      "needsInstall": "Add Nexus to your Home Screen to get alerts on this iPhone.",
+      "serverOff": "Phone alerts aren't set up on the server yet.",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "otherDevices": "Also on {{count}} other device(s)."
+    },
+    "categories": {
+      "title": "What to notify me about",
+      "messages": {
+        "label": "Messages",
+        "hint": "Customers writing in on chats that are yours or your team's."
+      },
+      "assignments": {
+        "label": "Assignments",
+        "hint": "A chat or task is assigned to you."
+      },
+      "mentions": {
+        "label": "Mentions & replies",
+        "hint": "Someone @mentions you or replies in a note thread you're in."
+      },
+      "comments": {
+        "label": "Comments",
+        "hint": "A teammate adds a note to a chat assigned to you."
+      },
+      "reviews": {
+        "label": "Lead reviews",
+        "hint": "The AI flags a hot lead or a customer who needs a person."
+      },
+      "deadlines": {
+        "label": "Deadlines",
+        "hint": "Your tasks are due tomorrow, today, or overdue."
+      },
+      "reminders": {
+        "label": "Reminders",
+        "hint": "A snoozed chat comes back."
+      }
+    },
+    "test": {
+      "button": "Send a test",
+      "sending": "Sending…",
+      "sent": "Test sent — check this device.",
+      "sentNoDevice": "Test added to your inbox. Turn on this device to get it as a phone alert.",
+      "failed": "Couldn't send the test. Try again."
+    },
+    "saveFailed": "Couldn't save that change.",
+    "prompt": {
+      "title": "Never miss a customer",
+      "body": "Turn on notifications to hear about new messages, chats assigned to you, mentions and due tasks — even when Nexus is closed.",
+      "points": [
+        "New customer messages, with sound",
+        "Chats and tasks assigned to you",
+        "Mentions, deadlines and reminders"
+      ],
+      "allow": "Allow notifications",
+      "later": "Later",
+      "working": "Turning on…",
+      "done": "You're all set",
+      "iosTitle": "Get alerts on your iPhone",
+      "iosBody": "iPhone only shows notifications for apps on your Home Screen. It takes 10 seconds:",
+      "iosSteps": [
+        "Tap the Share button in Safari",
+        "Choose “Add to Home Screen”",
+        "Open Nexus from the new icon and tap Allow"
+      ],
+      "blockedTitle": "Notifications are blocked",
+      "blockedBody": "This browser was told not to show notifications from Nexus. To turn them back on:",
+      "blockedSteps": {
+        "ios": [
+          "Open the Settings app",
+          "Tap Notifications, then Nexus",
+          "Turn on Allow Notifications"
+        ],
+        "android": [
+          "Tap the lock icon next to the address (or long-press the app icon → App info)",
+          "Open Notifications",
+          "Allow them, then come back here"
+        ],
+        "desktop": [
+          "Click the lock icon at the left of the address bar",
+          "Set Notifications to Allow",
+          "Reload this page"
+        ]
+      },
+      "gotIt": "Got it"
+    },
+    "type": {
+      "MESSAGE": "Message",
+      "ASSIGNMENT": "Assigned to you",
+      "MENTION": "Mention",
+      "NOTE": "Note",
+      "TASK_DUE": "Deadline",
+      "REMINDER": "Reminder",
+      "TEST": "Test",
+      "BUYING_INTENT": "Buying intent",
+      "NEEDS_ATTENTION": "Needs attention",
+      "STATUS_UPGRADE": "Status upgrade"
+    },
+    "banner": {
+      "dismiss": "Dismiss",
+      "region": "Notifications"
+    }
   }
 }

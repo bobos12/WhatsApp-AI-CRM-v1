@@ -128,7 +128,7 @@
     "notesSubtitle": "Only visible to your team — not sent to the customer",
     "notesEmpty": "No notes yet",
     "notesEmptyHint": "Add an internal note below",
-    "notesPlaceholder": "Write an internal note... (Enter to submit)",
+    "notesPlaceholder": "Write an internal note — @name to mention a teammate (Enter to submit)",
     "notesDeleteLabel": "Delete note",
     "notesAddLabel": "Add note",
     "addNote": "Add a note...",

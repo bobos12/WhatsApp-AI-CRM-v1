@@ -4,26 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import {
-  Bell, AlertTriangle, ShoppingCart, TrendingUp, Check,
-  RefreshCw, Flame, UserRound, X, ChevronRight,
+  Bell, Check, RefreshCw, Flame, UserRound, X, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
-import { useNotifications, type AppNotification, type NotificationType } from '@/hooks/useNotifications';
+import { notificationHref, useNotifications, type AppNotification } from '@/hooks/useNotifications';
 import { useToast } from '@/hooks/useToast';
-
-const TYPE_ICON: Record<NotificationType, React.ElementType> = {
-  BUYING_INTENT: ShoppingCart,
-  NEEDS_ATTENTION: AlertTriangle,
-  STATUS_UPGRADE: TrendingUp,
-};
-
-const TYPE_COLOR: Record<NotificationType, { dot: string; icon: string; bg: string }> = {
-  BUYING_INTENT:  { dot: 'bg-brand',  icon: 'text-brand',  bg: 'bg-brand/10' },
-  NEEDS_ATTENTION:{ dot: 'bg-red-400',    icon: 'text-red-400',    bg: 'bg-red-500/10'   },
-  STATUS_UPGRADE: { dot: 'bg-amber-400',  icon: 'text-amber-400',  bg: 'bg-amber-500/10' },
-};
+import { NotificationAvatar } from './NotificationBanner';
+import { OPEN_INBOX_EVENT } from '@/components/providers/NotificationProvider';
 
 const SCORE_COLOR = (s: number) =>
   s >= 80 ? '#ef4444' : s >= 65 ? '#f59e0b' : '#25D366';
@@ -80,6 +69,14 @@ export default function NotificationBell({ placement = 'bar' }: { placement?: 'n
 
   useEffect(() => { if (open) fetchHotLeads(); }, [open, fetchHotLeads]);
 
+  // "N more notifications" pushes land here with the inbox open. Only the
+  // visible bell answers (there is one in the sidebar and one in the mobile bar).
+  useEffect(() => {
+    const onOpen = () => { if (ref.current?.offsetParent) setOpen(true); };
+    window.addEventListener(OPEN_INBOX_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_INBOX_EVENT, onOpen);
+  }, []);
+
   useSocket('lead:updated', useCallback(() => {
     if (open) fetchHotLeads();
   }, [open, fetchHotLeads]));
@@ -115,9 +112,7 @@ export default function NotificationBell({ placement = 'bar' }: { placement?: 'n
   const handleNotifClick = (n: AppNotification) => {
     if (!n.isRead) void markRead(n.id);
     setOpen(false);
-    router.push(n.conversationId
-      ? `/conversations?conversationId=${encodeURIComponent(n.conversationId)}`
-      : '/leads');
+    router.push(notificationHref(n));
   };
 
   const openLead = (lead: HotLead) => {
@@ -305,8 +300,6 @@ export default function NotificationBell({ placement = 'bar' }: { placement?: 'n
                   </p>
                 )}
                 {items.map((n) => {
-                  const Icon = TYPE_ICON[n.type] ?? Bell;
-                  const tone = TYPE_COLOR[n.type] ?? { dot: 'bg-gray-400', icon: 'text-gray-400', bg: 'bg-gray-400/10' };
                   return (
                     <button
                       key={n.id}
@@ -317,9 +310,7 @@ export default function NotificationBell({ placement = 'bar' }: { placement?: 'n
                         !n.isRead && 'bg-brand/[0.04]',
                       )}
                     >
-                      <span className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl', tone.bg)}>
-                        <Icon className={cn('h-3.5 w-3.5', tone.icon)} />
-                      </span>
+                      <span className="mt-0.5"><NotificationAvatar n={n} size={32} /></span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[12.5px] font-semibold text-ink">
                           {pick(n.title)}
@@ -332,7 +323,7 @@ export default function NotificationBell({ placement = 'bar' }: { placement?: 'n
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                         <span className="text-[10px] text-ink-4/50">{timeAgo(n.createdAt)}</span>
-                        {!n.isRead && <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} />}
+                        {!n.isRead && <span className="h-2 w-2 rounded-full bg-brand" />}
                       </div>
                     </button>
                   );

@@ -6,6 +6,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { ConversationsService } from '../../conversations/conversations.service';
 import { NotesService } from '../../conversations/notes.service';
+import { notificationsService } from '../../notifications/notifications.service';
+import { emitToUser } from '../../realtime/socket';
 import { authMiddleware, checkPermission } from '../../auth/auth.middleware';
 import { getOrCreateConversationByPhone } from '../../conversations/conversation-resolver';
 import interactiveMessageService from '../../services/interactive-message.service';
@@ -118,6 +120,12 @@ router.put('/:id/status', checkPermission('update', 'conversations'), async (req
 router.put('/:id/read', async (req, res) => {
   try {
     const conversation = await ConversationsService.markAsRead(req.params.id);
+    // Reading the chat also clears its message notifications in the inbox.
+    const userId = (req as any).user?.id;
+    if (userId) {
+      const cleared = await notificationsService.markConversationRead(userId, req.params.id).catch(() => 0);
+      if (cleared > 0) emitToUser(userId, 'notifications:changed', { conversationId: req.params.id });
+    }
     res.json(conversation);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

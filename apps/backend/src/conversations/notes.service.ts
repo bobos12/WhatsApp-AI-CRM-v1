@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { emitRealtime } from '../realtime/socket';
+import { notifyNoteAdded } from '../notifications/events';
 
 export class NotesService {
   static async getNotes(conversationId: string) {
@@ -23,6 +24,7 @@ export class NotesService {
     });
 
     emitRealtime('note:new', { conversationId, note }, conversation.teamId);
+    void notifyNoteAdded({ conversationId, noteId: note.id, authorId, body });
     return note;
   }
 

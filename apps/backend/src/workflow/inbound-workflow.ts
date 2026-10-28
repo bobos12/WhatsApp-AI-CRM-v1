@@ -21,6 +21,7 @@ import { getCapabilities } from '../messaging/capabilities';
 import { persistNormalizedMessage } from '../messaging/persist';
 import { aiBotService } from '../services/ai-bot.service';
 import { scheduleQualification } from '../lead-qualification/debounce';
+import { notifyInboundMessage } from '../notifications/events';
 
 /**
  * Inbound orchestration for the WhatsApp Business Cloud API.
@@ -315,6 +316,8 @@ export async function processIncomingMessage(
       },
       teamId,
     );
+
+    void notifyInboundMessage({ conversationId: conversation.id, preview: body, senderName: normalized.senderName });
 
     // ── Fan-out ──────────────────────────────────────────────────────────────
     // Every one of these is fire-and-forget: an automation that throws must not

@@ -1,33 +1,41 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { getSocket } from '../../lib/socket';
-import {
-  playNotificationSound,
-  showBrowserNotification,
-  requestNotificationPermission,
-  primeNotificationSound,
-} from '../../lib/notifications';
-import { useToastStore } from '../../hooks/useToast';
+import { primeNotificationSound } from '../../lib/notifications';
 import { useChatUnread } from '../../stores/chat-unread-store';
-import { formatPhone } from '../../lib/phone';
-import { ensurePushSubscription } from '../../lib/push';
+import { syncPushSubscription } from '../../lib/push';
+import { isImpersonating } from '../../lib/api';
+import { useNotificationStore } from '../../hooks/useNotifications';
+import { useLanguage } from './I18nProvider';
+
+/** Fired to open the notifications inbox from anywhere (e.g. a "N more" push). */
+export const OPEN_INBOX_EVENT = 'nx:open-inbox';
 
 /**
- * Mounted once in the dashboard layout. The single hub for new-message alerts:
- * in-app toast + sound + browser notification + unread badge, driven by the
- * realtime `message:new` event. Runs in every tab, so all tabs stay in sync.
+ * Mounted once in the dashboard layout. Owns everything about notifications
+ * that is not drawn on screen:
+ * - the unread-chats badge, driven by `message:new`
+ * - the shared inbox store, kept fresh across reconnects and other tabs
+ * - this device's push subscription, kept pointed at whoever is signed in and
+ *   written in their language
+ * - taps on phone notifications, routed client-side into the open app
+ * - the unread count on the installed app's icon
  *
- * Suppression: while the user is actively looking at the inbox (on
- * /conversations with the tab focused) we stay quiet — the conversation list
- * already shows the message live — and we keep the unread badge cleared.
+ * The live banner itself (and its sound) is NotificationBanner, fed by the
+ * server's `notification:new` — every alert is a stored notification now.
  */
 export default function NotificationProvider() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { data: session } = useSession();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  const { language } = useLanguage();
   const pathRef = useRef(pathname);
-  pathRef.current = pathname;
-  const lastNotifiedRef = useRef<{ id: string; at: number } | null>(null);
+  useEffect(() => { pathRef.current = pathname; }, [pathname]);
 
   // Clear the unread badge whenever the user opens the inbox.
   useEffect(() => {
@@ -36,68 +44,81 @@ export default function NotificationProvider() {
     }
   }, [pathname]);
 
+  // Arrived from a notification tap: mark it read, open the inbox if asked,
+  // then tidy the URL. history.replaceState (not the router) so this never
+  // races a page's own URL rewrite, e.g. the inbox turning conversationId into c.
+  const handledNids = useRef(new Set<string>());
   useEffect(() => {
-    requestNotificationPermission();
+    const nid = searchParams.get('nid');
+    const inbox = searchParams.get('inbox');
+    if (!nid && !inbox) return;
+    if (nid && !handledNids.current.has(nid)) {
+      handledNids.current.add(nid);
+      void useNotificationStore.getState().markRead(nid);
+    }
+    if (inbox) window.dispatchEvent(new Event(OPEN_INBOX_EVENT));
+    const url = new URL(window.location.href);
+    url.searchParams.delete('nid');
+    url.searchParams.delete('inbox');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [searchParams]);
+
+  // Whoever signs in on this device takes over its notifications, in their
+  // language. Not while impersonating: the device stays the operator's own.
+  useEffect(() => {
+    if (!isImpersonating()) void syncPushSubscription(userId);
+  }, [userId, language]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'OPEN_URL' && typeof e.data.url === 'string') router.push(e.data.url);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [router]);
+
+  // The installed app's icon shows the unread count.
+  useEffect(() => {
+    const apply = (count: number) => {
+      const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+      if (!nav.setAppBadge) return;
+      void (count > 0 ? nav.setAppBadge(count) : nav.clearAppBadge?.())?.catch(() => {});
+    };
+    apply(useNotificationStore.getState().unread);
+    return useNotificationStore.subscribe((s, prev) => { if (s.unread !== prev.unread) apply(s.unread); });
+  }, []);
+
+  useEffect(() => {
     primeNotificationSound();
-    // Register this device for Web Push so hot leads & important alerts reach
-    // the user's phone even when the app is closed (no-op until permission is
-    // granted and the server has VAPID configured).
-    void ensurePushSubscription();
+    const store = useNotificationStore.getState();
+    if (!store.loaded) void store.refetch();
 
     const socket = getSocket();
 
-    function onNewMessage(data: {
-      conversationId: string;
-      message?: {
-        id?: string;
-        direction?: string;
-        body?: string;
-        fromMe?: boolean;
-        senderName?: string | null;
-        phone?: string | null;
-        from?: string | null;
-      };
-      contactName?: string;
-    }) {
+    let lastMessageId: string | null = null;
+    function onNewMessage(data: { conversationId: string; message?: { id?: string; fromMe?: boolean; direction?: string } }) {
       const msg = data.message;
-      if (!msg) return;
-      // Inbound only.
-      if (msg.fromMe) return;
+      if (!msg || msg.fromMe) return;
       if (msg.direction && msg.direction.toUpperCase() === 'OUTBOUND') return;
-
-      // De-dupe: the same message can arrive via more than one emit path.
-      const msgId = msg.id || `${data.conversationId}:${msg.body}`;
-      const now = Date.now();
-      if (lastNotifiedRef.current && lastNotifiedRef.current.id === msgId && now - lastNotifiedRef.current.at < 4000) {
-        return;
-      }
-      lastNotifiedRef.current = { id: msgId, at: now };
-
-      const focused = typeof document !== 'undefined' && document.hasFocus();
-      const inInbox = !!pathRef.current?.startsWith('/conversations');
-      // Actively watching the inbox → the list already reflects it; stay quiet.
-      const suppressInApp = inInbox && focused;
-
-      const name =
-        data.contactName ||
-        msg.senderName ||
-        (msg.phone || msg.from ? formatPhone(msg.phone || msg.from || '') : '') ||
-        'New message';
-      const body = msg.body || 'Sent a message';
-      const href = `/conversations?conversationId=${encodeURIComponent(data.conversationId)}`;
-
-      if (!suppressInApp) {
-        useChatUnread.getState().bump();
-        playNotificationSound();
-        useToastStore.getState().add(body, 'message', { title: name, href });
-      }
-
-      // Browser notification only fires when the tab is unfocused (handled inside).
-      showBrowserNotification(name, body, { tag: `conv-${data.conversationId}`, href });
+      // The same message can arrive via more than one emit path.
+      if (msg.id && msg.id === lastMessageId) return;
+      lastMessageId = msg.id ?? null;
+      const watching = !!pathRef.current?.startsWith('/conversations') && document.hasFocus();
+      if (!watching) useChatUnread.getState().bump();
     }
+    // Read elsewhere (another tab, or by opening the chat) — or events missed
+    // while disconnected: reload the inbox.
+    const refetch = () => void useNotificationStore.getState().refetch();
 
     socket.on('message:new', onNewMessage);
-    return () => { socket.off('message:new', onNewMessage); };
+    socket.on('notifications:changed', refetch);
+    socket.io.on('reconnect', refetch);
+    return () => {
+      socket.off('message:new', onNewMessage);
+      socket.off('notifications:changed', refetch);
+      socket.io.off('reconnect', refetch);
+    };
   }, []);
 
   return null;

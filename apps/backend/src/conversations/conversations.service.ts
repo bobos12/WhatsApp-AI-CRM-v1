@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { getTenantContext, runWithTenant } from '../lib/tenant-context';
 import { normalizePhone } from '../lib/phone';
 import { emitRealtime } from '../realtime/socket';
+import { notifyConversationAssigned } from '../notifications/events';
 import { providerManager } from '../providers/manager';
 
 // How long a cached profile-picture URL is trusted before we ask the provider
@@ -256,6 +257,9 @@ export class ConversationsService {
       assignedUser: updated.assignedUser,
     }, conversation.teamId);
     await logActivity('assign_user', 'conversation', { conversationId: id, agentId }, userId);
+    if (agentId && agentId !== conversation.assignedTo) {
+      void notifyConversationAssigned({ conversationId: id, assigneeId: agentId, actorId: userId ?? null });
+    }
     return updated;
   }
 

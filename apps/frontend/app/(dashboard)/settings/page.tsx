@@ -7,6 +7,8 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import WhatsAppLinkPanel from '../../../components/whatsapp/WhatsAppLinkPanel';
+import NotificationSettings from '../../../components/notifications/NotificationSettings';
+import { releaseDeviceAndSignOut } from '../../../lib/push';
 import ConnectionStatus from '../../../components/shared/ConnectionStatus';
 import FriendlyError from '../../../components/ui/FriendlyError';
 import { useSocket } from '../../../hooks/useSocket';
@@ -19,13 +21,13 @@ import {
   Settings2, Globe, CheckCircle2, MessageCircle,
   User, LogOut, SlidersHorizontal,
   Wifi, WifiOff, RefreshCw,
-  ChevronRight, ShieldCheck, Eye, EyeOff, Loader, Lock, Crown,
+  ChevronRight, ShieldCheck, Eye, EyeOff, Loader, Lock, Crown, Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SIMPLE_ROLE_LABEL, SIMPLE_ROLE_BADGE, toSimpleRole } from '@/lib/roles';
 import { useOperatorAccess } from '@/hooks/useOperatorAccess';
 
-type Section = 'whatsapp' | 'account' | 'password' | 'language';
+type Section = 'whatsapp' | 'notifications' | 'account' | 'password' | 'language';
 
 function initials(name?: string | null, email?: string | null): string {
   if (name) return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -45,7 +47,7 @@ export default function SettingsPage() {
   // Deep-link support: /settings?section=whatsapp opens the right tab straight away
   // (the global connect banner + dashboard CTA both link here).
   const sectionParam = searchParams.get('section') as Section | null;
-  const validSections: Section[] = ['whatsapp', 'account', 'password', 'language'];
+  const validSections: Section[] = ['whatsapp', 'notifications', 'account', 'password', 'language'];
   const [activeSection, setActiveSection] = useState<Section>(
     sectionParam && validSections.includes(sectionParam) ? sectionParam : 'whatsapp',
   );
@@ -114,6 +116,7 @@ export default function SettingsPage() {
   // ── Nav items ─────────────────────────────────────────────────────────────
   const navItems: { id: Section; icon: React.ElementType; label: string }[] = [
     { id: 'whatsapp',     icon: MessageCircle,      label: t('tabs.whatsapp') },
+    { id: 'notifications', icon: Bell,              label: t('notify.tab') },
     { id: 'account',      icon: User,               label: t('tabs.account') },
     { id: 'password',     icon: ShieldCheck,        label: language === 'ar' ? t('password.title', { defaultValue: 'كلمة المرور' }) : t('password.title', { defaultValue: 'Password' }) },
     { id: 'language',     icon: Globe,              label: t('tabs.language') },
@@ -157,7 +160,7 @@ export default function SettingsPage() {
           <p className="mb-3 text-sm font-medium text-ink">{t('account.signOutConfirm.title')}</p>
           <p className="mb-4 text-xs text-ink-3">{t('account.signOutConfirm.message')}</p>
           <Button
-            onClick={() => signOut()}
+            onClick={() => void releaseDeviceAndSignOut(signOut)}
             variant="destructive"
             className="gap-2"
           >
@@ -343,6 +346,7 @@ export default function SettingsPage() {
 
   const sectionTitles: Record<Section, string> = {
     whatsapp:      t('whatsapp.title'),
+    notifications: t('notify.title'),
     account:       t('account.title'),
     password:      t('password.title'),
     language:      t('language.title'),
@@ -350,6 +354,7 @@ export default function SettingsPage() {
 
   const sectionDesc: Record<Section, string> = {
     whatsapp:      t('whatsapp.description'),
+    notifications: t('notify.description'),
     account:       t('account.description'),
     password:      t('password.description'),
     language:      t('language.description'),
@@ -440,6 +445,7 @@ export default function SettingsPage() {
 
           {/* Section content */}
           {activeSection === 'whatsapp'      && <WhatsAppSection />}
+          {activeSection === 'notifications' && <NotificationSettings />}
           {activeSection === 'account'       && <AccountSection />}
           {activeSection === 'password'      && <PasswordSection />}
           {activeSection === 'language'      && <LanguageSection />}

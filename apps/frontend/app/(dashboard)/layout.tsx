@@ -8,7 +8,8 @@ import NotificationProvider from '../../components/providers/NotificationProvide
 import { RealtimeProvider } from '../../components/providers/RealtimeProvider';
 import OnboardingWizard from '../../components/onboarding/OnboardingWizard';
 import Toaster from '../../components/ui/Toaster';
-import LeadAlertPopup from '../../components/notifications/LeadAlertPopup';
+import NotificationBanner from '../../components/notifications/NotificationBanner';
+import PushPrompt from '../../components/notifications/PushPrompt';
 import CrmAssistantBubble from '../../components/layout/CrmAssistantBubble';
 import WhatsAppConnectBanner from '../../components/whatsapp/WhatsAppConnectBanner';
 import SendingBlockedBanner from '../../components/whatsapp/SendingBlockedBanner';
@@ -30,7 +31,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <NotificationProvider />
+      <Suspense fallback={null}>
+        <NotificationProvider />
+      </Suspense>
       <RealtimeProvider>
         {/* One status read for the whole shell — the gate, sidebar line, banner
             and settings all share it. */}
@@ -50,7 +53,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
             <BottomNav />
             <CommandPalette />
-            <LeadAlertPopup />
+            <Suspense fallback={null}>
+              <NotificationBanner />
+            </Suspense>
+            <PushPrompt />
             <CrmAssistantBubble />
           </SetupGate>
         </WhatsAppConnectProvider>

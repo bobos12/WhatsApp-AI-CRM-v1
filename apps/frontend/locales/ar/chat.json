@@ -128,7 +128,7 @@
     "notesSubtitle": "مرئي لفريقك فقط — لا يُرسل للعميل",
     "notesEmpty": "لا توجد ملاحظات بعد",
     "notesEmptyHint": "أضف ملاحظة داخلية أدناه",
-    "notesPlaceholder": "اكتب ملاحظة داخلية... (اضغط Enter للإرسال)",
+    "notesPlaceholder": "اكتب ملاحظة داخلية — @الاسم للإشارة إلى زميل (اضغط Enter للإرسال)",
     "notesDeleteLabel": "حذف الملاحظة",
     "notesAddLabel": "إضافة ملاحظة",
     "addNote": "أضف ملاحظة...",

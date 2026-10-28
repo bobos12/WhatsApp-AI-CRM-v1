@@ -62,7 +62,7 @@ export function playNotificationSound() {
     gain.connect(ctx.destination);
     osc.type = 'sine';
     osc.frequency.value = note.freq;
-    gain.gain.setValueAtTime(0.3, now + note.start);
+    gain.gain.setValueAtTime(0.16, now + note.start);
     gain.gain.exponentialRampToValueAtTime(0.001, now + note.start + note.duration);
     osc.start(now + note.start);
     osc.stop(now + note.start + note.duration + 0.05);

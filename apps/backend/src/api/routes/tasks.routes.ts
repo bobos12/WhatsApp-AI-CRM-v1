@@ -3,6 +3,7 @@ import { authMiddleware, requireAdmin } from '../../auth/auth.middleware';
 import { isManager } from '../../auth/authorize';
 import { TasksService } from '../../tasks/tasks.service';
 import { emitRealtime } from '../../realtime/socket';
+import { notifyTaskAssigned } from '../../notifications/events';
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.post('/', async (req, res) => {
     });
 
     emitRealtime('task:created', task, user?.teamId);
+    if (task?.assigneeId) void notifyTaskAssigned({ task, assigneeId: task.assigneeId, actorId: user.id });
     res.json(task);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -66,7 +68,9 @@ router.put('/:id', async (req, res) => {
       ? { ...req.body, teamId: user?.teamId ?? undefined }
       : { status: req.body.status };
 
-    const task = await TasksService.updateTask(req.params.id, updateData);
+    const task = await TasksService.updateTask(req.params.id, updateData, (assigneeId, updated) =>
+      notifyTaskAssigned({ task: updated, assigneeId, actorId: user.id }),
+    );
     emitRealtime('task:updated', task, user?.teamId);
     res.json(task);
   } catch (error) {

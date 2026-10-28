@@ -545,8 +545,28 @@ html[dir="rtl"] .animate-slide-in {
   to   { transform: scaleX(0); }
 }
 
-html[dir="ltr"] .lead-alert-enter { animation: slideInFromRight 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
-html[dir="rtl"] .lead-alert-enter { animation: slideInFromLeft 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+/* Live notification banner: drops in from the top edge like a phone alert,
+   and leaves the way it came. */
+@keyframes nxBannerIn {
+  from { opacity: 0; transform: translateY(-110%) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes nxBannerOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-60%) scale(0.98); }
+}
+.banner-enter { animation: nxBannerIn 0.42s var(--ease-out) both; }
+.banner-leave { animation: nxBannerOut 0.2s ease-in both; }
+
+/* A single small swing on the bell in the "allow notifications" prompt. */
+@keyframes nxBellRing {
+  0%, 60%, 100% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(8deg); }
+  40% { transform: rotate(-5deg); }
+}
+.bell-ring { transform-origin: 50% 10%; animation: nxBellRing 1.4s var(--ease-out) 0.3s 1 both; }
 
 /* ─── Donezo dashboard utilities ─────────────────────────── */
 

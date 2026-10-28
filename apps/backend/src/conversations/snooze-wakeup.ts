@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { emitRealtime } from '../realtime/socket';
 import { forEachActiveTenant } from '../tenants/for-each-tenant';
 import { logger } from '../lib/logger';
+import { notifySnoozeEnded } from '../notifications/events';
 
 /**
  * Runs every minute. Finds conversations whose snooze has expired and reopens
@@ -14,7 +15,7 @@ export function startSnoozeWakeupScheduler(): NodeJS.Timeout {
       const now = new Date();
       const expired = await prisma.conversation.findMany({
         where: { snoozedUntil: { lte: now }, status: 'ON_HOLD' },
-        select: { id: true, teamId: true },
+        select: { id: true, teamId: true, snoozedUntil: true },
       });
 
       for (const conv of expired) {
@@ -28,6 +29,7 @@ export function startSnoozeWakeupScheduler(): NodeJS.Timeout {
           conv.teamId,
         );
         logger.info('snooze.wakeup', { conversationId: conv.id });
+        if (conv.snoozedUntil) await notifySnoozeEnded({ conversationId: conv.id, snoozedUntil: conv.snoozedUntil });
       }
     });
   }, 60_000); // every 60 seconds

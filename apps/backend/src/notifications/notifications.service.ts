@@ -1,14 +1,50 @@
-import type { NotificationType, Priority } from '@prisma/client';
+import { Prisma, type NotificationType, type Priority } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { emitToUser } from '../realtime/socket';
 import { excludeDevSuperuser } from '../auth/authorize';
 import { pushService } from './push.service';
+import {
+  CATEGORY_OF,
+  HIGH_PRIORITY_TYPES,
+  NOTIFY_CATEGORIES,
+  pack,
+  unpackBilingual,
+  type Bilingual,
+  type NotifyCategory,
+} from './shared';
 
+export { unpackBilingual };
+
+
+export interface NotifyInput {
+  type: NotificationType;
+  recipients: string[];
+  /** The user who caused this — they are never notified about their own action. */
+  actorId?: string | null;
+  actorName?: string | null;
+  title: Bilingual;
+  body?: Bilingual | null;
+  /** In-app path opened on tap. Defaults to the conversation when there is one. */
+  url?: string | null;
+  priority?: Priority;
+  contactId?: string | null;
+  conversationId?: string | null;
+  teamId?: string | null;
+  /** Same key for the same recipient never creates a second notification. */
+  dedupeKey?: string | null;
+  /**
+   * Fold into the recipient's unread notification of the same type for the same
+   * conversation instead of stacking a new one (a burst of chat messages).
+   * Receives the new total so the title can say "3 new messages".
+   */
+  foldTitle?: (count: number) => Bilingual;
+}
+
+/** Legacy shape used by the AI lead alerts (team-targeted). */
 export interface CreateNotificationInput {
   type: NotificationType;
   priority?: Priority;
-  /** Bilingual titles/bodies — the recipient's client renders the right one. */
   titleEn: string;
   titleAr: string;
   bodyEn?: string;
@@ -23,12 +59,12 @@ export interface CreateNotificationInput {
 const NON_RECIPIENT_ROLES = new Set(['VIEWER']);
 
 /**
- * Resolve who should receive a lead notification:
+ * Who hears about activity on a conversation:
  * - assigned conversation → just the assigned agent
  * - otherwise            → every actionable member of the team
  *   (team-less conversations notify all actionable users — single-org fallback).
  */
-async function resolveRecipients(teamId: string | null, assignedTo?: string | null): Promise<string[]> {
+export async function conversationRecipients(teamId: string | null, assignedTo?: string | null): Promise<string[]> {
   if (assignedTo) return [assignedTo];
 
   const users = await prisma.user.findMany({
@@ -38,61 +74,142 @@ async function resolveRecipients(teamId: string | null, assignedTo?: string | nu
   return users.filter((u) => !NON_RECIPIENT_ROLES.has(u.role)).map((u) => u.id);
 }
 
+export function conversationUrl(conversationId: string): string {
+  return `/conversations?conversationId=${encodeURIComponent(conversationId)}`;
+}
+
+function switchedOff(prefs: Prisma.JsonValue | null): Set<string> {
+  const off = (prefs as { off?: unknown } | null)?.off;
+  return new Set(Array.isArray(off) ? off.filter((x): x is string => typeof x === 'string') : []);
+}
+
 class NotificationsService {
   /**
-   * Persist one notification per recipient and push it over the socket.
-   * Titles/bodies are stored as a JSON-ish "en | ar" pair so a single row
-   * serves agents on either language. We keep them in `title`/`body` columns
-   * using a delimiter the client splits on.
+   * The one way anything in the CRM notifies a person. Stores one row per
+   * recipient — that row drives the inbox, the live in-app banner, and the
+   * phone push (which the push dispatcher picks up from it). Never throws.
    */
-  async create(input: CreateNotificationInput): Promise<void> {
-    const recipients = await resolveRecipients(input.teamId, input.assignedTo);
-    if (recipients.length === 0) return;
+  async notify(input: NotifyInput): Promise<string[]> {
+    try {
+      const isTest = input.type === 'TEST';
+      const ids = [...new Set(input.recipients.filter(Boolean))].filter(
+        (id) => isTest || id !== input.actorId,
+      );
+      if (ids.length === 0) return [];
 
-    const title = packBilingual(input.titleEn, input.titleAr);
-    const body = input.bodyEn || input.bodyAr ? packBilingual(input.bodyEn ?? '', input.bodyAr ?? '') : null;
-    const priority: Priority = input.priority ?? 'NORMAL';
+      // Tenant-guarded: only people who still exist in this tenant come back.
+      const users = await prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, notificationPrefs: true },
+      });
+      const category = CATEGORY_OF[input.type];
+      const recipients = users
+        .filter((u) => !category || !switchedOff(u.notificationPrefs).has(category))
+        .map((u) => u.id);
+      if (recipients.length === 0) return [];
 
-    await Promise.all(
-      recipients.map(async (recipientId) => {
-        try {
-          const n = await prisma.notification.create({
-            data: {
+      const priority: Priority = input.priority ?? (HIGH_PRIORITY_TYPES.has(input.type) ? 'HIGH' : 'NORMAL');
+      const url = input.url ?? (input.conversationId ? conversationUrl(input.conversationId) : null);
+      const body = input.body ? pack(input.body) : null;
+
+      const created: string[] = [];
+      await Promise.all(
+        recipients.map(async (recipientId) => {
+          try {
+            const row = await this.writeOne(recipientId, input, { priority, url, body });
+            if (!row) return;
+            created.push(row.id);
+            emitToUser(recipientId, 'notification:new', serialize(row));
+          } catch (err) {
+            logger.warn('notifications.create_failed', {
               recipientId,
-              teamId: input.teamId,
               type: input.type,
-              priority,
-              title,
-              body,
-              contactId: input.contactId,
-              conversationId: input.conversationId,
-            },
-          });
-          emitToUser(recipientId, 'notification:new', serialize(n));
-        } catch (err) {
-          logger.warn('notifications.create_failed', {
-            recipientId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }),
-    );
-    logger.info('notifications.created', { type: input.type, recipients: recipients.length });
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }),
+      );
 
-    // Also fire a Web Push so recipients are alerted on their phone even when
-    // the app is closed (hot leads, handoffs, status upgrades — everything that
-    // flows through here). Best-effort; disabled unless VAPID is configured.
-    void pushService
-      .sendToUsers(recipients, {
-        title: input.titleEn,
-        body: input.bodyEn,
+      if (created.length > 0) {
+        pushService.enqueue(created, { immediate: isTest });
+        logger.info('notifications.created', { type: input.type, recipients: created.length });
+      }
+      return created;
+    } catch (err) {
+      logger.warn('notifications.notify_failed', {
         type: input.type,
-        tag: input.conversationId || input.type,
-        url: input.conversationId
-          ? `/conversations?conversationId=${encodeURIComponent(input.conversationId)}`
-          : '/dashboard',
-      })
-      .catch(() => {});
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  }
+
+  private async writeOne(
+    recipientId: string,
+    input: NotifyInput,
+    resolved: { priority: Priority; url: string | null; body: string | null },
+  ) {
+    if (input.foldTitle && input.conversationId) {
+      const open = await prisma.notification.findFirst({
+        where: { recipientId, type: input.type, conversationId: input.conversationId, isRead: false },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, groupCount: true },
+      });
+      if (open) {
+        const count = open.groupCount + 1;
+        // Re-arming pushedAt sends one fresh push carrying the latest message;
+        // the phone replaces the previous one (same tag) instead of stacking.
+        return prisma.notification.update({
+          where: { id: open.id },
+          data: {
+            title: pack(input.foldTitle(count)),
+            body: resolved.body,
+            actorName: input.actorName ?? null,
+            groupCount: count,
+            createdAt: new Date(),
+            pushedAt: null,
+          },
+        });
+      }
+    }
+
+    try {
+      return await prisma.notification.create({
+        data: {
+          recipientId,
+          teamId: input.teamId ?? null,
+          type: input.type,
+          priority: resolved.priority,
+          title: pack(input.foldTitle ? input.foldTitle(1) : input.title),
+          body: resolved.body,
+          contactId: input.contactId ?? null,
+          conversationId: input.conversationId ?? null,
+          actorId: input.actorId ?? null,
+          actorName: input.actorName ?? null,
+          url: resolved.url,
+          dedupeKey: input.dedupeKey ?? null,
+        },
+      });
+    } catch (err) {
+      // Already notified this person about this exact thing.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return null;
+      throw err;
+    }
+  }
+
+  /** AI lead alerts: the assigned agent, or the whole team when unassigned. */
+  async create(input: CreateNotificationInput): Promise<void> {
+    const recipients = await conversationRecipients(input.teamId, input.assignedTo);
+    await this.notify({
+      type: input.type,
+      priority: input.priority,
+      recipients,
+      title: { en: input.titleEn, ar: input.titleAr },
+      body: input.bodyEn || input.bodyAr ? { en: input.bodyEn ?? '', ar: input.bodyAr ?? '' } : null,
+      contactId: input.contactId,
+      conversationId: input.conversationId,
+      teamId: input.teamId,
+    });
   }
 
   async list(userId: string, opts: { unreadOnly?: boolean; limit?: number } = {}) {
@@ -116,26 +233,33 @@ class NotificationsService {
     });
   }
 
+  /** Opening a chat clears its message notifications — the person has seen them. */
+  async markConversationRead(userId: string, conversationId: string): Promise<number> {
+    const { count } = await prisma.notification.updateMany({
+      where: { recipientId: userId, conversationId, type: 'MESSAGE', isRead: false },
+      data: { isRead: true, readAt: new Date() },
+    });
+    return count;
+  }
+
   async markAllRead(userId: string): Promise<void> {
     await prisma.notification.updateMany({
       where: { recipientId: userId, isRead: false },
       data: { isRead: true, readAt: new Date() },
     });
   }
-}
 
-const BILINGUAL_DELIM = '␟'; // unit separator — won't appear in normal text
+  async getPreferences(userId: string): Promise<{ off: NotifyCategory[] }> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { notificationPrefs: true } });
+    const off = switchedOff(user?.notificationPrefs ?? null);
+    return { off: NOTIFY_CATEGORIES.filter((c) => off.has(c)) };
+  }
 
-function packBilingual(en: string, ar: string): string {
-  return `${en}${BILINGUAL_DELIM}${ar}`;
-}
-
-/** Split a packed "en␟ar" string into { en, ar }; tolerant of legacy plain text. */
-export function unpackBilingual(value: string | null): { en: string; ar: string } {
-  if (!value) return { en: '', ar: '' };
-  const idx = value.indexOf(BILINGUAL_DELIM);
-  if (idx === -1) return { en: value, ar: value };
-  return { en: value.slice(0, idx), ar: value.slice(idx + 1) };
+  async setPreferences(userId: string, off: string[]): Promise<{ off: NotifyCategory[] }> {
+    const clean = NOTIFY_CATEGORIES.filter((c) => off.includes(c));
+    await prisma.user.update({ where: { id: userId }, data: { notificationPrefs: { off: clean } } });
+    return { off: clean };
+  }
 }
 
 function serialize(n: {
@@ -146,6 +270,9 @@ function serialize(n: {
   body: string | null;
   contactId: string | null;
   conversationId: string | null;
+  actorName: string | null;
+  url: string | null;
+  groupCount: number;
   isRead: boolean;
   createdAt: Date;
 }) {
@@ -157,6 +284,9 @@ function serialize(n: {
     body: n.body ? unpackBilingual(n.body) : null,
     contactId: n.contactId,
     conversationId: n.conversationId,
+    actorName: n.actorName,
+    url: n.url ?? (n.conversationId ? conversationUrl(n.conversationId) : null),
+    groupCount: n.groupCount,
     isRead: n.isRead,
     createdAt: n.createdAt.toISOString(),
   };

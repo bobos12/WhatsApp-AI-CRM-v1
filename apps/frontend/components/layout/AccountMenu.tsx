@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSession, signOut } from 'next-auth/react';
+import { releaseDeviceAndSignOut } from '@/lib/push';
 import { useTranslation } from 'react-i18next';
 import { Moon, Globe, RefreshCw, RotateCw, LogOut, Settings, ChevronsUpDown, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -149,7 +150,7 @@ export default function AccountMenu({
               {t('account.refresh')}
             </button>
             <div className="my-1 h-px bg-line" />
-            <button type="button" role="menuitem" onClick={() => signOut()} className={cn(item, 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10')}>
+            <button type="button" role="menuitem" onClick={() => void releaseDeviceAndSignOut(signOut)} className={cn(item, 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10')}>
               <LogOut className="h-4 w-4" aria-hidden="true" />
               {t('account.signOut')}
             </button>

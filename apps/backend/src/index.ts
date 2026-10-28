@@ -12,6 +12,8 @@ import { logger } from './lib/logger';
 import { runAsPlatform } from './lib/tenant-context';
 import { bindRealtimeServer } from './realtime/socket';
 import { startSnoozeWakeupScheduler } from './conversations/snooze-wakeup';
+import { pushService } from './notifications/push.service';
+import { startDeadlineReminders } from './notifications/deadlines';
 import { startBroadcastScheduler } from './broadcasts/broadcast.scheduler';
 import { ensureFlowWorker } from './automations/flow-executor';
 import { startNoReplyDetector } from './automations/no-reply-detector';
@@ -323,6 +325,9 @@ server.listen(PORT, async () => {
     provisionPlatformOwner();
     await bootstrapDefaultTenant();
     startSnoozeWakeupScheduler();
+    // Phone pushes: picks up anything not yet sent (also right after a restart).
+    pushService.startSweeper();
+    startDeadlineReminders();
     // Dispatches SCHEDULED broadcasts whose time has come, and recovers any run
     // interrupted by a restart. Must start before traffic so a schedule that fell
     // due while the process was down fires on the first tick.
