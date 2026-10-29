@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Smartphone, Monitor, Apple, RefreshCw } from 'lucide-react'
+import { Download, Smartphone, Monitor, Apple, RefreshCw, Share, MoreVertical, ArrowDown } from 'lucide-react'
 import { hardRefresh } from '@/lib/hard-refresh'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -15,8 +15,36 @@ function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'unknown'
   const ua = navigator.userAgent.toLowerCase()
   if (/iphone|ipad|ipod/.test(ua)) return 'ios'
+  // iPadOS reports itself as a Mac — touch support gives it away.
+  if (/macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'ios'
   if (/android/.test(ua)) return 'android'
   return 'desktop'
+}
+
+// WhatsApp / Instagram / Facebook etc. open links in their own browser, which
+// can't install apps — so the button first hops the user into the real one.
+function isInAppBrowser(platform: Platform): boolean {
+  const ua = navigator.userAgent
+  if (/FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|TikTok|musical_ly|Bytedance|Twitter|LinkedInApp|WhatsApp/i.test(ua)) return true
+  if (platform === 'ios') return !/Safari\//.test(ua)
+  if (platform === 'android') return /; wv\)/.test(ua)
+  return false
+}
+
+function withInstallFlag(): URL {
+  const url = new URL(window.location.href)
+  url.searchParams.set('install', '1')
+  return url
+}
+
+function openInSystemBrowser(platform: Platform) {
+  const url = withInstallFlag()
+  if (platform === 'ios') {
+    window.location.href = `x-safari-${url.href}`
+  } else {
+    const fallback = encodeURIComponent(url.href)
+    window.location.href = `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallback};end`
+  }
 }
 
 interface InstallButtonProps {
@@ -30,15 +58,24 @@ export function InstallButton({ variant = 'hero', className = '', label, install
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [platform, setPlatform] = useState<Platform>('unknown')
-  const [showIOSGuide, setShowIOSGuide] = useState(false)
+  const [guide, setGuide] = useState<'ios' | 'android' | null>(null)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
-    setPlatform(detectPlatform())
+    const p = detectPlatform()
+    setPlatform(p)
 
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true)
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true
+    if (standalone) setIsInstalled(true)
+
+    // Arrived from an in-app browser hop: show the final step straight away.
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('install') === '1') {
+      params.delete('install')
+      const qs = params.toString()
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash)
+      if (!standalone && p === 'ios') setGuide('ios')
     }
 
     const handler = (e: Event) => {
@@ -70,8 +107,13 @@ export function InstallButton({ variant = 'hero', className = '', label, install
   }
 
   function handleClick() {
+    if ((platform === 'ios' || platform === 'android') && !installPrompt && isInAppBrowser(platform)) {
+      openInSystemBrowser(platform)
+      return
+    }
+
     if (platform === 'ios') {
-      setShowIOSGuide(true)
+      setGuide('ios')
       return
     }
 
@@ -81,6 +123,11 @@ export function InstallButton({ variant = 'hero', className = '', label, install
         if (outcome === 'accepted') setIsInstalled(true)
       })
       setInstallPrompt(null)
+      return
+    }
+
+    if (platform === 'android') {
+      setGuide('android')
       return
     }
 
@@ -144,46 +191,36 @@ export function InstallButton({ variant = 'hero', className = '', label, install
         <PlatformIcon className="h-4 w-4 opacity-50" />
       </button>
 
-      {showIOSGuide && (
+      {guide && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowIOSGuide(false)}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setGuide(null)}
         >
           <div
-            className="w-full max-w-sm bg-[#0a1712] border border-white/10 rounded-2xl p-6 mb-4"
+            className="w-full max-w-sm bg-[#0a1712] border border-white/10 rounded-2xl p-5 mx-4 mb-24 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[#25D366]/20 flex items-center justify-center">
-                <Apple className="w-5 h-5 text-[#25D366]" />
-              </div>
-              <div>
-                <p className="font-semibold text-white text-sm">Add to Home Screen</p>
-                <p className="text-xs text-white/50">iOS Safari instructions</p>
-              </div>
-            </div>
+            <p className="font-semibold text-white text-base mb-4">Add Nexus to your Home Screen</p>
             <ol className="space-y-3 text-sm text-white/70">
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#25D366]/20 text-[#25D366] text-xs flex items-center justify-center font-bold">1</span>
-                Tap the <strong className="text-white">Share</strong> button at the bottom of Safari
+              <li className="flex items-center gap-3">
+                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  {guide === 'ios' ? <Share className="w-4 h-4 text-[#25D366]" /> : <MoreVertical className="w-4 h-4 text-[#25D366]" />}
+                </span>
+                {guide === 'ios'
+                  ? <span>Tap <strong className="text-white">Share</strong> below <span className="text-white/40">(inside ⋯ on newer iPhones)</span></span>
+                  : <span>Tap the browser menu <strong className="text-white">⋮</strong></span>}
               </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#25D366]/20 text-[#25D366] text-xs flex items-center justify-center font-bold">2</span>
-                Scroll down and tap <strong className="text-white">Add to Home Screen</strong>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#25D366]/20 text-[#25D366] text-xs flex items-center justify-center font-bold">3</span>
-                Tap <strong className="text-white">Add</strong> in the top-right corner
+              <li className="flex items-center gap-3">
+                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <Download className="w-4 h-4 text-[#25D366]" />
+                </span>
+                <span>Tap <strong className="text-white">{guide === 'ios' ? 'Add to Home Screen' : 'Install app'}</strong></span>
               </li>
             </ol>
-            <button
-              type="button"
-              onClick={() => setShowIOSGuide(false)}
-              className="mt-5 w-full py-2.5 rounded-xl bg-[#25D366] text-[#04130b] font-semibold text-sm hover:bg-[#3fe07d] transition-colors"
-            >
-              Got it
-            </button>
           </div>
+          {guide === 'ios' && (
+            <ArrowDown className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 text-[#25D366] animate-bounce motion-reduce:animate-none" />
+          )}
         </div>
       )}
     </>
