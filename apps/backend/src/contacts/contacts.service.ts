@@ -58,6 +58,27 @@ async function resolveCustomFields(
 }
 
 export class ContactsService {
+  /** Id, name and phone (plus tags) for pickers — same contacts and order as getContacts. */
+  static async getContactOptions(limit?: number) {
+    return prisma.contact.findMany({
+      where: {
+        AND: [
+          { NOT: { phone: { contains: '@g.us' } } },
+          { NOT: { phone: { contains: '@broadcast' } } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        createdAt: true,
+        contactTags: { select: { tag: { select: { id: true, name: true, color: true } } } },
+      },
+    });
+  }
+
   static async getContacts(filters?: { search?: string; tag?: string; filter?: AudienceFilter | null }) {
     const conditions: any[] = [
       { NOT: { phone: { contains: '@g.us' } } },

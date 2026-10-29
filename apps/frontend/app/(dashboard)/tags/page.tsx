@@ -47,8 +47,8 @@ export default function TagsPage() {
   const fetchData = useCallback(async () => {
     try {
       const [tagData, contactData] = await Promise.all([
-        api.get('/api/tags'),
-        api.get('/api/contacts'),
+        api.getCached('/api/tags', 5 * 60_000),
+        api.getCached('/api/contacts?fields=basic', 5 * 60_000),
       ]);
       setTags(Array.isArray(tagData) ? tagData : []);
       setContacts(Array.isArray(contactData) ? contactData : []);

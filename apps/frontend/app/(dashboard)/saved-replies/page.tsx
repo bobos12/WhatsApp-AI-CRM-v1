@@ -27,7 +27,7 @@ export default function SavedRepliesPage() {
 
   const fetchReplies = useCallback(async () => {
     try {
-      const data = await api.get('/api/saved-replies');
+      const data = await api.getCached('/api/saved-replies', 5 * 60_000);
       setSavedReplies(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch saved replies:', err);

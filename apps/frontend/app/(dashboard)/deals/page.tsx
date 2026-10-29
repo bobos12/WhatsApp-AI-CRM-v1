@@ -178,8 +178,8 @@ export default function DealsPage() {
       try {
         const [dealData, contactData, agentData] = await Promise.all([
           api.get('/api/deals'),
-          api.get('/api/contacts'),
-          api.get('/api/teams/agents'),
+          api.getCached('/api/contacts?fields=basic', 5 * 60_000),
+          api.getCached('/api/teams/agents'),
         ]);
         setDeals(Array.isArray(dealData) ? dealData : []);
         setContacts(Array.isArray(contactData) ? contactData : []);

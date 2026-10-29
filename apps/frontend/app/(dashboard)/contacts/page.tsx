@@ -174,7 +174,9 @@ export default function ContactsPage() {
       // Conditions are evaluated by the server — the same evaluator the broadcast
       // audience uses, so both surfaces agree on who matches.
       if (filterQuery) params.append('filter', filterQuery);
-      const data = await api.get(`/api/contacts?${params}`);
+      // The unfiltered list is reused across visits until a contact or tag changes.
+      const query = params.toString();
+      const data = query ? await api.get(`/api/contacts?${query}`) : await api.getCached('/api/contacts', 2 * 60_000);
       const list = Array.isArray(data) ? data : [];
       setContacts(list);
       if (!search && !tagFilter && !filterQuery) remember('contacts', list);
@@ -196,7 +198,8 @@ export default function ContactsPage() {
     },
     [status, fetchContacts],
   );
-  useSocket('message:new', onMessageNew);
+  // The server flags a first-time customer on conversation:updated, not message:new.
+  useSocket('conversation:updated', onMessageNew);
 
   // ─── Derived / processed data ─────────────────────────────────────────────
 

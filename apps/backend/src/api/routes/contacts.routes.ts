@@ -185,6 +185,11 @@ function parseFilterQuery(raw: unknown) {
 router.get('/', async (req, res) => {
   try {
     const { search, tag } = req.query;
+    // Pickers only need who the contact is — a fraction of the full rows.
+    if (req.query.fields === 'basic') {
+      const limit = Number(req.query.limit);
+      return res.json(await ContactsService.getContactOptions(Number.isFinite(limit) && limit > 0 ? limit : undefined));
+    }
     const contacts = await ContactsService.getContacts({
       search: search as string,
       tag: tag as string,

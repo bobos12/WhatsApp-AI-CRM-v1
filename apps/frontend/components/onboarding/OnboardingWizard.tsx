@@ -56,8 +56,8 @@ export default function OnboardingWizard() {
       try {
         const [statusData, contactData, convData, autoData] = await Promise.all([
           api.get('/api/whatsapp/status').catch(() => ({ status: 'disconnected' })),
-          api.get('/api/contacts').catch(() => []),
-          api.get('/api/conversations').catch(() => []),
+          api.get('/api/contacts?fields=basic&limit=1').catch(() => []),
+          api.get('/api/conversations?limit=1').catch(() => []),
           api.get('/api/automations').catch(() => []),
         ]);
 

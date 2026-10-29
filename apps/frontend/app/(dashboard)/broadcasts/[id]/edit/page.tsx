@@ -47,7 +47,7 @@ export default function EditBroadcastPage() {
 
   const fetchContacts = useCallback(async () => {
     try {
-      const data = await api.get('/api/contacts');
+      const data = await api.getCached('/api/contacts', 2 * 60_000);
       setContacts(Array.isArray(data) ? data : []);
     } catch {
       setContacts([]);

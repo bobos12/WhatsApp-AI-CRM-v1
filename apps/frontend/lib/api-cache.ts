@@ -19,18 +19,33 @@ const reference = new Map<string, { at: number; data: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 const screens = new Map<string, unknown>();
 
+/** `/api/contacts?fields=basic` → `contacts` — the name the server's data:changed uses. */
+function resourceOf(url: string): string {
+  return url.split('?')[0].split('/')[2] ?? '';
+}
+
+/** Data that embeds another resource goes stale when that one changes too. */
+const DEPENDS_ON: Record<string, string[]> = {
+  contacts: ['tags'],
+  tags: ['contacts'], // per-tag contact counts
+  teams: ['users'],
+  users: ['teams'],
+};
+
 export async function cachedGet<T>(url: string, fetcher: (url: string) => Promise<T>, maxAgeMs = 60_000): Promise<T> {
   const hit = reference.get(url);
   if (hit && Date.now() - hit.at < maxAgeMs) return hit.data as T;
   const pending = inflight.get(url);
   if (pending) return pending as Promise<T>;
 
-  const request = fetcher(url)
+  const request: Promise<T> = fetcher(url)
     .then((data) => {
-      reference.set(url, { at: Date.now(), data });
+      // Invalidation removes the in-flight entry: a response that left before the
+      // change is still returned, but not kept.
+      if (inflight.get(url) === request) reference.set(url, { at: Date.now(), data });
       return data;
     })
-    .finally(() => inflight.delete(url));
+    .finally(() => { if (inflight.get(url) === request) inflight.delete(url); });
   inflight.set(url, request);
   return request;
 }
@@ -38,13 +53,36 @@ export async function cachedGet<T>(url: string, fetcher: (url: string) => Promis
 /** Called after any write: whatever reference data the user just changed must be refetched. */
 export function invalidateReference() {
   reference.clear();
+  inflight.clear();
 }
 
-// A change made by anyone else (a colleague adds a saved reply, Meta approves a
-// template) makes the cached reference lists stale too — drop them so the next
-// read fetches fresh data.
+/** Drop only what a change to `resource` makes stale. */
+function invalidateResource(resource: string) {
+  for (const map of [reference, inflight] as Map<string, unknown>[]) {
+    for (const url of Array.from(map.keys())) {
+      const own = resourceOf(url);
+      if (own === resource || DEPENDS_ON[own]?.includes(resource)) map.delete(url);
+    }
+  }
+}
+
+// Changes made by anyone else (a colleague adds a saved reply, Meta approves a
+// template) arrive as data:changed for one resource; drop just what it touches.
+// A new customer writing in creates a contact without one, and events missed
+// while disconnected could have touched anything.
 if (typeof window !== 'undefined') {
-  socket.on('data:changed', () => reference.clear());
+  socket.on('data:changed', (event: { resource?: string }) => {
+    if (event?.resource) invalidateResource(event.resource);
+    else invalidateReference();
+  });
+  socket.on('conversation:updated', (event: { isNewContact?: boolean }) => {
+    if (event?.isNewContact) invalidateResource('contacts');
+  });
+  let connectedOnce = socket.connected;
+  socket.on('connect', () => {
+    if (connectedOnce) invalidateReference();
+    connectedOnce = true;
+  });
 }
 
 export function peek<T>(key: string): T | undefined {

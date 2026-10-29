@@ -136,8 +136,8 @@ export default function TasksPage() {
     try {
       const [taskData, contactData, agentData] = await Promise.all([
         api.get('/api/tasks'),
-        api.get('/api/contacts'),
-        api.get('/api/teams/agents'),
+        api.getCached('/api/contacts?fields=basic', 5 * 60_000),
+        api.getCached('/api/teams/agents'),
       ]);
       setTasks(Array.isArray(taskData) ? taskData : []);
       setContacts(Array.isArray(contactData) ? contactData : []);
