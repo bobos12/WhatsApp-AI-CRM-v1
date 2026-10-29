@@ -169,19 +169,43 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
       return () => window.removeEventListener('conversation:message', handler as EventListener);
     }, [patchConversation]);
 
+    // A message for a chat not in the list needs a full reload. A broadcast sends
+    // one per recipient, so reloads are capped at one per 5 s — reloading per
+    // message was what spent the database's monthly egress.
+    const fetchRef = useRef(fetchConversations);
+    fetchRef.current = fetchConversations;
+    const unknownCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const unknownPendingRef = useRef(false);
+    useEffect(() => () => { if (unknownCooldownRef.current) clearTimeout(unknownCooldownRef.current); }, []);
+    const refetchForUnknown = useCallback(() => {
+      // First one reloads at once; any more during the cooldown share one trailing reload.
+      if (unknownCooldownRef.current) { unknownPendingRef.current = true; return; }
+      void fetchRef.current();
+      const cool = () => {
+        unknownCooldownRef.current = setTimeout(() => {
+          unknownCooldownRef.current = null;
+          if (!unknownPendingRef.current) return;
+          unknownPendingRef.current = false;
+          void fetchRef.current();
+          cool();
+        }, 5000);
+      };
+      cool();
+    }, []);
+
     // ── Socket: new message (legacy) → patch store ───────────────────────────
     useSocket('message:new', useCallback((data: any) => {
       const cid = data.conversationId;
       if (!cid) return;
       const existing = useMessagingStore.getState().conversations.get(cid);
-      if (!existing) { fetchConversations(); return; }
+      if (!existing) { refetchForUnknown(); return; }
       const isInbound = data.message?.direction === 'INBOUND';
       patchConversation(cid, {
         lastMessage: data.message?.body ?? existing.lastMessage,
         lastMessageAt: data.message?.timestamp ?? existing.lastMessageAt,
         unreadCount: isInbound ? ((existing.unreadCount ?? 0) + 1) : (existing.unreadCount ?? 0),
       });
-    }, [fetchConversations, patchConversation]));
+    }, [refetchForUnknown, patchConversation]));
 
     // ── Socket: conversation updated (legacy) → patch store ──────────────────
     useSocket('conversation:updated', useCallback((data: any) => {
