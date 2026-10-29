@@ -862,6 +862,36 @@ html.lang-ar .nx-eyebrow { font-size: 0.875rem; }
 [dir='rtl'] .nx-arrow { transform: scaleX(-1); }
 [dir='rtl'] .nx-btn:hover .nx-arrow, [dir='rtl'] .nx-link:hover .nx-arrow { transform: scaleX(-1) translateX(3px); }
 
+/* App download: light plate + signal icon tile, distinct from the WhatsApp CTA. */
+.nx-btn-app {
+  height: 4rem;
+  gap: 0.875rem;
+  padding-inline: 0.625rem 1.5rem;
+  border-radius: 0.875rem;
+  background: var(--nx-text);
+  color: var(--nx-ink);
+  animation: nx-app-glow 2.8s var(--nx-ease) infinite;
+}
+.nx-btn-app:hover { background: #fff; }
+.nx-btn-app__icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  background: var(--nx-signal);
+  color: var(--nx-signal-ink);
+  transition: transform var(--nx-base) var(--nx-ease);
+}
+.nx-btn-app:hover .nx-btn-app__icon { transform: translateY(2px); }
+.nx-btn-app-ink { background: var(--nx-ink); color: var(--nx-text); }
+.nx-btn-app-ink:hover { background: #10241b; }
+@keyframes nx-app-glow {
+  0%, 60%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0), 0 14px 34px -16px rgba(37, 211, 102, 0.55); }
+  30% { box-shadow: 0 0 0 6px rgba(37, 211, 102, 0.2), 0 14px 34px -16px rgba(37, 211, 102, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) { .nx-btn-app { animation: none; } }
+
 .nx-link {
   display: inline-flex;
   align-items: center;

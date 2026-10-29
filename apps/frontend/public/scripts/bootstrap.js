@@ -25,3 +25,13 @@ try {
     window.navigator.standalone === true;
   if (standalone) document.documentElement.classList.add('pwa-standalone');
 } catch (e) {}
+try {
+  // Chrome fires beforeinstallprompt once, often before React mounts. Catch it
+  // here so the landing page's Install button always has it.
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    window.__installPrompt = e;
+    window.dispatchEvent(new CustomEvent('install-prompt-ready'));
+  });
+  window.addEventListener('appinstalled', function () { window.__installPrompt = null; });
+} catch (e) {}

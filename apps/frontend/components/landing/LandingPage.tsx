@@ -274,7 +274,7 @@ function Hero({ t, isAr }: { t: LandingContent; isAr: boolean }) {
               <WhatsAppGlyph />
               {t.hero.ctaPrimary}
             </a>
-            <InstallButton variant="hero" label={t.hero.download} installedLabel={t.appInstalled} />
+            <InstallButton variant="hero" hint={isAr ? 'آيفون · أندرويد · كمبيوتر' : undefined} label={t.hero.download} installedLabel={t.appInstalled} />
             <a href="#product" className="nx-btn nx-btn-ghost">
               {t.hero.ctaSecondary}
               <ArrowRight className="nx-arrow h-4 w-4" />
@@ -576,7 +576,7 @@ function MobileSection({ t, isAr }: { t: LandingContent; isAr: boolean }) {
           </ul>
           <Reveal delay={200}>
             <div className="mt-8">
-              <InstallButton variant="hero" label={t.mobile.install} installedLabel={t.appInstalled} />
+              <InstallButton variant="hero" hint={isAr ? 'آيفون · أندرويد · كمبيوتر' : undefined} label={t.mobile.install} installedLabel={t.appInstalled} />
             </div>
           </Reveal>
         </div>
@@ -698,7 +698,7 @@ function FinalCta({ t, isAr }: { t: LandingContent; isAr: boolean }) {
               <WhatsAppGlyph />
               {t.finalCta.primary}
             </a>
-            <InstallButton variant="onSignal" label={t.mobile.install} installedLabel={t.appInstalled} />
+            <InstallButton variant="onSignal" hint={isAr ? 'آيفون · أندرويد · كمبيوتر' : undefined} label={t.mobile.install} installedLabel={t.appInstalled} />
           </div>
           <p className="mt-5 text-sm text-[rgba(4,19,11,0.62)]">{t.finalCta.reassurance}</p>
         </Reveal>

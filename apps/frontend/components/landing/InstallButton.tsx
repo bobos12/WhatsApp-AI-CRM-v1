@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Download, Smartphone, Monitor, Apple, RefreshCw, Share, MoreVertical, ArrowDown } from 'lucide-react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { Download, RefreshCw, Share, MoreVertical, ArrowDown } from 'lucide-react'
 import { hardRefresh } from '@/lib/hard-refresh'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -19,6 +19,15 @@ function detectPlatform(): Platform {
   if (/macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'ios'
   if (/android/.test(ua)) return 'android'
   return 'desktop'
+}
+
+type Guide = 'ios' | 'android' | 'chromium' | 'safari-mac' | 'unsupported'
+
+function desktopGuide(): Guide {
+  const ua = navigator.userAgent
+  if (/Edg\/|Chrome\//.test(ua) && !/OPR\//.test(ua)) return 'chromium'
+  if (/Safari\//.test(ua) && !/Chrome|Firefox/.test(ua)) return 'safari-mac'
+  return 'unsupported'
 }
 
 // WhatsApp / Instagram / Facebook etc. open links in their own browser, which
@@ -51,14 +60,15 @@ interface InstallButtonProps {
   variant?: 'hero' | 'section' | 'onSignal'
   className?: string
   label?: string
+  hint?: string
   installedLabel?: string
 }
 
-export function InstallButton({ variant = 'hero', className = '', label, installedLabel }: InstallButtonProps) {
+export function InstallButton({ variant = 'hero', className = '', label, hint, installedLabel }: InstallButtonProps) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [platform, setPlatform] = useState<Platform>('unknown')
-  const [guide, setGuide] = useState<'ios' | 'android' | null>(null)
+  const [guide, setGuide] = useState<Guide | null>(null)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [updating, setUpdating] = useState(false)
 
@@ -78,22 +88,23 @@ export function InstallButton({ variant = 'hero', className = '', label, install
       if (!standalone && p === 'ios') setGuide('ios')
     }
 
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setInstallPrompt(e as BeforeInstallPromptEvent)
-    }
+    // Captured early by bootstrap.js; shared by every Install button on the page.
+    const syncPrompt = () => setInstallPrompt((window as any).__installPrompt ?? null)
+    syncPrompt()
 
     // React when the SW registration announces a newer version (or one is
     // already waiting from a previous visit) so the button flips to "Update".
     if ((window as any).__swUpdateAvailable) setUpdateAvailable(true)
     const onUpdate = () => setUpdateAvailable(true)
 
-    window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', () => setIsInstalled(true))
+    const onInstalled = () => setIsInstalled(true)
+    window.addEventListener('install-prompt-ready', syncPrompt)
+    window.addEventListener('appinstalled', onInstalled)
     window.addEventListener('sw-update-available', onUpdate)
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('install-prompt-ready', syncPrompt)
+      window.removeEventListener('appinstalled', onInstalled)
       window.removeEventListener('sw-update-available', onUpdate)
     }
   }, [])
@@ -122,18 +133,14 @@ export function InstallButton({ variant = 'hero', className = '', label, install
       installPrompt.userChoice.then(({ outcome }) => {
         if (outcome === 'accepted') setIsInstalled(true)
       })
+      ;(window as any).__installPrompt = null
       setInstallPrompt(null)
       return
     }
 
-    if (platform === 'android') {
-      setGuide('android')
-      return
-    }
-
-    // No install prompt (already installed elsewhere / unsupported browser):
-    // deliver the latest version instead — hard refresh past every cache.
-    applyUpdate()
+    // No native prompt (browser without it, or the app is already installed):
+    // show the short manual path. Never just reload the page.
+    setGuide(platform === 'android' ? 'android' : desktopGuide())
   }
 
   const surface =
@@ -163,32 +170,20 @@ export function InstallButton({ variant = 'hero', className = '', label, install
     )
   }
 
-  const PlatformIcon = platform === 'ios' ? Apple : platform === 'android' ? Smartphone : Monitor
-
   return (
     <>
       <button
         type="button"
         onClick={handleClick}
-        disabled={updating}
-        className={`group nx-btn disabled:cursor-wait ${surface} ${className}`}
+        className={`nx-btn nx-btn-app ${variant === 'onSignal' ? 'nx-btn-app-ink' : ''} ${className}`}
       >
-        {updating
-          ? <RefreshCw className="h-4 w-4 animate-spin" />
-          : <Download className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />}
-        <span>
-          {updating
-            ? 'Getting latest version…'
-            : label ??
-              (platform === 'ios'
-                ? 'Add to Home Screen'
-                : platform === 'android'
-                ? 'Install Android App'
-                : installPrompt
-                ? 'Install Desktop App'
-                : 'Get Latest Version')}
+        <span className="nx-btn-app__icon">
+          <Download className="h-5 w-5" />
         </span>
-        <PlatformIcon className="h-4 w-4 opacity-50" />
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-base font-bold">{label ?? 'Download the app'}</span>
+          <span className="text-xs font-medium opacity-60">{hint ?? 'iPhone · Android · Desktop'}</span>
+        </span>
       </button>
 
       {guide && (
@@ -197,24 +192,24 @@ export function InstallButton({ variant = 'hero', className = '', label, install
           onClick={() => setGuide(null)}
         >
           <div
-            className="w-full max-w-sm bg-[#0a1712] border border-white/10 rounded-2xl p-5 mx-4 mb-24 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            className={`w-full max-w-sm bg-[#0a1712] border border-white/10 rounded-2xl p-5 mx-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${guide === 'ios' ? 'mb-24' : 'mb-4 sm:mb-auto sm:mt-[20vh]'}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="font-semibold text-white text-base mb-4">Add Nexus to your Home Screen</p>
+            <p className="font-semibold text-white text-base mb-4">
+              {guide === 'ios' || guide === 'android' ? 'Add Nexus to your Home Screen' : 'Install Nexus on this computer'}
+            </p>
             <ol className="space-y-3 text-sm text-white/70">
               <li className="flex items-center gap-3">
                 <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                   {guide === 'ios' ? <Share className="w-4 h-4 text-[#25D366]" /> : <MoreVertical className="w-4 h-4 text-[#25D366]" />}
                 </span>
-                {guide === 'ios'
-                  ? <span>Tap <strong className="text-white">Share</strong> below <span className="text-white/40">(inside ⋯ on newer iPhones)</span></span>
-                  : <span>Tap the browser menu <strong className="text-white">⋮</strong></span>}
+                {GUIDE_STEPS[guide][0]}
               </li>
               <li className="flex items-center gap-3">
                 <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                   <Download className="w-4 h-4 text-[#25D366]" />
                 </span>
-                <span>Tap <strong className="text-white">{guide === 'ios' ? 'Add to Home Screen' : 'Install app'}</strong></span>
+                {GUIDE_STEPS[guide][1]}
               </li>
             </ol>
           </div>
@@ -225,4 +220,29 @@ export function InstallButton({ variant = 'hero', className = '', label, install
       )}
     </>
   )
+}
+
+const b = (t: string) => <strong className="text-white">{t}</strong>
+
+const GUIDE_STEPS: Record<Guide, [ReactNode, ReactNode]> = {
+  ios: [
+    <span key="1">Tap {b('Share')} below <span className="text-white/40">(inside ⋯ on newer iPhones)</span></span>,
+    <span key="2">Tap {b('Add to Home Screen')}</span>,
+  ],
+  android: [
+    <span key="1">Tap the browser menu {b('⋮')}</span>,
+    <span key="2">Tap {b('Install app')} <span className="text-white/40">(or Add to Home screen)</span></span>,
+  ],
+  chromium: [
+    <span key="1">Click the install icon at the right end of the {b('address bar')}</span>,
+    <span key="2">Click {b('Install')} <span className="text-white/40">(already installed? it says Open in app)</span></span>,
+  ],
+  'safari-mac': [
+    <span key="1">Open Safari&apos;s {b('File')} menu</span>,
+    <span key="2">Choose {b('Add to Dock')}</span>,
+  ],
+  unsupported: [
+    <span key="1">This browser can&apos;t install apps. Open this page in {b('Chrome')} or {b('Edge')}</span>,
+    <span key="2">Click {b('Download the app')} again</span>,
+  ],
 }
