@@ -254,5 +254,24 @@
     "step1": "Press \"Pay now in Meta\", then open the \"WhatsApp Business accounts\" tab.",
     "step2": "Find account {{waba}} — if it shows \"Pay Now\", pay the balance, and make sure the payment method is your card, not another company such as 360dialog.",
     "step3": "Come back and press \"Check now\". It can take a few minutes after paying."
+  },
+  "usage": {
+    "title": "WhatsApp spend",
+    "range": "Period",
+    "days": "{{n}} days",
+    "total": "Approximate total charges",
+    "messages": "{{n}} messages",
+    "empty": "No charged messages in this period.",
+    "error": "Couldn't load spend from Meta. Try again in a moment.",
+    "note": "Approximate figures from Meta, WhatsApp only. Your Meta invoice is the final amount.",
+    "cat": {
+      "MARKETING": "Marketing",
+      "MARKETING_LITE": "Marketing lite",
+      "UTILITY": "Utility",
+      "AUTHENTICATION": "Authentication",
+      "AUTHENTICATION_INTERNATIONAL": "Authentication (international)",
+      "SERVICE": "Service",
+      "REFERRAL_CONVERSION": "Referral conversion"
+    }
   }
 }

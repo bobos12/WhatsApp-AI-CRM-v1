@@ -21,6 +21,7 @@ import { Modal } from '@/components/ui/modal';
 import { useWhatsAppConnection } from './WhatsAppConnectProvider';
 import HealthChecklist from './setup/HealthChecklist';
 import BillingCard from './BillingCard';
+import UsageCard from './UsageCard';
 import SetupWizard from './setup/SetupWizard';
 import { Notice, errorText } from './setup/shared';
 
@@ -116,6 +117,8 @@ export default function WhatsAppLinkPanel(_props: { size?: 'sm' | 'md' }) {
       <HealthChecklist key={healthKey} canManage={canManage} onReconnect={() => setChanging(true)} />
 
       <BillingCard />
+
+      <UsageCard />
 
       {/* Change number — the same wizard as first-time setup, with the saved
           token and secret kept unless the manager pastes new ones. */}

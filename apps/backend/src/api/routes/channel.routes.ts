@@ -408,6 +408,25 @@ router.get('/sending-status', async (req: AuthRequest, res) => {
   }
 });
 
+/** WhatsApp-only spend (per message category) for the billing view. */
+router.get('/usage', checkPermission('read', 'whatsapp'), async (req, res) => {
+  try {
+    requireTenant();
+    const cloud = (await getChannel()).cloud;
+    if (!cloud) throw new HttpError(409, 'WhatsApp is not connected yet.', 'CLOUD_API_NOT_CONFIGURED');
+    const asked = Number(req.query.days);
+    const days = [7, 30, 90].includes(asked) ? asked : 30;
+    const { getUsage } = await import('../../providers/meta/usage');
+    try {
+      res.json(await getUsage(cloud, days));
+    } catch (err) {
+      throw new HttpError(502, asMetaError(err).userMessage, 'USAGE_UNAVAILABLE');
+    }
+  } catch (err) {
+    handle(res, err);
+  }
+});
+
 router.get('/health', checkPermission('read', 'whatsapp'), async (req: AuthRequest, res) => {
   try {
     requireTenant();
