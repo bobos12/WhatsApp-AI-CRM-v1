@@ -26,7 +26,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // the window *is* the app, and every pixel of it goes to the work.
     // Pinned frame: the document never scrolls, only panes inside it, so the
     // bottom nav can't jump. Height still follows --app-h for the keyboard.
-    <div className="fixed inset-x-0 top-0 flex h-[var(--app-h,100dvh)] overflow-hidden overscroll-none bg-canvas text-ink">
+    <div className="fixed inset-x-0 top-[var(--app-top,0px)] flex h-[var(--app-h,100dvh)] overflow-hidden overscroll-none bg-canvas text-ink">
       <ViewportFit />
       <Suspense fallback={null}>
         <NavigationProgress />

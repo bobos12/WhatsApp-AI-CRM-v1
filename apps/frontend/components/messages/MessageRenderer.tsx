@@ -583,7 +583,7 @@ function BodyTextView({ text, isFromMe, trailing }: { text: string; isFromMe: bo
 
   return (
     <div>
-      <div ref={ref} dir="auto" className={`text-[16px] leading-[1.35] md:text-[14.5px] md:leading-[1.4] break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-[12]'}`}>
+      <div ref={ref} dir="auto" className={`text-[17px] leading-[22px] md:text-[14.5px] md:leading-[19px] break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-[12]'}`}>
         {parts.map((part, i) => {
           if (typeof part === 'string') {
             return <span key={i}>{part}</span>;
@@ -841,7 +841,7 @@ function BubbleFooter({ timestamp, status, compatibility, isFromMe, overlay }: {
   return (
     <span
       dir="ltr"
-      className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] leading-none tabular-nums ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-[12px] leading-none tabular-nums md:text-[11px] ${
         overlay ? 'rounded-full bg-black/40 px-1.5 py-1 text-white' : isFromMe ? 'text-[rgb(var(--wa-meta-out))]' : 'text-[rgb(var(--wa-meta-in))]'
       }`}
     >
@@ -1046,7 +1046,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   const mediaOnly = segments.length === 1 && lastSeg?.kind === 'single' && lastSeg.block.type === 'media'
     && (lastSeg.block.media.mediaType === 'image' || lastSeg.block.media.mediaType === 'video') && !lastSeg.block.caption;
   const footer = <BubbleFooter timestamp={timestamp} status={status} compatibility={renderable.compatibility} isFromMe={isFromMe} overlay={mediaOnly} />;
-  const spacer = <span aria-hidden="true" className={`inline-block h-3 align-baseline ${isFromMe ? 'w-[76px]' : 'w-[54px]'}`} />;
+  const spacer = <span aria-hidden="true" className={`inline-block h-3 align-baseline ${isFromMe ? 'w-[82px]' : 'w-[62px]'}`} />;
 
   // The bubble takes its text's direction: the inline timestamp then sits at the
   // end of the last line in Arabic and English alike. The tail corner is
@@ -1055,6 +1055,10 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   const bubbleDir = textDirection(messageText);
   const pageRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
   const tailRight = isFromMe !== pageRtl;
+  // WhatsApp keeps the time at the page's end corner. Text running the other
+  // way (Arabic in an English UI, or vice versa) pushes it onto its own line.
+  const pageDir = pageRtl ? 'rtl' : 'ltr';
+  const inlineTime = endsInText && (!bubbleDir || bubbleDir === pageDir);
   const tail = last ? (tailRight ? 'rounded-br-none md:rounded-br-none' : 'rounded-bl-none md:rounded-bl-none') : '';
   void first;
   const actionBtn = 'flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-3 shadow-soft ring-1 ring-line transition-colors hover:text-ink';
@@ -1063,7 +1067,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
     <div className={`group/msg w-full min-w-0 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
       <div
         ref={containerRef}
-        className={`relative flex min-w-0 max-w-[85%] items-center gap-1.5 md:max-w-[65%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${isFromMe ? 'flex-row-reverse' : ''}`}
+        className={`relative flex min-w-0 max-w-[78%] items-center gap-1.5 md:max-w-[65%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${isFromMe ? 'flex-row-reverse' : ''}`}
         onContextMenu={variant === 'chat' ? (e) => { e.preventDefault(); setShowMenu(true); setPickerOpen(false); } : undefined}
         {...touchHold}
       >
@@ -1120,11 +1124,11 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
           {/* Bubble */}
           <div className="relative w-fit max-w-full">
           {last && (
-            <svg viewBox="0 0 8 13" aria-hidden="true" className={`absolute bottom-0 h-[13px] w-2 drop-shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:drop-shadow-none ${isFromMe ? 'text-bubble-out' : 'text-bubble-in'} ${tailRight ? 'left-full -ml-px' : 'right-full -mr-px -scale-x-100'}`}>
-              <path d="M0 0C0 7.5 2.5 11 8 13H0z" fill="currentColor" />
+            <svg viewBox="0 0 5 11" aria-hidden="true" className={`absolute bottom-0 h-[11px] w-[5px] drop-shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:drop-shadow-none ${isFromMe ? 'text-bubble-out' : 'text-bubble-in'} ${tailRight ? 'left-full -ml-px' : 'right-full -mr-px -scale-x-100'}`}>
+              <path d="M0 0C0 6 1.2 9.4 5 11H0z" fill="currentColor" />
             </svg>
           )}
-          <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-[12px] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:shadow-none md:rounded-[8px] ${mediaOnly ? 'p-[3px]' : 'px-[9px] pb-[7px] pt-[6px]'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
+          <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-[16px] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:shadow-none md:rounded-[8px] ${mediaOnly ? 'p-[3px]' : 'px-[10px] pb-[6px] pt-[6px] md:px-[9px]'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
             {/* Menu chevron for mouse users, on hover. Touch screens use press-and-hold
                 instead — a chevron on every bubble covered text and timestamps. */}
             {variant === 'chat' && (
@@ -1145,7 +1149,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
                   return <ButtonsView key={i} blocks={seg.blocks as any} isFromMe={isFromMe} />;
                 }
                 const isLast = i === contentSegs.length - 1;
-                return <BlockRenderer key={i} block={seg.block} isFromMe={isFromMe} trailing={isLast && endsInText ? spacer : undefined} />;
+                return <BlockRenderer key={i} block={seg.block} isFromMe={isFromMe} trailing={isLast && inlineTime ? spacer : undefined} />;
               })}
             </div>
 
@@ -1156,9 +1160,9 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
               </div>
             )}
 
-            {(endsInText && !trailingButtons) || mediaOnly
-              ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-[6px] end-[9px]'}`}>{footer}</span>
-              : <div className={`flex justify-end ${endsInText ? '-mt-4' : 'mt-1'}`}>{footer}</div>}
+            {(inlineTime && !trailingButtons) || mediaOnly
+              ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-[6px] end-[10px] md:end-[9px]'}`}>{footer}</span>
+              : <div dir={pageDir} className={`flex justify-end ${inlineTime ? '-mt-4' : 'mt-0.5'}`}>{footer}</div>}
 
             {/* Template buttons hang below the time, as WhatsApp draws them. */}
             {trailingButtons && lastSeg?.kind === 'buttons' && (

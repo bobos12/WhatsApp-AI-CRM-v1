@@ -22,9 +22,15 @@ export default function ViewportFit() {
     const sync = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        root.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
         // Undo iOS's "scroll the page to the input" — the shell already fits.
         if (window.scrollY !== 0 && vv.height < window.innerHeight) window.scrollTo(0, 0);
+        root.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
+        // iOS also pans the visible area down by the keyboard's height without
+        // scrolling the page, which left the (shrunken, top-pinned) shell above
+        // the screen — a blank view. Follow the pan so the shell stays on screen.
+        root.style.setProperty('--app-top', `${Math.max(0, Math.round(vv.offsetTop))}px`);
+        // Keyboard up: the home-indicator inset no longer applies under the composer.
+        root.classList.toggle('kb-open', window.innerHeight - vv.height > 120);
       });
     };
 
@@ -38,6 +44,8 @@ export default function ViewportFit() {
       vv.removeEventListener('scroll', sync);
       window.removeEventListener('orientationchange', sync);
       root.style.removeProperty('--app-h');
+      root.style.removeProperty('--app-top');
+      root.classList.remove('kb-open');
     };
   }, []);
 

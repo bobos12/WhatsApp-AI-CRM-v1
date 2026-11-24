@@ -528,9 +528,9 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   }, [conversation?.contact?.id, conversation?.contact?.name]);
 
   useEffect(() => {
-    if (isAtBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
+    // Scroll the pane itself — scrollIntoView also scrolls the page on iOS.
+    const el = scrollContainerRef.current;
+    if (isAtBottomRef.current && el) el.scrollTop = el.scrollHeight;
     // isScrolledToBottom intentionally excluded: we only auto-scroll when messages
     // arrive, not when the user manually scrolls to the bottom.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -549,16 +549,21 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     };
     el.addEventListener('load', keepPinned, true);
     el.addEventListener('loadedmetadata', keepPinned, true);
+    // The keyboard shrinks the pane: stay on the newest message, as WhatsApp does.
+    const ro = new ResizeObserver(keepPinned);
+    ro.observe(el);
     return () => {
       el.removeEventListener('load', keepPinned, true);
       el.removeEventListener('loadedmetadata', keepPinned, true);
+      ro.disconnect();
     };
     // Re-attach once the message list exists (it isn't rendered while loading).
   }, [conversationId, hasConversation]);
 
   const scrollToBottom = useCallback(() => {
     isAtBottomRef.current = true;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = scrollContainerRef.current;
+    el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     setIsScrolledToBottom(true);
     setUnreadWhileScrolled(0);
   }, []);
@@ -1391,7 +1396,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
           <div className="chat-doodle pointer-events-none absolute inset-0" aria-hidden="true" />
           <div
             ref={scrollContainerRef}
-            className="relative h-full overflow-y-auto overflow-x-hidden px-3 pb-2 pt-2 sm:px-[5%] xl:px-[7%]"
+            className="relative h-full overflow-y-auto overflow-x-hidden px-[14px] pb-2 pt-2 sm:px-[5%] xl:px-[7%]"
             onScroll={() => {
               const el = scrollContainerRef.current;
               if (!el) return;
@@ -1454,7 +1459,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                           </span>
                         </div>
                       )}
-                      <div className={`${String(msg.id).startsWith('optimistic-') ? 'pop-enter' : ''} w-full ${isGrouped ? 'mt-[2px]' : 'mt-2.5'}`}>
+                      <div className={`${String(msg.id).startsWith('optimistic-') ? 'pop-enter' : ''} w-full ${isGrouped ? 'mt-1 md:mt-[2px]' : 'mt-[14px] md:mt-2.5'}`}>
                         <MessageBubble
                           message={msg as any}
                           conversationId={conversationId ?? undefined}
@@ -1506,7 +1511,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
         </div>
 
         {/* Composer */}
-        <footer className="relative z-10 shrink-0 border-t border-black/[0.06] bg-[rgb(var(--wa-bar))] px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 dark:border-transparent sm:px-3">
+        <footer className="kb-tight relative z-10 shrink-0 border-t border-black/[0.06] bg-[rgb(var(--wa-bar))] px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 dark:border-transparent sm:px-3">
           {(peerTyping || sendError || recordingError || replyTo || attachment || recordedAudio || isRecording || slashMatches.length > 0) && (
             <div className="mb-2 space-y-2">
               {peerTyping && (

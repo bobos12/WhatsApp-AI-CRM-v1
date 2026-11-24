@@ -1166,6 +1166,8 @@ html.pwa-standalone .select-text * {
 .ps-safe { padding-inline-start: env(safe-area-inset-left); }
 .pe-safe { padding-inline-end: env(safe-area-inset-right); }
 .min-h-dvh { min-height: 100dvh; }
+/* Keyboard open (ViewportFit): the composer sits on the keyboard, not the home indicator. */
+html.kb-open .kb-tight { padding-bottom: 0.5rem; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    LAUNCH / SPLASH SCREEN — installed app only, on cold start.
