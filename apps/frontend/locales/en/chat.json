@@ -41,7 +41,7 @@
     "replyingTo": "Replying to {{name}}"
   },
   "composer": {
-    "placeholder": "Type a message...",
+    "placeholder": "Message",
     "typeSomething": "Type something...",
     "sendMessage": "Send message",
     "attachFile": "Attach file",
@@ -283,7 +283,7 @@
     }
   },
   "list": {
-    "inbox": "Inbox",
+    "inbox": "Chats",
     "all": "All",
     "unread": "Unread",
     "mine": "Mine",
@@ -304,7 +304,8 @@
     "snoozedUntil": "Snoozed · {{time}}",
     "noMatch": "No chats match",
     "noMatchSub": "Try another filter or clear the search.",
-    "chatOptions": "Chat options"
+    "chatOptions": "Chat options",
+    "search": "Search"
   },
   "header": {
     "resolve": "Resolve",
@@ -316,7 +317,8 @@
     "aiGlobalOn": "AI replying",
     "aiGlobalOff": "AI paused",
     "assignedTo": "Assigned to {{name}}",
-    "more": "More"
+    "more": "More",
+    "tapForInfo": "tap for contact info"
   },
   "panel": {
     "conversation": "Conversation",

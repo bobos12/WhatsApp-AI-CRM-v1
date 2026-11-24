@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   Mic,
+  Camera,
   Square,
   Image as ImageIcon,
   FileText,
@@ -1245,7 +1246,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   if (!conversation) {
     return (
       <div dir={dir} className="relative flex h-full w-full min-w-0 flex-col bg-chat">
-        <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+        <div className="flex h-[60px] shrink-0 items-center gap-3 bg-[rgb(var(--wa-header))] px-4">
           <Skeleton className="h-10 w-10 rounded-full" />
           <div className="space-y-2"><Skeleton className="h-3 w-36 rounded" /><Skeleton className="h-2.5 w-24 rounded" /></div>
         </div>
@@ -1296,95 +1297,93 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
   };
 
   const iconBtn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-raised hover:text-ink';
+  const glassBtn = 'press flex shrink-0 items-center justify-center rounded-full bg-[rgb(var(--wa-glass))] text-ink transition-opacity hover:opacity-80';
+  const pillBtn = 'press flex h-9 w-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-black/5 disabled:opacity-60 dark:hover:bg-white/5';
+  // WhatsApp composer icons: plain glyphs in the ink colour, no chrome.
+  const barBtn = 'press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink transition-colors hover:bg-black/5 dark:hover:bg-white/5';
 
   return (
     <div dir={dir} className="relative flex h-full w-full min-w-0 overflow-hidden bg-chat">
       {/* ===== MAIN CHAT AREA ===== */}
       <div className="relative flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <header className="relative z-20 box-content flex h-[60px] shrink-0 items-center gap-1.5 border-b border-line bg-surface px-2 pt-safe sm:gap-2 sm:px-3">
+        <header className="relative z-20 box-content flex h-[60px] shrink-0 items-center gap-2 border-b border-black/[0.06] bg-[rgb(var(--wa-header))] px-2 pt-safe dark:border-transparent sm:px-3">
           {onBack && (
-            <button type="button" onClick={onBack} className={`${iconBtn} md:hidden`} aria-label={t('common:actions.back', 'Back')}>
-              <ArrowLeft className="h-5 w-5 icon-mirror" />
+            <button type="button" onClick={onBack} className={`${glassBtn} h-10 w-10 md:hidden`} aria-label={t('common:actions.back', 'Back')}>
+              <ChevronLeft className="h-6 w-6 icon-mirror" strokeWidth={2.25} />
             </button>
           )}
           <button
             type="button"
             onClick={() => setShowRightPanel((v) => !v)}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-start transition-colors hover:bg-raised/60"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-1 text-start"
             title={t('header.details')}
           >
-            <div className="relative shrink-0">
-              <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={40} />
-              <span className={`absolute -bottom-0.5 -end-0.5 h-3 w-3 rounded-full ring-2 ring-surface ${
-                statusLabel === 'open' ? 'bg-brand' : statusLabel === 'pending' ? 'bg-amber-400' : 'bg-ink-4'
-              }`} aria-hidden="true" />
-            </div>
+            <Avatar src={contactAvatar} name={contactName} contactId={contactId} size={38} silhouette />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink"><bdi>{contactName}</bdi></h3>
+                <h3 className="truncate text-[16px] font-semibold leading-5 text-ink"><bdi>{contactName}</bdi></h3>
                 {!isOpen && <span className="chip chip-neutral shrink-0">{t(`details.statusOptions.${conversation.status}`, { defaultValue: conversation.status })}</span>}
               </div>
               {peerTyping ? (
-                <p className="flex items-center gap-1 text-xs font-medium text-brand">{t('window.typing')}</p>
+                <p className="truncate text-[13px] leading-4 text-[rgb(var(--wa-badge))]">{t('window.typing')}</p>
               ) : (
-                // The number is its own left-to-right run: in one mixed string the
-                // Arabic layout reorders "+20 111…" into "…111 20+".
-                <p className="truncate text-xs text-ink-3">
-                  {contactPhone && <span dir="ltr">{contactPhone}</span>}
-                  {contactPhone && assignee && ' · '}
-                  {assignee && <bdi>{t('header.assignedTo', { name: assignee })}</bdi>}
-                </p>
+                <>
+                  <p className="truncate text-[13px] leading-4 text-ink-3 md:hidden">{t('header.tapForInfo')}</p>
+                  {/* The number is its own left-to-right run: in one mixed string the
+                      Arabic layout reorders "+20 111…" into "…111 20+". */}
+                  <p className="hidden truncate text-[13px] leading-4 text-ink-3 md:block">
+                    {contactPhone && <span dir="ltr">{contactPhone}</span>}
+                    {contactPhone && assignee && ' · '}
+                    {assignee && <bdi>{t('header.assignedTo', { name: assignee })}</bdi>}
+                  </p>
+                </>
               )}
             </div>
           </button>
 
-          {headerBot && (
+          {/* CRM actions in one glass pill, where WhatsApp keeps video/voice call. */}
+          <div className="flex h-10 shrink-0 items-center rounded-full bg-[rgb(var(--wa-glass))] px-1">
+            {headerBot && (
+              <button
+                type="button"
+                disabled={headerBot.busy}
+                onClick={headerBot.toggle}
+                title={`${headerBot.label} — ${headerBot.title}`}
+                aria-label={headerBot.label}
+                aria-pressed={headerBot.on}
+                className={`${pillBtn} relative ${headerBot.on ? 'text-[rgb(var(--wa-badge))]' : 'text-ink-3'}`}
+              >
+                <Bot className="h-[21px] w-[21px]" aria-hidden="true" />
+                <span className={`absolute end-2 top-1.5 h-2 w-2 rounded-full ring-2 ring-[rgb(var(--wa-glass))] transition-colors ${headerBot.on ? 'bg-[rgb(var(--wa-badge))]' : 'bg-ink-4'}`} aria-hidden="true" />
+              </button>
+            )}
+            {!conversation?.contact?.name && (
+              <button type="button" onClick={() => setShowSaveContactModal(true)} className={`${pillBtn} hidden sm:flex`} title={t('details.saveContactBtn')} aria-label={t('details.saveContactBtn')}>
+                <UserPlus className="h-[21px] w-[21px]" aria-hidden="true" />
+              </button>
+            )}
+            {/* One-click resolve: the most common way a conversation ends. */}
             <button
               type="button"
-              disabled={headerBot.busy}
-              onClick={headerBot.toggle}
-              title={headerBot.title}
-              className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-full border px-2.5 text-xs font-medium transition-colors disabled:opacity-60 ${
-                headerBot.on ? 'border-brand/30 bg-brand/10 text-brand' : 'border-line bg-surface text-ink-3 hover:text-ink'
-              }`}
+              onClick={() => handleStatusChange(resolved ? 'OPEN' : 'RESOLVED')}
+              className={pillBtn}
+              title={resolved ? t('header.reopen') : t('header.resolve')}
+              aria-label={resolved ? t('header.reopen') : t('header.resolve')}
             >
-              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="hidden lg:inline">{headerBot.label}</span>
-              <span className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${headerBot.on ? 'bg-brand' : 'bg-line-strong'}`} aria-hidden="true">
-                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow transition-transform duration-base ease-spring ${headerBot.on ? 'translate-x-3 rtl:-translate-x-3' : 'translate-x-0.5 rtl:-translate-x-0.5'}`} />
-              </span>
+              {resolved ? <RotateCcw className="h-[20px] w-[20px]" aria-hidden="true" /> : <CheckCheck className="h-[21px] w-[21px]" aria-hidden="true" />}
             </button>
-          )}
-
-          {!conversation?.contact?.name && (
-            <button type="button" onClick={() => setShowSaveContactModal(true)} className="btn btn-secondary btn-sm hidden sm:inline-flex">
-              <UserPlus aria-hidden="true" />
-              {t('details.saveContactBtn')}
+            <button
+              type="button"
+              onClick={() => setShowRightPanel((v) => !v)}
+              className={`${pillBtn} hidden md:flex ${showRightPanel ? 'text-[rgb(var(--wa-badge))]' : ''}`}
+              aria-label={t('header.details')}
+              aria-pressed={showRightPanel}
+              title={t('header.details')}
+            >
+              <PanelRight className="h-[20px] w-[20px] icon-mirror" />
             </button>
-          )}
-
-          {/* One-click resolve: the most common way a conversation ends. */}
-          <button
-            type="button"
-            onClick={() => handleStatusChange(resolved ? 'OPEN' : 'RESOLVED')}
-            className={`btn btn-sm shrink-0 ${resolved ? 'btn-secondary' : 'btn-secondary'}`}
-            title={resolved ? t('header.reopen') : t('header.resolve')}
-          >
-            {resolved ? <RotateCcw aria-hidden="true" /> : <CheckCheck aria-hidden="true" />}
-            <span className="hidden sm:inline">{resolved ? t('header.reopen') : t('header.resolve')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowRightPanel((v) => !v)}
-            className={`${iconBtn} ${showRightPanel ? 'bg-raised text-ink' : ''}`}
-            aria-label={t('header.details')}
-            aria-pressed={showRightPanel}
-            title={t('header.details')}
-          >
-            <PanelRight className="h-[18px] w-[18px] icon-mirror" />
-          </button>
+          </div>
         </header>
 
         {/* Messages */}
@@ -1392,7 +1391,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
           <div className="chat-doodle pointer-events-none absolute inset-0" aria-hidden="true" />
           <div
             ref={scrollContainerRef}
-            className="relative h-full overflow-y-auto overflow-x-hidden px-3 pb-3 pt-3 sm:px-[5%] xl:px-[8%]"
+            className="relative h-full overflow-y-auto overflow-x-hidden px-3 pb-2 pt-2 sm:px-[5%] xl:px-[7%]"
             onScroll={() => {
               const el = scrollContainerRef.current;
               if (!el) return;
@@ -1430,6 +1429,12 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                   // Runs from one sender within 2 minutes stack tightly; only the first gets the tail.
                   const isGrouped = !!prev && sameSender && !showDateSeparator &&
                     (msgDate.getTime() - new Date(prev.timestamp).getTime() < 120000);
+                  // WhatsApp (iOS) draws the tail on the LAST bubble of a run.
+                  const next = messages[idx + 1];
+                  const nextDate = next ? new Date(next.timestamp) : null;
+                  const isLastOfRun = !next || next.fromMe !== msg.fromMe || !nextDate
+                    || nextDate.toDateString() !== msgDate.toDateString()
+                    || nextDate.getTime() - msgDate.getTime() >= 120000;
 
                   const dateLabel = (() => {
                     const today = new Date();
@@ -1443,17 +1448,18 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                   return (
                     <div key={msg.id}>
                       {showDateSeparator && (
-                        <div className="sticky top-1 z-[5] my-3 flex justify-center">
-                          <span className="rounded-md bg-surface px-2.5 py-1 text-2xs font-medium text-ink-3 shadow-soft">
+                        <div className="sticky top-2 z-[5] my-3 flex justify-center">
+                          <span className="rounded-lg bg-[rgb(var(--wa-date))] px-3 py-1 text-[12.5px] font-medium text-ink-3 shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:shadow-none">
                             {dateLabel}
                           </span>
                         </div>
                       )}
-                      <div className={`${String(msg.id).startsWith('optimistic-') ? 'pop-enter' : ''} w-full ${isGrouped ? 'mt-0.5' : 'mt-2'}`}>
+                      <div className={`${String(msg.id).startsWith('optimistic-') ? 'pop-enter' : ''} w-full ${isGrouped ? 'mt-[2px]' : 'mt-2.5'}`}>
                         <MessageBubble
                           message={msg as any}
                           conversationId={conversationId ?? undefined}
                           first={!isGrouped}
+                          last={isLastOfRun}
                           onReactionUpdate={(messageId, reactions) => {
                             setConversation((prev) => {
                               if (!prev) return prev;
@@ -1486,11 +1492,11 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
             <button
               type="button"
               onClick={scrollToBottom}
-              className="pop-enter absolute bottom-4 end-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink-3 shadow-pop transition-colors hover:text-ink"
+              className="pop-enter absolute bottom-4 end-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--wa-date))] text-ink-3 shadow-[0_1px_3px_rgb(11_20_26/0.25)] transition-colors hover:text-ink"
               aria-label={t('window.scrollToBottom')}
             >
               {unreadWhileScrolled > 0 && (
-                <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold tabular-nums text-brand-fg">
+                <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(var(--wa-badge))] px-1.5 text-[11px] font-semibold tabular-nums text-[rgb(var(--wa-badge-ink))]">
                   {unreadWhileScrolled > 99 ? '99+' : unreadWhileScrolled}
                 </span>
               )}
@@ -1500,7 +1506,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
         </div>
 
         {/* Composer */}
-        <footer className="relative z-10 shrink-0 border-t border-line bg-surface px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-3">
+        <footer className="relative z-10 shrink-0 border-t border-black/[0.06] bg-[rgb(var(--wa-bar))] px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 dark:border-transparent sm:px-3">
           {(peerTyping || sendError || recordingError || replyTo || attachment || recordedAudio || isRecording || slashMatches.length > 0) && (
             <div className="mb-2 space-y-2">
               {peerTyping && (
@@ -1586,35 +1592,16 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
             </div>
           )}
 
-          <div className="flex items-end gap-1">
-            <div className="relative" ref={emojiBarRef}>
-              <button
-                ref={emojiButtonRef}
-                onClick={() => setShowEmojiBar((v) => !v)}
-                className={`${iconBtn} h-10 w-10 ${showEmojiBar ? 'bg-raised text-ink' : ''}`}
-                type="button"
-                aria-label={t('composer.pickEmoji')}
-              >
-                <Smile className="h-[22px] w-[22px]" />
-              </button>
-              {showEmojiBar && (
-                <EmojiPicker
-                  anchorRef={emojiButtonRef}
-                  onSelect={(emoji) => { insertEmoji(emoji); }}
-                  onClose={() => setShowEmojiBar(false)}
-                />
-              )}
-            </div>
-
+          <div className="flex items-end gap-0.5 sm:gap-1">
             <div className="relative" ref={attachmentMenuRef}>
               <button
                 onClick={() => setShowAttachmentMenu((v) => !v)}
-                className={`${iconBtn} h-10 w-10 ${showAttachmentMenu ? 'bg-raised text-ink' : ''}`}
+                className={barBtn}
                 type="button"
                 aria-label={t('composer.attachFile')}
                 aria-expanded={showAttachmentMenu}
               >
-                <Plus className={`h-[22px] w-[22px] transition-transform duration-base ease-out ${showAttachmentMenu ? 'rotate-45' : ''}`} />
+                <Plus className={`h-[26px] w-[26px] transition-transform duration-base ease-out ${showAttachmentMenu ? 'rotate-45' : ''}`} strokeWidth={1.75} />
               </button>
               <input ref={fileInputRef} type="file" onChange={handleAttachmentChange} className="hidden" />
               {showAttachmentMenu && (
@@ -1644,7 +1631,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                 <button
                   type="button"
                   onClick={() => setShowTemplatePicker((v) => !v)}
-                  className={`${iconBtn} h-10 w-10 ${showTemplatePicker ? 'bg-raised text-ink' : ''}`}
+                  className={barBtn}
                   title={t('composer.insertTemplate')}
                   aria-label={t('composer.insertTemplate')}
                 >
@@ -1760,7 +1747,7 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               </div>
             )}
 
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <textarea
                 ref={textareaRef}
                 value={message}
@@ -1768,11 +1755,30 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
                 onKeyDown={onComposerKeyDown}
                 placeholder={t('composer.placeholder')}
                 dir="auto"
-                className="block max-h-[140px] min-h-[40px] w-full resize-none rounded-[20px] border border-transparent bg-raised px-4 py-2.5 text-[14.5px] leading-5 text-ink outline-none transition-[border-color,box-shadow,background-color] placeholder:text-ink-4 focus:border-line focus:bg-surface focus:ring-[3px] focus:ring-brand/10"
+                className="block max-h-[140px] min-h-[40px] w-full resize-none rounded-[20px] border border-black/[0.08] bg-[rgb(var(--wa-input))] py-[9px] pe-11 ps-4 text-[16px] leading-5 text-ink outline-none placeholder:text-ink-3 dark:border-transparent md:text-[15px]"
                 rows={1}
               />
+              {/* Emoji sits inside the field, where WhatsApp keeps its sticker button. */}
+              <div className="absolute bottom-0 end-0" ref={emojiBarRef}>
+                <button
+                  ref={emojiButtonRef}
+                  onClick={() => setShowEmojiBar((v) => !v)}
+                  className={`flex h-10 w-11 items-center justify-center rounded-full transition-colors ${showEmojiBar ? 'text-[rgb(var(--wa-badge))]' : 'text-ink-3 hover:text-ink'}`}
+                  type="button"
+                  aria-label={t('composer.pickEmoji')}
+                >
+                  <Smile className="h-[22px] w-[22px]" strokeWidth={1.75} />
+                </button>
+                {showEmojiBar && (
+                  <EmojiPicker
+                    anchorRef={emojiButtonRef}
+                    onSelect={(emoji) => { insertEmoji(emoji); }}
+                    onClose={() => setShowEmojiBar(false)}
+                  />
+                )}
+              </div>
               {typingHint && (
-                <span className="pointer-events-none absolute bottom-2.5 end-3 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
+                <span className="pointer-events-none absolute bottom-2.5 end-11 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
                   {typingHint}
                 </span>
               )}
@@ -1782,23 +1788,36 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
               <button
                 onClick={sendMessage}
                 disabled={isSending}
-                className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg shadow-brand transition-colors hover:bg-brand-strong disabled:opacity-70"
+                className="press ms-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg transition-colors hover:bg-brand-strong disabled:opacity-70"
                 type="button"
                 aria-label={t('composer.sendMessage')}
               >
-                {isSending ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Send className="h-[18px] w-[18px] icon-mirror" />}
+                {isSending ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Send className="h-[19px] w-[19px] icon-mirror" fill="currentColor" />}
               </button>
             ) : (
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`press flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-                  isRecording ? 'bg-red-500 text-white' : 'text-ink-3 hover:bg-raised hover:text-ink'
-                }`}
-                type="button"
-                aria-label={isRecording ? t('composer.stopRecording') : t('composer.recordVoice')}
-              >
-                {isRecording ? <Square className="h-[16px] w-[16px]" fill="currentColor" /> : <Mic className="h-[22px] w-[22px]" />}
-              </button>
+              <>
+                {!isRecording && (
+                  <button
+                    type="button"
+                    onClick={() => openAttachmentPicker('image/*,video/*')}
+                    className={barBtn}
+                    aria-label={t('composer.attachPhoto')}
+                    title={t('composer.attachPhoto')}
+                  >
+                    <Camera className="h-[24px] w-[24px]" strokeWidth={1.75} />
+                  </button>
+                )}
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`press ms-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    isRecording ? 'bg-red-500 text-white' : 'bg-[rgb(var(--wa-mic))] text-[rgb(var(--wa-mic-ink))] hover:opacity-90'
+                  }`}
+                  type="button"
+                  aria-label={isRecording ? t('composer.stopRecording') : t('composer.recordVoice')}
+                >
+                  {isRecording ? <Square className="h-[16px] w-[16px]" fill="currentColor" /> : <Mic className="h-[21px] w-[21px]" strokeWidth={2} />}
+                </button>
+              </>
             )}
           </div>
         </footer>

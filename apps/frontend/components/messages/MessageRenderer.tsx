@@ -232,30 +232,31 @@ function StatusTick({ status }: { status: MessageStatus }) {
   if (status === 'failed') {
     return <span className="text-red-500 text-xs leading-none" title="Failed">⚠</span>;
   }
-  if (status === 'queued' || status === 'sending') {
-    return <span className="text-gray-400 text-xs leading-none" title="Sending">🕒</span>;
-  }
-  if (status === 'expired') {
-    return <span className="text-red-400 text-xs leading-none" title="Expired">🕒</span>;
+  if (status === 'queued' || status === 'sending' || status === 'expired') {
+    // WhatsApp's pending clock, drawn in the timestamp colour.
+    return (
+      <svg viewBox="0 0 16 16" className={`h-3 w-3 shrink-0 ${status === 'expired' ? 'text-red-400' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-label={status === 'expired' ? 'Expired' : 'Sending'}>
+        <circle cx="8" cy="8" r="6.25" /><path d="M8 4.5V8l2.25 1.5" />
+      </svg>
+    );
   }
   if (status === 'provider_accepted') {
     return (
-      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-ink-4" fill="currentColor" aria-label="Sent">
+      <svg viewBox="0 0 16 11" className="h-[11px] w-auto shrink-0" fill="currentColor" aria-label="Sent">
         <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
       </svg>
     );
   }
   if (status === 'server_confirmed') {
     return (
-      <svg viewBox="0 0 16 11" className="h-3 w-3 shrink-0 text-ink-3" fill="currentColor" aria-label="Confirmed">
+      <svg viewBox="0 0 16 11" className="h-[11px] w-auto shrink-0" fill="currentColor" aria-label="Confirmed">
         <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
       </svg>
     );
   }
   const isRead = status === 'read';
-  const color = isRead ? '#34B7F1' : 'currentColor';
   return (
-    <svg viewBox="0 0 20 11" className="h-3 w-auto shrink-0" fill={color} aria-label={isRead ? 'Read' : 'Delivered'}>
+    <svg viewBox="0 0 20 11" className={`h-[11px] w-auto shrink-0 ${isRead ? 'text-[rgb(var(--wa-tick))]' : ''}`} fill="currentColor" aria-label={isRead ? 'Read' : 'Delivered'}>
       <path d="M15.071.653a.75.75 0 0 1 .025 1.06L9.196 8.1 7.12 6.079a.75.75 0 1 0-1.06 1.072L8.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
       <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
     </svg>
@@ -331,8 +332,8 @@ function VoiceNotePlayer({ src, duration, isFromMe }: { src: string; duration?: 
 
 function ReplyQuoteView({ block, isFromMe }: { block: { preview: string; kind: MessageKind }; isFromMe: boolean }) {
   return (
-    <div className={`mb-1 rounded-md border-s-[3px] px-2 py-1 text-xs ${isFromMe ? 'border-brand/60 bg-black/[0.05] dark:bg-black/20' : 'border-brand bg-black/[0.04] dark:bg-white/[0.05]'}`}>
-      <p className="truncate text-ink-2">{block.preview || '(message)'}</p>
+    <div className={`-mx-[3px] mb-1 rounded-[7px] border-s-4 border-[#06A77D] px-2.5 py-1.5 text-[13.5px] leading-[1.3] dark:border-[#06CF9C] ${isFromMe ? 'bg-[rgb(var(--wa-quote-out))]' : 'bg-[rgb(var(--wa-quote-in))]'}`}>
+      <p className="line-clamp-3 text-ink-3">{block.preview || '(message)'}</p>
     </div>
   );
 }
@@ -582,7 +583,7 @@ function BodyTextView({ text, isFromMe, trailing }: { text: string; isFromMe: bo
 
   return (
     <div>
-      <div ref={ref} dir="auto" className={`text-[14px] leading-[1.45] break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-[12]'}`}>
+      <div ref={ref} dir="auto" className={`text-[16px] leading-[1.35] md:text-[14.5px] md:leading-[1.4] break-words whitespace-pre-wrap [overflow-wrap:anywhere] [word-break:break-word] ${expanded ? '' : 'line-clamp-[12]'}`}>
         {parts.map((part, i) => {
           if (typeof part === 'string') {
             return <span key={i}>{part}</span>;
@@ -593,7 +594,7 @@ function BodyTextView({ text, isFromMe, trailing }: { text: string; isFromMe: bo
               href={part.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sky-700 underline decoration-sky-700/30 underline-offset-2 transition-colors hover:decoration-sky-700 dark:text-sky-300 dark:decoration-sky-300/30"
+              className="text-[#027EB5] underline underline-offset-2 dark:text-[#53BDEB]"
             >
               {part.text}
             </a>
@@ -841,7 +842,7 @@ function BubbleFooter({ timestamp, status, compatibility, isFromMe, overlay }: {
     <span
       dir="ltr"
       className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] leading-none tabular-nums ${
-        overlay ? 'rounded-full bg-black/40 px-1.5 py-1 text-white' : 'text-ink-3'
+        overlay ? 'rounded-full bg-black/40 px-1.5 py-1 text-white' : isFromMe ? 'text-[rgb(var(--wa-meta-out))]' : 'text-[rgb(var(--wa-meta-in))]'
       }`}
     >
       {showDowngradeBadge && <span className="opacity-60" title="Sent as text fallback">📝</span>}
@@ -869,7 +870,7 @@ function ReactionPills({ grouped, isFromMe, onReact }: {
           key={emoji}
           type="button"
           onClick={() => onReact(emoji)}
-          className="pop-enter flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-xs shadow-soft ring-1 ring-line transition-transform hover:scale-105"
+          className="pop-enter flex items-center gap-0.5 rounded-full bg-[rgb(var(--wa-date))] px-1.5 py-0.5 text-[13px] ring-2 ring-[rgb(var(--chat-bg))] transition-transform hover:scale-105"
           title={t('message.reactWith', { emoji })}
         >
           <span>{emoji}</span>
@@ -889,11 +890,13 @@ export interface MessageRendererProps {
   onDelete?: (messageId: string) => void;
   onForward?: (message: MessageDTO) => void;
   variant?: 'chat' | 'preview';
-  /** First bubble of a run from the same sender — gets the tail corner. */
+  /** First bubble of a run from the same sender. */
   first?: boolean;
+  /** Last bubble of a run — carries the tail, as on WhatsApp for iOS. */
+  last?: boolean;
 }
 
-export function MessageRenderer({ message, reactions: reactionsProp = [], conversationId, onReactionUpdate, onReply, onDelete, onForward, variant = 'chat', first = true }: MessageRendererProps) {
+export function MessageRenderer({ message, reactions: reactionsProp = [], conversationId, onReactionUpdate, onReply, onDelete, onForward, variant = 'chat', first = true, last = true }: MessageRendererProps) {
   const { t } = useTranslation('chat');
   const isFromMe = message.direction === 'outbound';
   const { renderable, status, timestamp } = message;
@@ -1043,7 +1046,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   const mediaOnly = segments.length === 1 && lastSeg?.kind === 'single' && lastSeg.block.type === 'media'
     && (lastSeg.block.media.mediaType === 'image' || lastSeg.block.media.mediaType === 'video') && !lastSeg.block.caption;
   const footer = <BubbleFooter timestamp={timestamp} status={status} compatibility={renderable.compatibility} isFromMe={isFromMe} overlay={mediaOnly} />;
-  const spacer = <span aria-hidden="true" className={`inline-block h-3 align-baseline ${isFromMe ? 'w-[74px]' : 'w-[50px]'}`} />;
+  const spacer = <span aria-hidden="true" className={`inline-block h-3 align-baseline ${isFromMe ? 'w-[76px]' : 'w-[54px]'}`} />;
 
   // The bubble takes its text's direction: the inline timestamp then sits at the
   // end of the last line in Arabic and English alike. The tail corner is
@@ -1052,14 +1055,15 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
   const bubbleDir = textDirection(messageText);
   const pageRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
   const tailRight = isFromMe !== pageRtl;
-  const tail = first ? (tailRight ? 'rounded-tr-[4px]' : 'rounded-tl-[4px]') : '';
+  const tail = last ? (tailRight ? 'rounded-br-none md:rounded-br-none' : 'rounded-bl-none md:rounded-bl-none') : '';
+  void first;
   const actionBtn = 'flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-3 shadow-soft ring-1 ring-line transition-colors hover:text-ink';
 
   return (
     <div className={`group/msg w-full min-w-0 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
       <div
         ref={containerRef}
-        className={`relative flex min-w-0 max-w-[88%] items-center gap-1.5 sm:max-w-[70%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${isFromMe ? 'flex-row-reverse' : ''}`}
+        className={`relative flex min-w-0 max-w-[85%] items-center gap-1.5 md:max-w-[65%] [@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none] ${isFromMe ? 'flex-row-reverse' : ''}`}
         onContextMenu={variant === 'chat' ? (e) => { e.preventDefault(); setShowMenu(true); setPickerOpen(false); } : undefined}
         {...touchHold}
       >
@@ -1114,7 +1118,13 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
           )}
 
           {/* Bubble */}
-          <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-lg shadow-[0_1px_0.5px_rgb(11_20_16/0.10)] ${mediaOnly ? 'p-1' : 'px-2.5 pb-1.5 pt-1.5'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
+          <div className="relative w-fit max-w-full">
+          {last && (
+            <svg viewBox="0 0 8 13" aria-hidden="true" className={`absolute bottom-0 h-[13px] w-2 drop-shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:drop-shadow-none ${isFromMe ? 'text-bubble-out' : 'text-bubble-in'} ${tailRight ? 'left-full -ml-px' : 'right-full -mr-px -scale-x-100'}`}>
+              <path d="M0 0C0 7.5 2.5 11 8 13H0z" fill="currentColor" />
+            </svg>
+          )}
+          <div dir={bubbleDir} className={`relative w-fit max-w-full overflow-hidden rounded-[12px] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)] dark:shadow-none md:rounded-[8px] ${mediaOnly ? 'p-[3px]' : 'px-[9px] pb-[7px] pt-[6px]'} ${bubbleTone} ${tail} ${segments.some(s => s.kind === 'buttons') ? 'min-w-[220px]' : ''}`}>
             {/* Menu chevron for mouse users, on hover. Touch screens use press-and-hold
                 instead — a chevron on every bubble covered text and timestamps. */}
             {variant === 'chat' && (
@@ -1147,15 +1157,16 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
             )}
 
             {(endsInText && !trailingButtons) || mediaOnly
-              ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-1.5 end-2.5'}`}>{footer}</span>
+              ? <span className={`absolute ${mediaOnly ? 'bottom-2 end-2' : 'bottom-[6px] end-[9px]'}`}>{footer}</span>
               : <div className={`flex justify-end ${endsInText ? '-mt-4' : 'mt-1'}`}>{footer}</div>}
 
             {/* Template buttons hang below the time, as WhatsApp draws them. */}
             {trailingButtons && lastSeg?.kind === 'buttons' && (
-              <div className="-mx-2.5 -mb-1.5 mt-1">
+              <div className="-mx-[9px] -mb-[7px] mt-1">
                 <ButtonsView blocks={lastSeg.blocks as any} isFromMe={isFromMe} />
               </div>
             )}
+          </div>
           </div>
 
           {/* Reaction pills — hang off the bottom edge, as on WhatsApp */}
@@ -1248,9 +1259,10 @@ interface LegacyMessageBubbleProps {
   onDelete?: (messageId: string) => void;
   onForward?: (message: any) => void;
   first?: boolean;
+  last?: boolean;
 }
 
-export function LegacyMessageBubble({ message, conversationId, onReactionUpdate, onReply, onDelete, onForward, first }: LegacyMessageBubbleProps) {
+export function LegacyMessageBubble({ message, conversationId, onReactionUpdate, onReply, onDelete, onForward, first, last }: LegacyMessageBubbleProps) {
   const dto = legacyToDto(message);
   return (
     <MessageRenderer
@@ -1262,6 +1274,7 @@ export function LegacyMessageBubble({ message, conversationId, onReactionUpdate,
       onDelete={onDelete}
       onForward={onForward ? (msg) => onForward(message) : undefined}
       first={first}
+      last={last}
     />
   );
 }

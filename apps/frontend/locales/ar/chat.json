@@ -41,7 +41,7 @@
     "audioAttachmentReady": "المرفق الصوتي جاهز"
   },
   "composer": {
-    "placeholder": "اكتب رسالة...",
+    "placeholder": "رسالة",
     "typeSomething": "اكتب شيئاً...",
     "sendMessage": "إرسال الرسالة",
     "attachFile": "إرفاق ملف",
@@ -283,7 +283,7 @@
     }
   },
   "list": {
-    "inbox": "صندوق الوارد",
+    "inbox": "الدردشات",
     "all": "الكل",
     "unread": "غير مقروءة",
     "mine": "محادثاتي",
@@ -304,7 +304,8 @@
     "snoozedUntil": "مؤجلة · {{time}}",
     "noMatch": "لا توجد محادثات مطابقة",
     "noMatchSub": "جرّب عامل تصفية آخر أو امسح البحث.",
-    "chatOptions": "خيارات المحادثة"
+    "chatOptions": "خيارات المحادثة",
+    "search": "بحث"
   },
   "header": {
     "resolve": "إنهاء",
@@ -316,7 +317,8 @@
     "aiGlobalOn": "الذكاء يرد",
     "aiGlobalOff": "الذكاء متوقف",
     "assignedTo": "مُسندة إلى {{name}}",
-    "more": "المزيد"
+    "more": "المزيد",
+    "tapForInfo": "اضغط لعرض معلومات جهة الاتصال"
   },
   "panel": {
     "conversation": "المحادثة",

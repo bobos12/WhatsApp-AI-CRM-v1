@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
-  Pin, PinOff, Clock, BellOff, Bookmark, X as XIcon, SlidersHorizontal, ChevronDown, Inbox, SearchX,
+  Pin, PinOff, Clock, BellOff, Bookmark, X as XIcon, MoreHorizontal, ChevronDown, Inbox, SearchX,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSession } from 'next-auth/react';
@@ -44,6 +44,19 @@ function useDismiss(open: boolean, onClose: () => void) {
     return () => { document.removeEventListener('mousedown', down); document.removeEventListener('keydown', key); };
   }, [open, onClose]);
   return ref;
+}
+
+/** Sent / delivered / read ticks ahead of the last-message preview. */
+function ListTick({ status }: { status?: string }) {
+  if (!status || status === 'RECEIVED' || status === 'PROCESSED') return null;
+  if (status === 'FAILED') return <span className="me-1 text-red-500" aria-label="Failed">!</span>;
+  const double = status === 'DELIVERED' || status === 'READ';
+  return (
+    <svg viewBox={double ? '0 0 20 11' : '0 0 16 11'} className={cn('me-1 inline-block h-[11px] w-auto align-[-1px]', status === 'READ' ? 'text-[rgb(var(--wa-tick))]' : 'text-ink-3')} fill="currentColor" aria-hidden="true">
+      {double && <path d="M15.071.653a.75.75 0 0 1 .025 1.06L9.196 8.1 7.12 6.079a.75.75 0 1 0-1.06 1.072L8.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />}
+      <path d="M11.071.653a.75.75 0 0 1 .025 1.06L5.196 8.1 3.12 6.079a.75.75 0 1 0-1.06 1.072L4.67 9.76a.75.75 0 0 0 1.072-.012l6.389-6.889a.75.75 0 0 0-1.061-1.206z" />
+    </svg>
+  );
 }
 
 /**
@@ -307,29 +320,28 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
     const filtersRef = useDismiss(filtersOpen, closeFilters);
     const closeRowMenu = useCallback(() => setRowMenu(null), []);
     const rowMenuRef = useDismiss(rowMenu !== null, closeRowMenu);
-    const totalUnread = sorted.reduce((n, c) => n + ((c.unreadCount ?? 0) > 0 ? 1 : 0), 0);
+    const holdRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean; x: number; y: number }>({ timer: null, fired: false, x: 0, y: 0 });
 
     const menuItem = 'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[13px] text-ink-2 hover:bg-raised hover:text-ink';
 
     return (
       <div className="flex h-full flex-col bg-surface">
-        {/* ── Header ── */}
-        <div className="box-content flex h-14 shrink-0 items-center justify-between gap-2 px-4 pt-safe">
-          <h1 className="flex items-center gap-2 text-base font-semibold tracking-[-0.01em] text-ink">
+        {/* ── Header: WhatsApp's large "Chats" title ── */}
+        <div className="flex shrink-0 items-end justify-between gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] md:pt-4">
+          <h1 className="text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink md:text-[22px]">
             {t('list.inbox')}
-            {totalUnread > 0 && <span className="chip chip-brand tabular-nums">{totalUnread}</span>}
           </h1>
-          <div className="relative" ref={filtersRef}>
+          <div className="relative mb-1" ref={filtersRef}>
             <button
               type="button"
               onClick={() => setFiltersOpen((v) => !v)}
               aria-expanded={filtersOpen}
               aria-label={t('list.filters')}
               title={t('list.filters')}
-              className={cn('btn btn-ghost btn-icon btn-sm relative', (filtersOpen || filterCount > 0) && 'bg-raised text-ink')}
+              className="press relative flex h-9 w-9 items-center justify-center rounded-full bg-[rgb(var(--wa-glass))] text-ink transition-opacity hover:opacity-80"
             >
-              <SlidersHorizontal aria-hidden="true" />
-              {filterCount > 0 && <span className="absolute end-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />}
+              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+              {filterCount > 0 && <span className="absolute end-0 top-0 h-2.5 w-2.5 rounded-full bg-[rgb(var(--wa-badge))] ring-2 ring-surface" aria-hidden="true" />}
             </button>
             <AnimatePresence>
               {filtersOpen && (
@@ -409,19 +421,25 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
         </div>
 
         {/* ── Search + quick chips ── */}
-        <div className="shrink-0 space-y-2.5 px-3 pb-2.5">
-          <SearchField value={search} onChange={setSearch} placeholder={t('searchPlaceholder')} inputClassName="h-10 rounded-full border-transparent bg-raised hover:border-transparent focus:border-line focus:bg-surface" />
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+        <div className="shrink-0 space-y-3 px-4 pb-2">
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={t('list.search')}
+            className="[&>svg]:start-3 [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:text-ink-3"
+            inputClassName="h-10 rounded-full border-transparent bg-raised ps-10 text-[16px] text-ink placeholder:text-ink-3 hover:border-transparent focus:border-transparent focus:shadow-none focus:ring-0 md:h-9 md:text-[15px]"
+          />
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 scrollbar-none">
             {chips.map((c) => (
               <button
                 key={c.key}
                 type="button"
                 onClick={() => selectChip(c.key)}
                 className={cn(
-                  'h-8 shrink-0 rounded-full border px-3.5 text-[13px] font-medium transition-colors duration-fast',
+                  'press h-8 shrink-0 rounded-full px-3.5 text-[15px] font-medium transition-colors duration-fast md:text-[14px]',
                   activeChip === c.key
-                    ? 'border-transparent bg-brand-soft text-brand-strong dark:text-[#D9FDD3]'
-                    : 'border-line-strong text-ink-3 hover:bg-raised hover:text-ink',
+                    ? 'bg-[rgb(var(--wa-chip-on))] text-[rgb(var(--wa-chip-on-ink))]'
+                    : 'bg-[rgb(var(--wa-chip))] text-[rgb(var(--wa-chip-ink))] hover:text-ink',
                 )}
               >
                 {c.label}
@@ -445,7 +463,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
         </div>
 
         {/* ── Rows ── own scroll; reserves the phone tab bar's footprint (0 on sm+). */}
-        <div className="flex-1 overflow-y-auto px-2 pb-[var(--bottom-nav-space)]">
+        <div className="flex-1 overflow-y-auto pb-[var(--bottom-nav-space)]">
           {loading && sorted.length === 0 && <ConversationListSkeleton />}
 
           {!loading && sorted.length === 0 && (
@@ -471,60 +489,81 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
                 assigneeName,
               ].filter(Boolean).join(' · ');
               const showUnread = unread > 0 && !selected;
+              // Ticks before the preview when we sent the last message, as in
+              // WhatsApp — only while the included message is still the latest.
+              const lastMsg = (conv as any).messages?.[0] as { fromMe?: boolean; status?: string; timestamp?: string } | undefined;
+              const lastIsOurs = !!lastMsg?.fromMe && (!conv.lastMessageAt || !lastMsg.timestamp
+                || Math.abs(new Date(lastMsg.timestamp).getTime() - new Date(conv.lastMessageAt).getTime()) < 3000);
 
               return (
                 <li key={conv.id} className="relative">
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => onSelect(conv.id)}
+                    onClick={() => { if (holdRef.current.fired) { holdRef.current.fired = false; return; } onSelect(conv.id); }}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(conv.id); } }}
+                    // Press-and-hold (or right-click) opens the chat options, as in WhatsApp.
+                    onContextMenu={(e) => { e.preventDefault(); setRowMenu(conv.id); }}
+                    onPointerDown={(e) => {
+                      if (e.pointerType !== 'touch') return;
+                      const h = holdRef.current;
+                      h.fired = false; h.x = e.clientX; h.y = e.clientY;
+                      if (h.timer) clearTimeout(h.timer);
+                      h.timer = setTimeout(() => {
+                        h.timer = null; h.fired = true;
+                        try { navigator.vibrate?.(12); } catch { /* unsupported */ }
+                        setRowMenu(conv.id);
+                      }, 450);
+                    }}
+                    onPointerMove={(e) => {
+                      const h = holdRef.current;
+                      if (h.timer && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 10) { clearTimeout(h.timer); h.timer = null; }
+                    }}
+                    onPointerUp={() => { const h = holdRef.current; if (h.timer) { clearTimeout(h.timer); h.timer = null; } }}
+                    onPointerCancel={() => { const h = holdRef.current; if (h.timer) { clearTimeout(h.timer); h.timer = null; } }}
                     aria-current={selected ? 'true' : undefined}
                     className={cn(
-                      'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-3 text-start outline-none transition-colors duration-fast focus-visible:bg-raised',
-                      selected ? 'bg-raised' : 'hover:bg-raised/70',
+                      'group flex w-full cursor-pointer items-center gap-3 ps-4 text-start outline-none transition-colors duration-fast focus-visible:bg-raised active:bg-raised',
+                      selected ? 'bg-raised' : 'md:hover:bg-raised/60',
                     )}
                   >
-                    <div className="relative shrink-0">
-                      <Avatar src={contact.customFields?.avatarUrl} name={displayName} contactId={contact.id} size={48} />
+                    <div className="relative shrink-0 py-2.5">
+                      <Avatar src={contact.customFields?.avatarUrl} name={displayName} contactId={contact.id} size={52} silhouette />
                       {isSnoozed && (
-                        <span className="absolute -bottom-0.5 -end-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-surface">
+                        <span className="absolute bottom-2 -end-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-amber-500 ring-2 ring-surface">
                           <BellOff className="h-2.5 w-2.5 text-white" aria-hidden="true" />
                         </span>
                       )}
                     </div>
 
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 self-stretch border-b border-line py-2.5 pe-4">
                       <div className="flex items-baseline gap-2">
-                        <span className={cn('min-w-0 flex-1 truncate text-[15px] text-ink', showUnread ? 'font-semibold' : 'font-normal')}>
+                        <span className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 text-ink md:text-[16px]">
                           {displayName.startsWith('+') ? <span dir="ltr">{displayName}</span> : <bdi>{displayName}</bdi>}
                         </span>
                         {conv.lastMessageAt && (
-                          <span className={cn('shrink-0 text-xs tabular-nums', showUnread ? 'font-medium text-brand' : 'text-ink-3')}>
+                          <span className={cn('shrink-0 text-[14px] tabular-nums md:text-[12.5px]', showUnread ? 'text-[rgb(var(--wa-badge))]' : 'text-ink-3')}>
                             {formatListTime(conv.lastMessageAt, locale, t('window.yesterday'))}
                           </span>
                         )}
                       </div>
 
-                      <div className="mt-0.5 flex items-center gap-2">
+                      <div className="flex items-start gap-2">
                         {isTyping ? (
-                          <span className="flex min-w-0 flex-1 items-center gap-1 text-[13px] font-medium text-brand">
+                          <span className="min-w-0 flex-1 truncate text-[15px] leading-5 text-[rgb(var(--wa-badge))] md:text-[14px]">
                             {t('window.typing')}
-                            <span className="inline-flex gap-0.5" aria-hidden="true">
-                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:0ms]" />
-                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:150ms]" />
-                              <span className="h-1 w-1 animate-bounce rounded-full bg-brand [animation-delay:300ms]" />
-                            </span>
                           </span>
                         ) : (
-                          <span className={cn('min-w-0 flex-1 truncate text-[13.5px]', showUnread ? 'text-ink-2' : 'text-ink-3')}>
+                          <span className="line-clamp-2 min-w-0 flex-1 text-[15px] leading-5 text-ink-3 md:line-clamp-1 md:text-[14px]">
+                            {lastIsOurs && <ListTick status={lastMsg?.status} />}
                             <bdi>{(conv.lastMessagePreview ?? conv.lastMessage) || t('window.noMessages')}</bdi>
                           </span>
                         )}
-                        <span className="flex shrink-0 items-center gap-1">
-                          {conv.isPinned && <Pin className="h-3.5 w-3.5 rotate-45 text-ink-4" aria-hidden="true" />}
+                        <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                          {isSnoozed && <BellOff className="h-4 w-4 text-ink-4" aria-hidden="true" />}
+                          {conv.isPinned && <Pin className="h-4 w-4 rotate-45 fill-current text-ink-4" aria-hidden="true" />}
                           {showUnread && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold tabular-nums text-brand-fg">
+                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgb(var(--wa-badge))] px-1.5 text-[12px] font-semibold tabular-nums text-[rgb(var(--wa-badge-ink))]">
                               {unread > 99 ? '99+' : unread}
                             </span>
                           )}
@@ -535,7 +574,7 @@ const ConversationList = forwardRef<ConversationListHandle, ConversationListProp
                             onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === conv.id ? null : conv.id); }}
                             className={cn(
                               'flex h-5 w-5 items-center justify-center overflow-hidden rounded text-ink-3 transition-all duration-fast hover:text-ink',
-                              '[@media(hover:hover)]:w-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:w-5 [@media(hover:hover)]:group-hover:opacity-100',
+                              'w-0 opacity-0 group-hover:w-5 group-hover:opacity-100 [@media(hover:none)]:hidden',
                               rowMenu === conv.id && '!w-5 !opacity-100',
                             )}
                           >

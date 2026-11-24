@@ -1441,6 +1441,90 @@ html[dir="rtl"] .grow-x { transform-origin: right; }
   }
 }
 
+/* ─── WhatsApp skin (inbox only) ──────────────────────────────────────────
+   The inbox is meant to be indistinguishable from WhatsApp, so `.wa` re-points
+   the product tokens at WhatsApp's own palette (dark values sampled from the
+   iOS app) for everything inside it. The rest of the CRM keeps its brand.
+   --wa-* extras are global so message bubbles rendered elsewhere still work. */
+:root {
+  --wa-header: 246 246 246;
+  --wa-bar: 246 246 246;
+  --wa-input: 255 255 255;
+  --wa-chip: 240 242 245;
+  --wa-chip-ink: 84 101 111;
+  --wa-chip-on: 217 253 211;
+  --wa-chip-on-ink: 21 96 62;
+  --wa-glass: 233 233 235;
+  --wa-meta-in: 102 119 129;
+  --wa-meta-out: 102 119 129;
+  --wa-quote-in: 0 0 0 / 0.045;
+  --wa-quote-out: 0 0 0 / 0.055;
+  --wa-tick: 83 189 235;
+  --wa-badge: 37 211 102;
+  --wa-badge-ink: 255 255 255;
+  --wa-mic: 29 170 97;
+  --wa-mic-ink: 255 255 255;
+  --wa-date: 255 255 255;
+}
+html.dark {
+  --wa-header: 19 19 19;
+  --wa-bar: 16 16 16;
+  --wa-input: 40 40 40;
+  --wa-chip: 23 23 23;
+  --wa-chip-ink: 144 144 144;
+  --wa-chip-on: 67 68 70;
+  --wa-chip-on-ink: 255 255 255;
+  --wa-glass: 48 48 48;
+  --wa-meta-in: 175 177 176;
+  --wa-meta-out: 162 183 175;
+  --wa-quote-in: 0 0 0 / 0.22;
+  --wa-quote-out: 14 61 43 / 1;
+  --wa-tick: 83 189 235;
+  --wa-badge: 33 192 99;
+  --wa-badge-ink: 10 10 10;
+  --wa-mic: 250 250 250;
+  --wa-mic-ink: 10 10 10;
+  --wa-date: 36 38 37;
+}
+.wa {
+  --surface: 255 255 255;
+  --raised: 240 242 245;
+  --overlay: 233 237 239;
+  --line: 233 237 239;
+  --line-strong: 209 215 219;
+  --ink: 17 27 33;
+  --ink-2: 59 74 84;
+  --ink-3: 102 119 129;
+  --ink-4: 134 150 160;
+  --brand: 29 170 97;
+  --brand-strong: 21 128 72;
+  --brand-fg: 255 255 255;
+  --brand-soft: 217 253 211;
+  --chat-bg: 239 234 226;
+  --bubble-out: 217 253 211;
+  --bubble-in: 255 255 255;
+}
+html.dark .wa {
+  --surface: 10 10 10;
+  --raised: 34 34 34;
+  --overlay: 44 44 44;
+  --line: 28 28 28;
+  --line-strong: 52 52 52;
+  --ink: 250 250 250;
+  --ink-2: 222 222 222;
+  --ink-3: 139 139 139;
+  --ink-4: 104 104 104;
+  --brand: 33 192 99;
+  --brand-strong: 37 211 102;
+  --brand-fg: 10 10 10;
+  --brand-soft: 16 53 41;
+  --chat-bg: 10 10 10;
+  --bubble-out: 23 76 56;
+  --bubble-in: 36 38 37;
+}
+.wa .chat-doodle { opacity: 0.07; }
+html.dark .wa .chat-doodle { opacity: 0.075; }
+
 /* ─── Conversation canvas ─────────────────────────────────────────────────
    A faint doodle texture behind messages: the cue that says "this is a chat"
    to anyone who has used WhatsApp, drawn in the ink colour at low opacity so it

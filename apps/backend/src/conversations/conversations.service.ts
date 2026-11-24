@@ -66,7 +66,9 @@ export async function enrichContactAvatar(contact: any) {
   if (!contact?.id) return contact;
   const customFields = (contact.customFields as Record<string, unknown> | null | undefined) || {};
   const fetchedAt = typeof customFields.avatarUrlAt === 'number' ? customFields.avatarUrlAt : 0;
-  const isFresh = Boolean(customFields.avatarUrl) && Date.now() - fetchedAt < AVATAR_TTL_MS;
+  // Fresh means "checked recently", photo or not — Meta never returns one, so
+  // requiring a URL here re-wrote the contact on every chat open.
+  const isFresh = Date.now() - fetchedAt < AVATAR_TTL_MS;
   if (isFresh) return contact;
 
   // Refresh in the BACKGROUND and return immediately.
