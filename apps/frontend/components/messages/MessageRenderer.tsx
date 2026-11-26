@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronDown, Copy, Forward, Reply, Smile, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type {
   MessageDTO,
   RenderableBlock,
@@ -59,6 +60,13 @@ function deriveMediaType(type?: string, mime?: string): Media['mediaType'] {
 }
 
 const GENERIC_LABELS = new Set(['IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT']);
+
+/** Meta's failure reason in the UI language. The stored text ends in "(code)"; older rows carry English only. */
+function failReasonText(raw: string, t: TFunction): string {
+  const code = raw.match(/\((\d{5,6})\)\s*$/)?.[1] ?? (/24 hours/i.test(raw) ? '131047' : null);
+  if (!code) return t('message.failReason.unknown');
+  return t(`message.failReason.${code}`, { defaultValue: t('message.failReason.generic', { code }) });
+}
 
 export function legacyToDto(msg: LegacyMessage): MessageDTO & { _reactions?: LegacyReaction[] } {
   const isOutbound = msg.senderType === 'agent' || msg.fromMe || msg.direction === 'OUTBOUND';
@@ -1160,7 +1168,7 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
                 <span className="min-w-0">
                   {t('message.failedToSend')}
                   {message.meta?.errorReason && (
-                    <span dir="auto" className="mt-0.5 block break-words font-normal opacity-90">{message.meta.errorReason}</span>
+                    <span dir="auto" title={message.meta.errorReason} className="mt-0.5 block break-words font-normal opacity-90">{failReasonText(message.meta.errorReason, t)}</span>
                   )}
                 </span>
               </div>
