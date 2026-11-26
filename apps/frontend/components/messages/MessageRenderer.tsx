@@ -32,6 +32,7 @@ export interface LegacyMessage {
   mediaDuration?: number | null;
   timestamp: string;
   status?: string;
+  errorReason?: string | null;
   replyToId?: string | null;
   replyToBody?: string | null;
   reactions?: LegacyReaction[];
@@ -92,7 +93,7 @@ export function legacyToDto(msg: LegacyMessage): MessageDTO & { _reactions?: Leg
         meta: {
           sequenceNumber: 0,
           origin: null,
-          errorReason: null,
+          errorReason: msg.errorReason ?? null,
           errorCode: null,
           compatibilityMode: 'baileys_native',
           timestamps: {},
@@ -168,7 +169,7 @@ export function legacyToDto(msg: LegacyMessage): MessageDTO & { _reactions?: Leg
     meta: {
       sequenceNumber: 0,
       origin: null,
-      errorReason: null,
+      errorReason: msg.errorReason ?? null,
       errorCode: null,
       compatibilityMode: 'baileys_native',
       timestamps: {},
@@ -1154,9 +1155,14 @@ export function MessageRenderer({ message, reactions: reactionsProp = [], conver
             </div>
 
             {status === 'failed' && isFromMe && (
-              <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400">
+              <div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400">
                 <span aria-hidden="true">!</span>
-                <span>{t('message.failedToSend')}</span>
+                <span className="min-w-0">
+                  {t('message.failedToSend')}
+                  {message.meta?.errorReason && (
+                    <span dir="auto" className="mt-0.5 block break-words font-normal opacity-90">{message.meta.errorReason}</span>
+                  )}
+                </span>
               </div>
             )}
 

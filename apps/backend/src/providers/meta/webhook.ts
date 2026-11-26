@@ -393,6 +393,8 @@ async function applyStatus(status: MetaStatus): Promise<void> {
 
   const error = status.errors?.[0];
   const at = status.timestamp ? new Date(Number(status.timestamp) * 1000) : new Date();
+  const errorText = error?.error_data?.details || error?.title || error?.message || 'Delivery failed';
+  const errorReason = (error?.code ? `${errorText} (${error.code})` : errorText).slice(0, 500);
 
   await prisma.message.update({
     where: { id: message.id },
@@ -401,7 +403,7 @@ async function applyStatus(status: MetaStatus): Promise<void> {
       ...(next === MsgStatus.DELIVERED ? { deliveredAt: at } : {}),
       ...(next === MsgStatus.READ ? { readAt: at, deliveredAt: at } : {}),
       ...(isFailure
-        ? { errorReason: error?.error_data?.details || error?.title || error?.message || 'Delivery failed' }
+        ? { errorReason }
         : {}),
       // Billing arrives on the first status of a conversation and never again,
       // so it is captured whenever present rather than only on a chosen status.
@@ -415,7 +417,7 @@ async function applyStatus(status: MetaStatus): Promise<void> {
     messageId: message.id,
     conversationId: message.conversationId,
     status: next,
-    ...(isFailure ? { error: error?.title ?? 'Delivery failed' } : {}),
+    ...(isFailure ? { error: errorReason } : {}),
   });
 
   await applyCampaignStatus(status.id, next, at, error?.code ?? null);

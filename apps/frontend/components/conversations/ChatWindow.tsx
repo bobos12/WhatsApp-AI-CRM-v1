@@ -686,14 +686,14 @@ export default function ChatWindow({ conversationId, recipientContacts = [], onC
     });
   }, [conversationId]));
 
-  useSocket('message:status', useCallback((data: { conversationId: string; messageId: string; status: string }) => {
+  useSocket('message:status', useCallback((data: { conversationId: string; messageId: string; status: string; error?: string }) => {
     if (data.conversationId !== conversationId) return;
     setConversation((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         messages: prev.messages?.map((m) =>
-          m.id === data.messageId ? { ...m, status: data.status as any } : m
+          m.id === data.messageId ? { ...m, status: data.status as any, ...(data.error ? { errorReason: data.error } : {}) } : m
         ),
       };
     });
