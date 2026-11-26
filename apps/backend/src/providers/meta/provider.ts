@@ -73,6 +73,59 @@ async function headerMediaId(
   return upload;
 }
 
+/**
+ * Phone numbers on the tenant's WABA, keyed by phone_number_id. A WABA can hold
+ * several numbers and the webhook delivers messages for all of them, so a
+ * customer may be talking to a number other than the connected one.
+ */
+const WABA_NUMBERS_TTL_MS = 10 * 60 * 1000;
+const wabaNumbersCache = new Map<string, { numbers: Map<string, string | null>; at: number }>();
+
+async function wabaNumbers(cloud: CloudApiConfig): Promise<Map<string, string | null>> {
+  if (!cloud.wabaId) return new Map();
+  const hit = wabaNumbersCache.get(cloud.wabaId);
+  if (hit && Date.now() - hit.at < WABA_NUMBERS_TTL_MS) return hit.numbers;
+  const numbers = new Map<string, string | null>();
+  try {
+    const res = await graphRequest<{ data?: Array<{ id: string; display_phone_number?: string }> }>({
+      path: `/${cloud.wabaId}/phone_numbers?fields=id,display_phone_number`,
+      accessToken: cloud.accessToken,
+    });
+    for (const n of res?.data ?? []) {
+      numbers.set(String(n.id), n.display_phone_number ? normalizePhone(n.display_phone_number) ?? n.display_phone_number : null);
+    }
+  } catch (err) {
+    logger.warn('meta.waba_numbers_failed', { error: err instanceof Error ? err.message : String(err) });
+    // Keep a stale list rather than none; retry soon either way.
+    if (hit) return hit.numbers;
+  }
+  wabaNumbersCache.set(cloud.wabaId, { numbers, at: Date.now() });
+  return numbers;
+}
+
+/**
+ * Reply from the number the customer last wrote to. Meta's 24h window is per
+ * business number: replying from the connected number to someone who messaged a
+ * sibling number on the same WABA fails with 131047, while templates still pass.
+ */
+async function senderFor(cloud: CloudApiConfig, phone: string, conversationId?: string): Promise<CloudApiConfig> {
+  const lastInbound = await prisma.message.findFirst({
+    where: {
+      fromMe: false,
+      ...(conversationId ? { conversationId } : { phone: { in: [phone, phone.replace(/\D/g, '')] } }),
+    },
+    orderBy: { timestamp: 'desc' },
+    select: { sessionId: true },
+  }).catch(() => null);
+
+  const id = lastInbound?.sessionId;
+  if (!id || id === cloud.phoneNumberId || !/^\d+$/.test(id)) return cloud;
+
+  const numbers = await wabaNumbers(cloud);
+  if (!numbers.has(id)) return cloud;
+  return { ...cloud, phoneNumberId: id, displayPhoneNumber: numbers.get(id) ?? cloud.displayPhoneNumber };
+}
+
 export class MetaWhatsAppProvider implements MessagingProvider {
   readonly name: ProviderName = 'meta';
 
@@ -200,12 +253,11 @@ export class MetaWhatsAppProvider implements MessagingProvider {
   // ── Send ───────────────────────────────────────────────────────────────────
 
   async sendMessage(input: SendMessageInput): Promise<{ messageId: string }> {
-    const cloud = await this.config();
-
     const phone = normalizePhone(input.phone);
     if (!phone) throw new HttpError(400, 'Invalid phone number');
     // Meta wants digits only, no leading '+'.
     const to = phone.replace(/\D/g, '');
+    const cloud = await senderFor(await this.config(), phone, input.conversationId);
 
     // Resolve the reply target once; both the Graph payload and the persisted
     // row need it.
@@ -599,7 +651,7 @@ export class MetaWhatsAppProvider implements MessagingProvider {
     _fromMe: boolean,
     emoji: string,
   ): Promise<void> {
-    const cloud = await this.config();
+    const cloud = await senderFor(await this.config(), normalizePhone(phone) ?? phone);
     try {
       await graphRequest({
         path: `/${cloud.phoneNumberId}/messages`,
